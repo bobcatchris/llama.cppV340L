@@ -244,7 +244,7 @@
 typedef __hip_bfloat16 nv_bfloat16;
 typedef __hip_bfloat162 nv_bfloat162;
 
-#if HIP_VERSION >= 60200000
+#if HIP_VERSION >= 60200000 && (defined(__gfx942__) || defined(__gfx950__))
 #include <hip/hip_fp8.h>
 typedef __hip_fp8_e4m3 __nv_fp8_e4m3;
 #define FP8_AVAILABLE
