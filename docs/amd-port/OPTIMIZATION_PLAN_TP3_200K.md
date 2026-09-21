@@ -572,3 +572,13 @@ to Gemini's guard battery, die 3 is the dev cell.
   queued on the Gemini lane AFTER T4 (same protocol class: env-unset GREEN
   -> byte-identical determinism gate -> census launch counts -> 3-rep
   OFF/ON A/B, promote >= +2%; MAX_ROWS=384 sweep for attn k/v pairs).
+- E-026 2026-09-21 PRIORITY CORRECTION (Chris): activated MTP typically
+  costs OVER 2 GB PER DEVICE - the TP2 feasibility desk's hypothesis is
+  updated accordingly: the analytic ~202 MiB/die figure (weights+KV slice)
+  is a LOWER BOUND; the true cost likely lives in the draft context's
+  compute/logits buffers and pool allocations, ALL of which
+  --spec-mtp-device should relocate. Desk instructed to measure the true
+  per-device MTP VRAM cost first (MTP off vs on), then the flag's savings.
+  If >2 GB/device confirms, the serving-die savings at TP2/200k are
+  ~10x the historical 151 MiB shortfall - TP2+MTP@200k becomes
+  comfortably viable, and TP3 gains ~2 GB/die of context headroom.
