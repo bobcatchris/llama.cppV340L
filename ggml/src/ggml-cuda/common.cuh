@@ -1388,6 +1388,120 @@ struct ggml_cuda_stream_context {
     }
 };
 
+// Reuses the q8_1 quantization of an activation across the vec-q matmuls that
+// consume the same src1 within one graph compute (GGML_CUDA_Q81_ACT_CACHE=1).
+// The key carries the producing tensor node so a buffer address recycled by the
+// graph allocator for a different tensor within the same compute cannot hit.
+// Entries are dropped at the start of every graph compute, so they never span
+// two computes and never outlive the compute buffer their src1 lives in.
+struct ggml_cuda_q81_act_cache {
+    struct key {
+        const ggml_tensor * node;   // src1 producing node (guards recycled addresses)
+        const void *        data;   // src1 device pointer
+        cudaStream_t        stream; // stream the q8_1 was produced on
+        int                 device;
+        int64_t ne10, ne11, ne12, ne13;
+        int64_t s11, s12, s13;      // src1 row strides in elements
+
+        bool operator==(const key & other) const {
+            return node == other.node && data == other.data && stream == other.stream && device == other.device
+                && ne10 == other.ne10 && ne11 == other.ne11 && ne12 == other.ne12 && ne13 == other.ne13
+                && s11 == other.s11 && s12 == other.s12 && s13 == other.s13;
+        }
+    };
+
+    struct hash {
+        size_t operator()(const key & k) const {
+            size_t h = (size_t) (uintptr_t) k.node;
+            h = h*31 + (size_t) (uintptr_t) k.data;
+            h = h*31 + (size_t) (uintptr_t) k.stream;
+            h = h*31 + (size_t) (k.device
+                + k.ne10*7 + k.ne11*13 + k.ne12*29 + k.ne13*53
+                + k.s11*11 + k.s12*17 + k.s13*23);
+            return h;
+        }
+    };
+
+    struct entry {
+        void * buf = nullptr;        // q8_1 data, layout of quantize_row_q8_1_cuda
+        size_t buf_size = 0;         // actual pool allocation size of buf
+        ggml_cuda_pool * pool = nullptr;
+    };
+
+    // decode activations are a few KB; the cap only guards large prefill batches
+    static constexpr size_t max_total_bytes = 64ull*1024*1024;
+
+    bool active = false;
+    size_t total_bytes = 0;
+    int64_t n_begins = 0;
+    int64_t n_hits = 0;
+    int64_t n_misses = 0;
+
+    std::unordered_map<key, entry, hash> entries;
+
+    static key make_key(const ggml_tensor * src1, int device, cudaStream_t stream) {
+        return {src1, src1->data, stream, device,
+            src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3],
+            (int64_t) (src1->nb[1]/sizeof(float)),
+            (int64_t) (src1->nb[2]/sizeof(float)),
+            (int64_t) (src1->nb[3]/sizeof(float))};
+    }
+
+    static size_t nbytes(const ggml_tensor * src1) {
+        return ggml_nrows(src1)*GGML_PAD(src1->ne[0], MATRIX_ROW_PADDING) * sizeof(block_q8_1)/QK8_1;
+    }
+
+    // only tensors with a producing node may share a cached quantization; this
+    // excludes synthetic src1 tensors such as the mul_mat_id scratch slices
+    static bool cacheable(const ggml_tensor * src1) {
+        return src1->op != GGML_OP_NONE;
+    }
+
+    void begin_compute(bool enable) {
+        if (enable && ++n_begins % 256 == 0) {
+            GGML_LOG_INFO("%s: %lld hits / %lld misses over %lld computes\n",
+                          __func__, (long long) n_hits, (long long) n_misses, (long long) n_begins);
+        }
+        active = enable;
+        clear();
+    }
+
+    void clear() {
+        for (auto & it : entries) {
+            it.second.pool->free(it.second.buf, it.second.buf_size);
+        }
+        entries.clear();
+        total_bytes = 0;
+    }
+
+    // returns nullptr when the cache is disabled (no side effects, no counters)
+    const entry * find(const key & k) {
+        if (!active) {
+            return nullptr;
+        }
+        const auto it = entries.find(k);
+        if (it == entries.end()) {
+            n_misses++;
+            return nullptr;
+        }
+        n_hits++;
+        return &it->second;
+    }
+
+    // returns the slot to quantize into, or nullptr when disabled or over budget
+    entry * insert(const key & k, size_t nbytes_alloc, ggml_cuda_pool & pool) {
+        if (!active || total_bytes + nbytes_alloc > max_total_bytes) {
+            return nullptr;
+        }
+        GGML_ASSERT(entries.find(k) == entries.end()); // call sites check find() first
+        entry e;
+        e.buf       = pool.alloc(nbytes_alloc, &e.buf_size);
+        e.pool      = &pool;
+        total_bytes += e.buf_size;
+        return &entries.emplace(k, e).first->second;
+    }
+};
+
 struct ggml_backend_cuda_context {
     int device;
     std::string name;
@@ -1456,6 +1570,8 @@ struct ggml_backend_cuda_context {
     }
 
     ggml_cuda_stream_context concurrent_stream_context;
+
+    ggml_cuda_q81_act_cache q81_act_cache;
 
     ~ggml_backend_cuda_context();
 

@@ -1183,12 +1183,29 @@ void ggml_cuda_mul_mat_vec_q(
     }
 
     const int64_t ne10_padded = GGML_PAD(ne10, MATRIX_ROW_PADDING);
-    ggml_cuda_pool_alloc<char> src1_q8_1(ctx.pool(), ne13*ne12 * ne11*ne10_padded * sizeof(block_q8_1)/QK8_1);
+    const size_t src1_q8_1_nbytes = ne13*ne12 * ne11*ne10_padded * sizeof(block_q8_1)/QK8_1;
+
+    // GGML_CUDA_Q81_ACT_CACHE: matmuls that share the same src1 within one graph
+    // compute share one q8_1 quantization of it; mul_mat_id is excluded because its
+    // src1 is a per-call scratch buffer
+    char * src1_q8_1_d = nullptr;
+    ggml_cuda_pool_alloc<char> src1_q8_1(ctx.pool());
+    if (ids == nullptr && ggml_cuda_q81_act_cache::cacheable(src1)) {
+        const ggml_cuda_q81_act_cache::key q81_key = ggml_cuda_q81_act_cache::make_key(src1, ctx.device, stream);
+        if (const ggml_cuda_q81_act_cache::entry * q81_hit = ctx.q81_act_cache.find(q81_key)) {
+            src1_q8_1_d = (char *) q81_hit->buf;
+        } else if (ggml_cuda_q81_act_cache::entry * q81_slot = ctx.q81_act_cache.insert(q81_key, src1_q8_1_nbytes, ctx.pool())) {
+            src1_q8_1_d = (char *) q81_slot->buf;
+        }
+    }
+    if (src1_q8_1_d == nullptr) {
+        src1_q8_1_d = src1_q8_1.alloc(src1_q8_1_nbytes);
+    }
     {
         const int64_t s11 = src1->nb[1] / ts_src1;
         const int64_t s12 = src1->nb[2] / ts_src1;
         const int64_t s13 = src1->nb[3] / ts_src1;
-        quantize_row_q8_1_cuda(src1_d, nullptr, src1_q8_1.get(), src0->type, ne10, s11, s12, s13, ne10_padded, ne11, ne12, ne13, stream);
+        quantize_row_q8_1_cuda(src1_d, nullptr, src1_q8_1_d, src0->type, ne10, s11, s12, s13, ne10_padded, ne11, ne12, ne13, stream);
     }
 
     const int64_t s01 = src0->nb[1] / ts_src0;
@@ -1214,7 +1231,7 @@ void ggml_cuda_mul_mat_vec_q(
     const int64_t ids_stride = ids ? ids->nb[1] / ggml_type_size(ids->type) : 0;
 
     mul_mat_vec_q_switch_type(
-        src0->data, src0->type, src1_q8_1.get(), ids_d, fusion_local, dst_d, ne00,
+        src0->data, src0->type, src1_q8_1_d, ids_d, fusion_local, dst_d, ne00,
         ne01,              ncols_dst,     s01, stride_col_y,     stride_col_dst,
         ne02, nchannels_y, nchannels_dst, s02, stride_channel_y, stride_channel_dst,
         ne03,              ne3,           s03, s13,              s3,               ids_stride, stream);
