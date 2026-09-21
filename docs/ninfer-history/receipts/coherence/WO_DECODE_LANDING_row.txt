@@ -1,0 +1,116 @@
+WO_DECODE_LANDING row — 2026-09-19, desk agent (lane amd/wo-w7-body, worktree
+/home/chris/worktrees/amd-wo-w7-body, window = coordinator-granted, no claim protocol)
+
+BIN: /home/chris/artifacts_bin/ninfer-serve_183da007801e0fb6.bin
+     (bank law: filename = sha256[:16] of binary; built from worktree HEAD 87a7d2caf
+     + Task-1 edit: src/core/multi_gpu/one_shot_allreduce.cu, one env read +
+     one early break before the :1033 cudaStreamSynchronize; NINFER_AR_DEFER_STATUS=1,
+     unset/'0' = byte-identical legacy; strings: env HIT. Banked BEFORE any relink.)
+
+================================================================ TASK 2 (DONE — priced)
+k=3 draft-depth pricing. --draft-tokens IS a runtime dial (src/serve/serve_options.cpp:264;
+tp_engine.cpp:862 refuses only >3 for non-adaptive MTP -> 3 accepted, zero code changes).
+Design: fresh boot per arm, same bin, canonical posture (NO oneshot env — Task-1 arm was
+blocked, see below), 3x counting-prompt mt=600 temp0 conc1 (GATE-R family), engine line
+"[tp2] single-seq lane 0" + "[req N] done". Logs: w7_defer_landing/{K2CTRL,K3PRICE}_serve.log.
+
+  metric            | k=2 (control)          | k=3                    | delta
+  -------------------+------------------------+------------------------+---------
+  acceptance        | 0.96                   | 0.92                   | -0.04
+  tok/round         | 2.91                   | 3.75                   | +28.9%
+  rounds (600 tok)  | 206                    | 160                    | -22%
+  decode wall p1    | 12.15 s                | 13.57 s                |
+  round ms (p1)     | 59.0 ms  (=PLOG-066)   | 84.8 ms                | +43.7%
+  decode t/s p1     | 49.4                   | 44.2                   | -10.5%
+  decode t/s p2/p3  | 48.9 / 43.8            | 33.5 / 30.8 (thermal-  | worse
+                    |                        |   contaminated pairs)  |
+
+VERDICT: k=3 is a LOSS for decode throughput. The decisive pair is probe1 (both arms
+fresh-boot cold): 49.4 -> 44.2 t/s (-10.5%, >> +-2% band). Breakeven needed round <= 76.0 ms
+(3.75/2.91 x 59.0); measured 84.8 ms — the T=3 verify round costs +44% to return +29%
+tok/round (acceptance decays 0.96 -> 0.92 at position 3). Marginal position-3 rate
+(+0.84 tok/ 25.8 ms = 32.6 tok/s) sits BELOW the k=2 mean rate (49.4) -> dilutes.
+Cross-validation: k=2 probe1 reproduces PLOG-066 exactly (2.91 tok/round, acc 0.96,
+59.0 vs 59.2 ms round, 49.4 vs 49.3 t/s). Recommendation: keep --draft-tokens 2.
+
+================================================================ TASK 1 (edit landed; A/B BLOCKED)
+Edit + build + bank: DONE (bin above). Build GREEN (cmake at /home/chris/opt/cmake/bin —
+PATH lacks it; CMakeCache CMAKE_COMMAND is the oracle).
+
+BLOCKER (coordinator-owned, infra law): the W4AR oneshot arm (NINFER_TP_ONESHOT_AR=1)
+cannot complete warmup on this box today — 3 boots / 3 wedges across TWO bins:
+  1. 183da007 + oneshot+sync: SILENT wedge ~22 min in warmup (dies 0/1 100% 61/83 W,
+     2/3 idle; no watchdog fire; clean TERM exit, dies drained 3-9 W).
+  2. 183da007 + oneshot+sync retry: B3 watchdog fired AS DESIGNED — exit 72,
+     kind=2 crossing-heartbeat, matrix: rank0 hb_seq=1 stuck in FIRST crossing
+     2051 ms; rank3 hb_seq=2 done x2; ranks 1/2 hb_seq=0 never arrived; one-shot
+     gen=0 on ALL ranks = the AR never ran; the desync is in warmup ring crossings.
+  3. c618d356 (LKG) + oneshot: SILENT wedge (300 s health timeout, zero watchdog).
+Controls (same morning, same recipe): c618d356 canonical HEALTHY; 183da007 canonical
+HEALTHY (x3 boots: MYBIN_canon, K2CTRL, K3PRICE). Gate-off 4/4 healthy vs gate-on 0/3.
+READ: not my branch, not my edit (dormant at unset; wedges precede any AR call).
+PLOG-049 banked the arm GREEN twice on 09-18 clean-box; box has had boot faults + FLR
+this morning (PLOG-066 INCIDENT 1). Suspicion: the arm's ctor allocations/watchdog
+thread shift warmup timing enough to land the PLOG-050 flaky-warmup-wedge class
+deterministically TODAY; root-look owed. All wedged processes exited CLEAN on SIGTERM
+(no SIGKILL poisoning; idle power verified between boots).
+Task 1 remaining (parity battery >=10 gens byte-compare; paired A/B 3x mt=600 per arm;
+gate >=3% decode t/s within-pair; promote = runbook BIN+env flip + BOOT_BATTERY) fires
+the moment the arm boots. Scripts ready: /tmp/w7_defer/{boot_arm,parity,series600}.sh.
+
+================================================================ TASK 1 A/B RESULTS (gate FAIL; desk closes banked-unpromoted)
+Bracket 1 (ordinal-paired, same window, bin 183da007 both arms; A ran before B —
+box heated monotonically all window, see K2CTRL/ARMCNTLD2/ARMBDEFER probe0 decodes
+12.15 -> 18.33 -> 26.95 s; confounded ORDER, de-confounded by bracket 2):
+  decode t/s   | arm A sync (probe 0/1/2) | arm B defer (0/1/2) | within-pair delta
+  ---------------+--------------------------+---------------------+-------------------
+  p1            | 32.7 (18.33 s, r=222)    | 22.3 (26.95 s)      | -31.8%
+  p2            | 24.6 (24.41 s, r=221)    | 21.6 (27.78 s)      | -12.2%
+  p3            | 23.2 (25.82 s, r=221)    | 20.9 (28.68 s)      | -9.9%
+  acceptance    | 0.85/0.86                | 0.85/0.86 (identical streams) |
+  GATE (>= +3% within-pair): FAIL — B loses on every ordinal. Needed +3%, got -9.9..-31.8%.
+
+PARITY (step-3 cell): GREEN PERFECT — arm B vs arm A byte-identical on 12/12
+parity prompts (temp 0, >=10 gens, mixed classes incl 2x plen-2013 BLUE/GREEN)
+AND 3/3 mt=600 counting responses. The defer edit is exactly equivalent-time:
+same tokens, timing only. Correctness is NOT the blocker.
+
+ARM-vs-CANONICAL context (same bin, same window): canonical ring posture K2CTRL
+probe0 = 12.15 s decode, acc 0.96, tok/round 2.91, 59.0 ms/round (=PLOG-066
+reproduction) vs oneshot+sync ARMCNTLD2 probe0 = 18.33 s, acc 0.85, 2.70,
+82.6 ms/round. The oneshot arm on THIS box today: -34% decode t/s AND -11 pt
+acceptance (ulp-drift greedy token flips — arm outputs differ from canonical
+ring byte-wise; the GATE-T byte-equal question resurfaces on the serving kernel).
+No promotion path exists from this data: even a +3% B-over-A win would still be
+far below canonical, and flipping the runbook would change serving numerics.
+
+Bracket 2 (order-swapped per coordinator, cool-bracketed, no-retry discipline):
+B2 (defer) boot WEDGED at warmup (silent, dies 0/1/2 100%, die 3 idle); A2 (sync)
+boot WEDGED at warmup (B3 watchdog exit 72, kind=2). Two hits = arm UNTESTABLE
+today. CLOSED per coordinator close criteria.
+
+WEDGE LEDGER (all oneshot-arm boots today, both bins): 7 boots, 1 healthy
+(ARMCNTLD2), 6 wedged (silent x4, watchdog-caught x2) — ARMCNTLD b1 silent,
+b2 watchdog-exit72; LKG_oneshot silent; ARMB2 attempt-1 silent; ARMB2 bracket-2
+silent; ARMA2 bracket-2 watchdog-exit72. Canonical-posture boots same day: 4/4
+healthy. All wedged processes exited CLEAN on SIGTERM (no SIGKILL poisoning);
+idle power verified after each (3-9 W/die). SEE REMAINING_ITEMS blocker
+(coordinator: KAR-v2 first-crossing handshake deadlock, pre-dates this desk).
+
+PROVENANCE (F1b containment note): build 08:50 local compiled
+src/runtime/tp2/tp2_backend.cpp at content == HEAD (git status clean then and now;
+the 10:21 local mtime touch is content-identical) => NO d1-fix carry in bin
+183da007; within-bin A/B single-variable-safe regardless.
+
+VERDICT: Task 1 = Branch-B edit LANDED, BUILT, BANKED (183da007801e0fb6), parity
+GREEN — but NOT PROMOTED: A/B gate FAILED (-9.9..-31.8% within-pair, needed +3%),
+and bracket-2 could not re-test (oneshot warmup wedge, coordinator blocker). The
+sync-removal shows NO decode benefit on this box today in its one clean epoch;
+banked-unpromoted behind NINFER_AR_DEFER_STATUS=1 (default byte-identical legacy).
+Re-entry conditions: (1) REMAINING_ITEMS wedge blocker resolved (oneshot arm boots
+reliably), (2) fresh bracketed A/B per this row's design, (3) the arm-vs-canonical
+acceptance/numerics question (GATE-T byte-equal on the serving kernel) answered by
+the W4AR owner BEFORE any promotion consideration — the arm must first not-lose to
+canonical before defer-vs-sync matters.
+
+— desk agent, WO_DECODE_LANDING, close 2026-09-19 ~10:45 CDT

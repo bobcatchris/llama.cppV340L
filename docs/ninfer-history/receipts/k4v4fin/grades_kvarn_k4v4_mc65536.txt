@@ -1,0 +1,34 @@
+=== BOOT OK kvarn_k4v4 mc=65536 cap=65536 04:00:33 ===
+[preflight] required 8065 MiB / usable 8160 MiB (fixed 7363 MiB, context 702 MiB, prefix cap 256, ws 512 MiB, slack 94 MiB; usable=LIVE min-rank)
+[preflight] live-free dev0: 8160 MiB (gate uses the min over the world)
+[preflight] live-free dev1: 8160 MiB (gate uses the min over the world)
+[preflight] live-free dev2: 8160 MiB (gate uses the min over the world)
+[preflight] live-free dev3: 8160 MiB (gate uses the min over the world)
+[preflight] composition/rank: weights(measured-manifest) 5131 + decoder_fixed(incl drafter) 1360 + workspace 512 + staging 200 + arena_padding 160 + tp2_runtime_reserve(bf16,conc>=2) 0 = fixed 7363 | hidden_state(prefix cap 256) 5 + kv(11152 B/t x 65536 tok + mtp 2) 697
+[rank 0] materialized: 5131 MB device (capacity)
+[rank 0] kvarn staged shadow: 0 pages (0 MiB)
+[rank 1] materialized: 5131 MB device (capacity)
+[rank 1] kvarn staged shadow: 0 pages (0 MiB)
+[rank 2] materialized: 5131 MB device (capacity)
+[rank 2] kvarn staged shadow: 0 pages (0 MiB)
+BLUE SANITY: PASS
+--- LEG anchor63150 04:00:36 ---
+=== BOOT kvarn_k4v4 mc=65536 cap=65536 ws=512 04:31:52 ===
+=== BOOT OK kvarn_k4v4 mc=65536 cap=65536 04:32:32 ===
+[preflight] required 8065 MiB / usable 8160 MiB (fixed 7363 MiB, context 702 MiB, prefix cap 256, ws 512 MiB, slack 94 MiB; usable=LIVE min-rank)
+[preflight] composition/rank: weights(measured-manifest) 5131 + decoder_fixed(incl drafter) 1360 + workspace 512 + staging 200 + arena_padding 160 + tp2_runtime_reserve(bf16,conc>=2) 0 = fixed 7363 | hidden_state(prefix cap 256) 5 + kv(11152 B/t x 65536 tok + mtp 2) 697
+BLUE SANITY: PASS
+--- LEG anchor63150 04:32:36 ---
+LEG anchor63150: PASS expect=ORCHID-TUNNEL exact_content=True in_content+reasoning=True finish=stop prompt=49276 completion=74 wall=1435s
+  content_head='ORCHID-TUNNEL'
+--- LEG needle_d0.25 04:56:31 ---
+LEG needle_d0.25: PASS expect=ORCHID-TUNNEL exact_content=True in_content+reasoning=True finish=stop prompt=59935 completion=113 wall=2095s
+  content_head='ORCHID-TUNNEL'
+--- LEG needle_d0.5 05:31:26 ---
+LEG needle_d0.5: PASS expect=MARBLE-COMPASS exact_content=True in_content+reasoning=True finish=stop prompt=59830 completion=162 wall=2150s
+  content_head='MARBLE-COMPASS'
+--- LEG needle_d0.75 06:07:16 ---
+LEG needle_d0.75: PASS expect=CINDER-HARBOR exact_content=True in_content+reasoning=True finish=stop prompt=59984 completion=132 wall=2139s
+  content_head='CINDER-HARBOR'
+=== ARM CLOSE kvarn_k4v4 mc=65536 06:42:58: retired (mid-window) ===
+ARM DONE kvarn_k4v4 mc=65536 06:42:58

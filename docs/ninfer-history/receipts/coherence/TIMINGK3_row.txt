@@ -1,0 +1,24 @@
+== MANIFEST 2026-09-17T01:05:35Z night TIMINGK3 (k-sweep leg k=3) bin 07ad7eccc0b97cc0
+grant: user order "start on it now, full velocity" (blanket GPU grant 2026-09-16 stands)
+config: TP4 --devices 0,1,2,3 --spec mtp --draft-tokens 3 GRAPHS-ON port=8100 NINFER_TP2_TIMING=1 NINFER_WORKSPACE_MIB=96 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16
+purpose: k-sweep leg k=3 at count600 shape — completes marginal-cost-per-k table (SPEED_PLAN §3.2), PLOG-013
+KFD precondition: 0. serial TP4 boot, sole GPU user.
+== BOOT+HEALTH: healthy after 20s
+== PROBE count600: client wall 43.48s, finish=length, coherent 1..200
+[tp2] single-seq lane 0: acceptance=0.96 tok/round=3.90 rounds=154 gen=600 prefill=3.10s decode=40.37s (TIMINGK3_serve.log:117) -> 14.86 tok/s
+== B1 (Mean over 153 rounds, total = 262.10 ms/round) TIMINGK3_serve.log:104-114:
+  1. Target Verify (T=k+1=4): 237.43 ms (90.6%)  5. Alignment 8.70 (3.3%)  8. AR Draft Chain 15.49 (5.9%)  [2+3+4+6+7 = 0.49 ms]
+first-miss: rk=3 rounds=154 m=2.890 p_full=0.942 | a0=3 a1=2 a2=4 a3=145 (full-accept 94% of rounds)
+== PROBE BLUE (mt=64): finish=stop content='BLUE' -> PASS (log:136-149; block 290.52 ms/round over 15 rounds; acc=0.60 t/r=2.88)
+== K-TABLE COMPLETE (count600 shape, decode axis, graphs-ON):
+  k=1: 169.70 ms/round  t/r 1.99  11.70 tok/s  85.3 ms/tok
+  k=2: 211.95 ms/round  t/r 2.94  13.87 tok/s  72.1 ms/tok
+  k=3: 262.10 ms/round  t/r 3.90  14.86 tok/s  67.2 ms/tok
+  marginal tok/s: k1->k2 ~22.5, k2->k3 ~19.1 (both above the running average -> k=3 still pays on THIS synthetic shape where acc stays 0.96)
+  verify T-sweep: T=2 160.97, T=3 195.34, T=4 237.43 -> slope grows 34.4 -> 42.1 ms/position (superlinear beyond T=3); intercept ~126.5 @T=1
+== REAL-PROMPT LEG on best-k (k=3), PLOG-014: "Explain why the sky is blue in three short paragraphs." mt=300 temp=0
+  finish=stop, gen=186 tok, decode 18.86 s = 9.86 tok/s, acc=0.54 t/r=2.62, p_full=0.366 (a0=21 a1=12 a2=12 a3=26) — log:178-191
+  coherence: clean Rayleigh-scattering prose, zero mojibake — PASS. Real acceptance 0.54 = the expected 0.5-0.7 band (vs counting 0.96); counting-shape k-table does NOT transfer 1:1 to prose
+  caveat: k=2 real-prompt same-boot comparison not fired (would need a k=2 boot); MTP1 k=2 graphs-OFF real anchor was acc 0.53-0.64 t/r 2.1-2.4 (PLOG-007)
+== GRADE: TIMINGK3 PASS + REALPROMPT PASS
+== RELEASE 2026-09-17T01:09:22Z: exact-PID kill (anchored, sole match), no serve remains, KFD=0 verified after
