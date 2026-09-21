@@ -352,3 +352,37 @@ to Gemini's guard battery, die 3 is the dev cell.
   packed-fp16 tile route OPENS. Small shapes worst (attn k/v ~1.6-2.1 TF/s).
   Custom tile must beat 4.62 TF/s/die to promote. Full output:
   results/W5_gemm_run_2026-09-21.txt; harness tests/bench_gemm_gfx900.cu.
+- E-016 2026-09-21 W5 custom-tile cell RUN (die 3, oracle-gated): packed-fp16 GEMM
+  tile (v_pk_fma_f16 packed along k-pairs, weights resident f16 in HBM, M=128 tiles,
+  interleaved column ownership, split-K + fixed-order f32 reduce in the timed region)
+  BEATS THE W5 GATE: best arm a8 (128x64, TY4 TX8 KC32, auto split-K) = 5.53 TF/s/die
+  all-die call-weighted vs the 4.62 bar (+19.7%) and vs same-session rb16 control
+  4.55 (+21.5%); control reproduces banked E-015 (4.52/4.62) within ~1.5% drift.
+  Per-shape (die0): ffn_down +55% (6.15), ssm_out +67% (4.98), attn_out +57%,
+  attn_q+gate +48% (5.36), gdn_gate +24%, gdn_qkv +19% (5.18), attn_k/v +88-97%
+  (~3.0), ffn_gate/up parity 0.99-1.00x (5.60 vs 5.67). ORACLE: host mirror of the
+  exact per-output accumulation (chunk-local flush schedule, per-slice f16 state,
+  fixed-order f32 slice sum) with double-precision fused-half emulation = bit-exact
+  vs v_pk_fma_f16; 90/90 arm-shape gates PASS mismatch 0.000%; tile L2-vs-f64 err
+  2.3-5.4e-3 = 10-19x better than shipped h16 (K/ks f16 slices + f32 sums beat
+  full-K f16 accumulation). Two design bugs caught by the oracle before any timing
+  counted: (a) size_t 64-bit index math compiled to v_mad_u64_u32 chains, ~2x the
+  VALU stream - 32-bit indexing is the single biggest arm win; (b) MT64 arm A-stage
+  missed the M-tile row offset (50.8% outputs wrong). Arm ladder (all-die agg):
+  a8 5.53 > a3 5.20 > a4 4.88 > a2 4.85 > a1 4.85 > a6 4.44 > a5 4.23 > a9 4.21 >
+  a7 4.14; register-prefetch pipeline arm (ldg->reg before compute, stlds after,
+  1 barrier/chunk) REJECTED: VGPR 93->246 (a8), 155->256 (a6), all arms regress
+  (a6 4.25->1.34) - occupancy loss outweighs hidden HBM latency. Census
+  (hipFuncGetAttributes + --save-temps): a8 VGPR 93, LDS 25 KB, 2 waves/SIMD,
+  512 v_pk_fma_f16 + 975 other VALU per chunk loop, zero spills. Ceiling named:
+  W-frag/A-frag LDS service 48 cyc per 128 VALU-cyc per wave-kpair = 1.5x
+  oversubscribed on the per-CU LDS at 4 waves -> ~14 TF/s model cap; measured 5.6
+  on ffn_gate = staging exposure (lockstep barriers, HBM latency per chunk) + split-K
+  reduce dominate the gap. Next levers: 3-4-deep LDS buffering or W-frag direct from
+  L2 (without the VGPR blowup), cheaper W-frag, epilogue atomics to drop the reduce.
+  PROMOTION RECOMMENDED: runtime-env-gated dispatch at the ggml-cuda.cu:2629 cublas
+  fallback (E-012 option (a), static-once getenv pattern at 1600-1626), a8 geometry
+  for all census shapes, weights kept as load-time f16 dequant output (steady state)
+  - the per-call dequant tax (~16 GB/die/ubatch f16 writes) is deleted on top of the
+  +21% GEMM. Receipt: results/W5_tile_2026-09-21.md; raw:
+  results/W5_tile_full_2026-09-21_v1.txt; harness: tests/bench_tile_gfx900.cu.
