@@ -270,3 +270,8 @@ to Gemini's guard battery, die 3 is the dev cell.
   (109 samples). Battery fingerprint ab3dfba685c5. Receipt:
   results/tp3_guards_20260921_141900.jsonl (+ _thermal.log). This is the
   official baseline of record for all future arms. W0/W1 setup CLOSED.
+- E-011 2026-09-21 Second worktree dispatched: wt-prefill-gemm on branch
+  amd/w5-prefill-gemm for the W5 prefill desk (rocBLAS shape survey +
+  GEMM microbench harness authoring, NO GPU runs while the W2 decode-atom
+  desk holds die 3; benching deferred until W2 integration is recorded
+  in this ledger). Decode-atom agent still running (no report yet).
