@@ -404,3 +404,42 @@ to Gemini's guard battery, die 3 is the dev cell.
   results/T4_producer_2026-09-21.md: guards-off GREEN -> cache-ON byte-
   identical determinism + accept >= 0.63 + needle 3/3 -> census launch
   count check -> 3-rep OFF/ON A/B, promote at >= +2% decode.
+- E-019 2026-09-21 W6 draft-device desk dispatched + design banked (worktree
+  wt-draft-dev, branch amd/w6-draft-device; ZERO-GPU, no boots by the desk).
+  Device-inheritance audit of the MTP draft context (ctx_dft = second
+  llama_context on the shared target model) names three independent
+  inheritance points, all now pinnable: (1) context backends from
+  model.devices (meta over dies 0-2 under -sm tensor), (2) weight bufts from
+  the loader's meta buft lists, (3) MTP KV from model.dev_layer(il) (meta
+  AXIS_0 shard today). Load-bearing facts: the GGUF carries
+  blk.64.nextn.{eh_proj,enorm,hnorm,shared_head_norm} but NOT
+  shared_head_head/embed_tokens, so the draft graph falls back to the shared
+  model.output (517.8 MiB Q6_K, TP3 row-sharded) and model.tok_embd
+  (335.3 MiB IQ4_XS, mirrored) - both MUST stay on the TP group for the
+  target verify pass, only blk.64 itself (169.3 MiB, 15 tensors) is
+  draft-exclusive. The sched GGML_ABORTs on pre-allocated weights outside
+  the backend list (ggml-backend.cpp), so a naive [die3, CPU] draft backend
+  list crashes on the first head matmul: placement must be exact at load
+  time. Die-3 budget ~0.5-0.7 GiB of 8 GiB (weights 169 + KV ~220 at 200k
+  q4_0 + compute/output buffers).
+- E-020 2026-09-21 W6 implementation banked (zero-GPU): --spec-mtp-device
+  <DEV> (name or GPU index; env LLAMA_ARG_SPEC_MTP_DEVICE) + three pins:
+  llama_model_params.dev_mtp (weights: loader buft rule bid >= n_layer in
+  llama-model-loader.cpp buft_for_tensor; KV: llama_model::dev_layer override
+  for il >= n_layer - target unaffected, its cache filters the MTP layer out)
+  and llama_context_params.extra_device (draft ctx backends [meta, die3,
+  CPU]; server sets cparams_mtp.extra_device). Head stays on meta (keeps 3x
+  bandwidth); two ~20 KiB meta<->die3 activation hops per draft step are the
+  added PCIe cost; the h handoff crosses PCIe per token exactly as before,
+  relocated not added. Guarded: flag unset = zero behavior change;
+  dev_mtp-in-target-devices refused (arg + server, order-proof);
+  --device CUDA0,CUDA1,CUDA2 mandatory in 4-visible boots or the TENSOR
+  split builds TP4. Compile-validated gfx900 (8 touched TUs, exact
+  build-hip flags, zero warnings); host logic tests ALL PASS
+  (docs/amd-port/tests/test_w6_mtp_device_host.cpp). NOT RUN: served A/B
+  (alternating boots, 3 reps, guard battery, determinism within-arm only -
+  not vs control) queued for a negotiated window (dies 0-2 serve, die 3
+  drafts); honest overlap estimate and full protocol in
+  results/W6_draft_device_2026-09-21.md (v1 single-stream win 0-15%,
+  expected ~+5-10%, strict-dataflow overlap is zero until the v2
+  draft-ahead scheduler lands).

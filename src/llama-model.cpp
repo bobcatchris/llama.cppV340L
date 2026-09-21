@@ -1911,6 +1911,11 @@ void llama_model::print_info() const {
 }
 
 ggml_backend_dev_t llama_model::dev_layer(int il) const {
+    // the MTP layers (used only by the draft context) follow dev_mtp when set,
+    // so the draft KV cache lands on the draft device instead of the TP group
+    if (dev_mtp && il >= (int) hparams.n_layer()) {
+        return dev_mtp;
+    }
     return pimpl->dev_layer.at(il).dev;
 }
 
@@ -2283,6 +2288,7 @@ ggml_cgraph * llama_model::build_graph(const llm_graph_params & params) const {
 llama_model_params llama_model_default_params() {
     llama_model_params result = {
         /*.devices                     =*/ nullptr,
+        /*.dev_mtp                     =*/ nullptr,
         /*.tensor_buft_overrides       =*/ nullptr,
         /*.n_gpu_layers                =*/ -1,
         /*.split_mode                  =*/ LLAMA_SPLIT_MODE_LAYER,

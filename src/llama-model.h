@@ -626,6 +626,9 @@ struct llama_model {
     // statically allocated context for assigning
     struct llama_meta_device_get_split_state_userdata get_split_state_ud;
 
+    // device for the MTP/nextn layers (weights and KV cache); NULL = follow the normal split
+    ggml_backend_dev_t dev_mtp = nullptr;
+
     int64_t t_load_us  = 0;
     int64_t t_start_us = 0;
 

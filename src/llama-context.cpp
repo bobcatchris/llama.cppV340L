@@ -15,6 +15,7 @@
 #include <cinttypes>
 #include <cmath>
 #include <cstring>
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
 
@@ -273,6 +274,25 @@ llama_context::llama_context(
                 throw std::runtime_error(format("failed to initialize %s backend", ggml_backend_dev_name(dev.dev)));
             }
             backends.emplace_back(backend);
+        }
+
+        // extra per-context device (e.g. draft-device offload); skipped if the
+        // device is already among the model's devices
+        if (params.extra_device) {
+            const bool dup = std::any_of(model.devices.begin(), model.devices.end(),
+                    [&params](const llama_device & d) { return d.dev == params.extra_device; });
+            if (dup) {
+                LLAMA_LOG_WARN("%s: extra device %s is already used by the model - ignoring\n",
+                        __func__, ggml_backend_dev_name(params.extra_device));
+            } else {
+                ggml_backend_t backend = ggml_backend_dev_init(params.extra_device, nullptr);
+                if (backend == nullptr) {
+                    throw std::runtime_error(format("failed to initialize %s backend", ggml_backend_dev_name(params.extra_device)));
+                }
+                LLAMA_LOG_INFO("%s: using extra device %s for this context\n",
+                        __func__, ggml_backend_dev_name(params.extra_device));
+                backends.emplace_back(backend);
+            }
         }
 
         // add ACCEL backends (such as BLAS)
@@ -3486,6 +3506,7 @@ llama_context_params llama_context_default_params() {
         /*.sampler                     =*/ nullptr,
         /*.n_sampler                   =*/ 0,
         /*.ctx_other                   =*/ nullptr,
+        /*.extra_device                =*/ nullptr,
     };
 
     return result;
