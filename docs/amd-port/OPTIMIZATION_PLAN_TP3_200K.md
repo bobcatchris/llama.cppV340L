@@ -248,3 +248,9 @@ to Gemini's guard battery, die 3 is the dev cell.
 - E-008 2026-09-21 Protocol adopted (user-directed): agents work in git
   worktrees on side branches; this ledger is the append-only current state;
   timer automation (every 30 min) drives progress without user input.
+- E-009 2026-09-21 Worktree + agent split (user-directed protocol): worktree
+  /media/chris/ssd128/llamacpp/wt-decode-atom on branch amd/w2-decode-atom
+  dispatched to the W2 decode-atom desk (oracle-first mandate, target
+  >=130 GB/s on the iq3_s cell, die 3 only). Gemini retains dies 0-2 for the
+  served guard battery and its hardening tasks. Timer automation (30 min)
+  now carries this protocol.
