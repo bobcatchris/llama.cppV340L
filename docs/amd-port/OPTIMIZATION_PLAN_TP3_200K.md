@@ -529,3 +529,8 @@ to Gemini's guard battery, die 3 is the dev cell.
   Validation protocol in results/W6_draft_device_2026-09-21.md - Gemini lane,
   alternating-boot A/B, promote at >= +2% decode with guards green; within-arm
   determinism only (reduction order changes across devices).
+- E-024 2026-09-21 Tile-integration desk dispatched: wt-tile-integ on
+  amd/tile-integ - wire the a8 tile into the ggml-cuda dispatch behind
+  GGML_CUDA_TILE_FP16=1 at the cublas fallback branch point; die 3 open
+  for its validation runs. Gemini ACKed E-021 ruling (msg #1325); ubatch
+  re-stamp -> T4 validation -> W6 A/B queue stands.
