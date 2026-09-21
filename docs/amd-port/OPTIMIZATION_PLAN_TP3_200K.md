@@ -275,3 +275,26 @@ to Gemini's guard battery, die 3 is the dev cell.
   GEMM microbench harness authoring, NO GPU runs while the W2 decode-atom
   desk holds die 3; benching deferred until W2 integration is recorded
   in this ledger). Decode-atom agent still running (no report yet).
+- E-012 2026-09-21 W5 zero-GPU phase COMPLETE (desk: wt-prefill-gemm). Shape census
+  banked from the GGUF header + qwen35.cpp graph: 48 GDN + 16 attn layers; attn_q
+  5120x12288 carries q+gate fused; TP3 row-split rounds per-die shares to 128-row
+  blocks (get_mmq_y_host gfx900), canonical shares e.g. 17408 -> 5760/5760/5888. Trunk
+  = 6.23 TFLOP/ubatch (48.7 GFLOP/tok, ~2.04 TFLOP/die); FFN gate/up/down = 70.3% of
+  GEMM FLOPs, then gdn_qkv 10.3%, ssm_out+gdn_gate 6.2% each. Dispatch survey: every
+  dense prefill GEMM runs dequant-to-f16 + hipBLAS f16-acc/f16-out (gfx900 MMQ
+  disabled dense by rule mmq.cu:371-376; FORCE_MMQ/CUBLAS are compile-time only);
+  implied served rate ~2.0-2.2 TF/s/die vs 10.75-12.5 fp32-class / ~21.5 packed-fp16
+  ceilings, so the custom packed-fp16 tile route stays W5-live pending the bench gate.
+  Harness READY, compile-validated for gfx900, NOT RUN: die-3 runs deferred until the
+  W2 desk releases the cell. Receipt: results/W5_gemm_survey_2026-09-21.md;
+  harness: tests/bench_gemm_gfx900.cu (census table + build line in header).
+- E-013 2026-09-21 Integration: amd/w5-prefill-gemm merged into
+  amd/v340-port-v2 (merge resolved at the ledger tail; duplicate E-010
+  entries kept - same fact, recorded independently, both stand under
+  append-only). W5 zero-GPU phase ACCEPTED: shape census (FFN trio = 70.3%
+  of GEMM FLOPs, 6.23 TFLOP/ubatch), rocBLAS harness ready
+  (tests/bench_gemm_gfx900.cu, compile-validated, deferred die-3 run),
+  survey finding of record: dense prefill GEMMs run dequant-to-f16 +
+  hipBLAS f16-acc/f16-out every call (mmq.cu:371-376 rule) - the f16
+  dequant write traffic (~16 GB/die/ubatch) is a newly-named prefill
+  target. GPU phase queued behind W2 decode-atom desk.
