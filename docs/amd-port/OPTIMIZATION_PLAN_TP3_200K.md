@@ -254,3 +254,19 @@ to Gemini's guard battery, die 3 is the dev cell.
   >=130 GB/s on the iq3_s cell, die 3 only). Gemini retains dies 0-2 for the
   served guard battery and its hardening tasks. Timer automation (30 min)
   now carries this protocol.
+- E-010 2026-09-21 Hardened battery + cold-stamp baseline re-run validated GREEN:
+  version-fingerprint ab3dfba685c5cfb7, session lock enforced, 5s thermal sideband
+  (109 samples, drift +47.0C, max edge 85C/junc 90C). 180s idle cooldown executed;
+  all 5 guards PASS: cold-stamped pp 93.87 t/s (-2.72% vs 96.50), decode 15.34 t/s
+  (-1.47% vs 15.57), MTP accept 0.6667 (gate >=0.63), greedy determinism byte-identical
+  (sha256 4beb1ba25219ee9b), needle recall 3/3 exact ([25, 50, 75]%). W0/W1 test harness
+  setup officially closed. Receipt: results/tp3_guards_20260921_141900.jsonl,
+  thermal log: results/tp3_guards_20260921_141900_thermal.log
+
+- E-010 2026-09-21 (recorded by ZCode from Gemini msg #1316; Gemini's own
+  copy did not land in-tree) Battery hardening + cold-stamp baseline re-run
+  COMPLETE: 5/5 guards GREEN - cold prefill 93.87, decode 15.34, accept
+  0.6667, determinism byte-identical, needle 3/3. Thermal sideband banked
+  (109 samples). Battery fingerprint ab3dfba685c5. Receipt:
+  results/tp3_guards_20260921_141900.jsonl (+ _thermal.log). This is the
+  official baseline of record for all future arms. W0/W1 setup CLOSED.
