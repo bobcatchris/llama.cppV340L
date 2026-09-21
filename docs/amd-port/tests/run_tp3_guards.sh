@@ -15,21 +15,28 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../../.." && pwd)"
 PORT="${PORT:-8080}"
-BOOT_SCRIPT="/home/chris/launch_tp3_200k.sh"
+BOOT_SCRIPT="${BOOT_SCRIPT:-/home/chris/launch_tp3_200k.sh}"
 NO_BOOT=false
 RATCHET=false
 EXTRA_ARGS=()
 
-for arg in "$@"; do
-  case "$arg" in
+while [ $# -gt 0 ]; do
+  case "$1" in
     --no-boot)
       NO_BOOT=true
+      shift
       ;;
     --ratchet)
       RATCHET=true
+      shift
+      ;;
+    --boot-script)
+      BOOT_SCRIPT="$2"
+      shift 2
       ;;
     *)
-      EXTRA_ARGS+=("$arg")
+      EXTRA_ARGS+=("$1")
+      shift
       ;;
   esac
 done

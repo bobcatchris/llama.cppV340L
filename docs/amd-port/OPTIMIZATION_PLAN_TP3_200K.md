@@ -298,3 +298,51 @@ to Gemini's guard battery, die 3 is the dev cell.
   hipBLAS f16-acc/f16-out every call (mmq.cu:371-376 rule) - the f16
   dequant write traffic (~16 GB/die/ubatch) is a newly-named prefill
   target. GPU phase queued behind W2 decode-atom desk.
+- E-009 2026-09-21 W2 decode-atom cell goes oracle-gated (bench v2): host C++
+  mirror of vec_dot_iq3_s_q8_1 gates every arm (rel err < 1e-4, 64 rows). Three
+  traps caught and guarded: __device__-only table symbols (host silently read
+  garbage; pull via kernel D2H + pinned values), HIP __half host fields
+  VALUE-convert on assignment (ds.x fill became fp16(15360); q8_1 now built as
+  raw bytes), iq3s_grid = 512 entries (9th index bit from qh). Two v1 clone
+  bugs found vs mmvq.cu/vecdotq.cuh and fixed: u1 index l0+4 -> l0+1, y
+  pointer never offset by kby=kbx*8. results/W2_decode_atom_2026-09-21.md
+- E-010 2026-09-21 CORRECTION (supersedes E-005/E-006 absolutes): fixed-clone
+  control = 90.4-90.9 GB/s (422-425 us), stable across 3 sessions; the v1
+  105.2 GB/s figure was an accidentally lighter kernel - its missing kby
+  offset made all 8 x loads loop-invariant (compiler hoisted them out of the
+  kbx loop). Same-era A/B (old binary from git): 360.0 us/106.6 vs fixed
+  424.6/90.4. Perf-neutral claim FALSIFIED; old ratios stand only within their
+  own sessions. consume-ablation ladder unchanged structurally: loads-only
+  245, +LUT 178, full decode ~91 (corrected).
+- E-011 2026-09-21 W2 decode-atom ladder ALL NEGATIVE (all oracle-passing,
+  bit-exact, no numerics change, control drift < 1 percent): gmem (grid global
+  vs constant) 1.00x NEUTRAL; pip (reorder + 2 accumulators) 1.04x; sgn (32 KB
+  sign-folded LUT, kills whole vcmpne4/vsub4 chain) 2.20x - 32 KB > 16 KB L1,
+  L2-resident divergent lookups; partial folds net zero by instruction budget;
+  sexp (2 KB pre-expanded sign masks) 1.16x - 4 extra divergent lookups cost
+  more than ~30 vops saved; hand dp4a (v_bfe_i32+v_mad_i32_i24) 1.08x
+  volatile / 1.21x non-volatile - library 16-bit SDWA emulation wins. Static
+  census: base loop 314 vops/call (dp4a ~130, sign ~35, index/addr ~90).
+  results/W2_decode_atom_2026-09-21.md
+- E-012 2026-09-21 W2 decode-atom VERDICT (stop condition reached): the
+  shipped iq3_s atom is at its practical gfx900 ceiling at ~91 GB/s; the
+  130-150 GB/s target is ISA-walled - no v_dot4 on gfx900 (dp4a emu
+  irreducible for bit-exact math), fp16 V_DOT2 path blocked by x int8->half
+  conversion cost (and numerics), 8 divergent 9-bit LUT reads per 32 weights
+  irreducible for this format. Next levers named OUTSIDE the atom: T4
+  quantize_q8_1 elimination first (also the door to an fp16x2 activation
+  format for a dot2 atom), T3 tiny-tensor tax second. Handoff to W2 owner.
+- E-014 2026-09-21 Integration: amd/w2-decode-atom merged (desk-local ledger
+  entries kept verbatim alongside main-branch entries - some E-numbers now
+  appear twice from parallel desks; authoritative sequence continues E-015+).
+  W2 VERDICT OF RECORD: shipped iq3_s atom at its practical gfx900 ceiling -
+  8 arms all negative/neutral (oracle-gated, 3 reps x 200 iters, bit-exact);
+  binding terms: 8 divergent 9-bit LUT reads / 32 weights, ~130 vops dp4a
+  emulation (no v_dot4 on gfx900), sign-fold dead (32 KB > 16 KB L1). TRUE
+  shipped-atom figure 90.4-90.9 GB/s - v1 bench's missing kby offset hoisted
+  x loads out of the loop, so the banked 105.2 was an accidentally lighter
+  kernel (correction addendum on the cell receipt). 130 target ISA-walled,
+  not forced. NEXT LINK (desk ruling, adopted): T4 kill quantize_q8_1 BEFORE
+  T3 tiny-tensor tax - the fp16x2 activation producer is also the only door
+  to a cheap exact V_DOT2_F32_F16 atom. Die-3 window now OPEN for the W5
+  gemm harness run.
