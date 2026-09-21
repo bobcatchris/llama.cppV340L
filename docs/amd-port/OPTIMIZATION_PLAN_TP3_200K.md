@@ -346,3 +346,9 @@ to Gemini's guard battery, die 3 is the dev cell.
   T3 tiny-tensor tax - the fp16x2 activation producer is also the only door
   to a cheap exact V_DOT2_F32_F16 atom. Die-3 window now OPEN for the W5
   gemm harness run.
+- E-015 2026-09-21 W5 GEMM harness RUN (die 3): shipped-route rocBLAS fp16
+  (h16 mode) = 4.62 TF/s/die call-weighted (f32-out mode 3.04 - h16 stays).
+  37% of fp32-class / 21% of packed-fp16 ceiling -> W5 GATE MISSED: custom
+  packed-fp16 tile route OPENS. Small shapes worst (attn k/v ~1.6-2.1 TF/s).
+  Custom tile must beat 4.62 TF/s/die to promote. Full output:
+  results/W5_gemm_run_2026-09-21.txt; harness tests/bench_gemm_gfx900.cu.
