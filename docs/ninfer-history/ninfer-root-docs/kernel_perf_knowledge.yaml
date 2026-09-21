@@ -1,0 +1,753 @@
+meta:
+  version: 1
+  last_updated: '2026-08-31'
+  authors:
+  - coordinator-i8-lane
+  confidence_legend:
+    measured: direct number from a bench/probe on this box
+    derived: computed from measured inputs via a stated formula
+    hypothesized: plausible mechanism, not yet isolated
+hardware:
+  gpu: NVIDIA GeForce RTX 5060 Ti 16GB
+  arch: sm_120 (Blackwell consumer)
+  sms: 36
+  smem_per_sm_bytes: 102400
+  smem_optin_per_block_bytes: 101376
+  regs_per_sm: 65536
+  clock_max_mhz: 3090
+  dram_bw_spec_gbps: 448
+  dram_bw_achievable_gbps: 407
+  dram_bw_achievable_fraction: 0.91
+  dram_bw_curve_vs_warps_per_sm:
+    _comment: 'warps/SM is the dominant memory-bound predictor; pure-read has a sharp
+      4->8 cliff. But a REAL kernel with lockstep barriers is FAR below this curve
+      at high W (see case i8_unified_long_ctx_regression: W=8 -> 75 GB/s vs 397 GB/s
+      ceiling) -> barrier serialization, not warps/SM, caps real kernels.'
+    4: 220
+    8: 377
+    16: 420
+  dram_bw_curve2_ilp4_vs_warps_per_sm:
+    _comment: 'ILP=4 raises the curve ~40% (cp.async keeps multiple loads in flight;
+      ld.global grid-stride does not). Absolute ceiling for a cp.async kernel at warps/SM:
+      4->225, 8->397, 16->471, 32->540.'
+    4: 225
+    8: 397
+    16: 471
+    32: 540
+  dram_latency_ns_est: 700
+  nvlink: false
+  notes:
+  - All bandwidth reasoning scales from 448 GB/s spec / 407 achievable. Do NOT assume
+    H100-class.
+  - ncu is BLOCKED (ERR_NVGPUCTRPERM). compute-sanitizer is INCOMPATIBLE with TP2+NCCL
+    (cudaErrorNoKernelImageForDevice). nsys distorts wall-clock +/-12% and HANGS on
+    TP2+NCCL. See measurement_toolkit.
+predictive_model:
+  occupancy:
+    ctas_per_sm: floor(smem_per_sm / smem_per_cta)  AND  launch_bounds_min_blocks  AND  reg-limited
+    warps_per_sm: ctas_per_sm * warps_per_cta
+    independent_streams_per_sm: ctas_per_sm * warp_role_decoupling_factor
+    warp_role_decoupling_factor:
+      all_warps_lockstep: 1
+      producer_consumer: '>=2'
+  littles_law_gate:
+    inflight_bytes_needed_per_sm: dram_bw_target_gbps/1e9 / sms * dram_latency_ns_est*1e-9
+    worked_example: 407 GB/s -> ~7.7 KiB/SM needed. Both shipped (32 KiB/SM) and unified
+      Wc=2 (32 KiB/SM) EXCEED this -> neither is in-flight-limited -> the gap is streams,
+      not bytes.
+  roofline:
+    kernel_time_floor_ms: bytes_moved / dram_bw_achievable_gbps * 1e3
+    worked_example: 160k I8 decode reads 169.2 MB -> floor 0.416 ms (= shipped's actual).
+      Any design >0.416 ms is leaving BW on the table.
+  round_attribution:
+    attention_share_of_round: L_layers * per_layer_attn_ms * forwards_per_round /
+      round_ms
+    worked_example: 'I8 @160k: attention ~49% of the 56.7 ms round. So a 29% attention-kernel
+      gap => ~14% round gap. ALWAYS convert kernel-gap -> round-gap before judging
+      a ''small'' kernel delta.'
+  decision_rule:
+  - IF predicted independent_streams_per_sm(design) < incumbent AND shape is memory-bound
+    (bytes/round large) -> predict regression; do not build as-is.
+  - IF smem_per_cta scales with the SAME knob you'd raise for parallelism (e.g. Br=Wc*16)
+    -> the knobs are COUPLED; raising parallelism collapses occupancy. Flag as a design
+    smell.
+  work_partition_principle:
+  - "Split the dimension that has the MOST work, not the one that is convenient. At\
+    \ decode T=1 there are ~6 Q-rows and ~160k keys. Warps must partition KEYS (or\
+    \ D, the PV output), because rows are starved \u2014 splitting rows leaves most\
+    \ warps with zero real work."
+  - 'A row-split (each warp owns Br rows) is only valid when rows >> warps. When rows
+    < warps (T=1 long-ctx, or any small-token decode), switch to a D-split PV (output-disjoint
+    per warp, bit-identity preserved) or a producer/consumer role split. D-split is
+    the clean win: no cross-warp reduction, bit-identical.'
+  - 'Check: does raising Wc leave some warps with real output? If not, the partition
+    is wrong even if it is correct/occupancy-fine.'
+  bit_identity_rule:
+  - bit-identity survives ONLY if each output element is accumulated over all its
+    reduction dim in ONE warp. D-split PV (warp owns a D-slice, sums all keys) PRESERVES
+    it. Key-split QK or key-split PV (warp owns a key-slice, then reduce) BREAKS it.
+    Choose output-disjoint partitions to keep max_diff=0.
+preflight_checklist:
+- id: 1
+  q: What is the shape's bytes-moved and its BW-floor time (roofline)?
+  how: 'bytes / 407 GB/s. For decode: KV bytes = ctx * head_dim * 2(K+V) * dtype_bytes
+    * kv_heads_per_rank.'
+- id: 2
+  q: Is the shape memory-bound or compute-bound?
+  how: compare BW-floor time to MMA-floor time (flops / TC-rate). Decode T=1 long-ctx
+    is memory-bound; prefill is compute-bound.
+- id: 3
+  q: Compute smem_per_cta from the design's smem formula. Which terms scale with which
+    template params?
+  how: expand the constexpr smem formula. Mark terms that scale with Wc/Br/Bc.
+- id: 4
+  q: Compute ctas_per_sm = floor(102400 / smem_per_cta) and warps_per_sm and independent_streams_per_sm.
+  how: use occupancy probe (/tmp/occ.cu pattern) OR cudaOccupancyMaxActiveBlocksPerMultiprocessor.
+    Do NOT eyeball.
+- id: 5
+  q: Compare streams/SM to the incumbent kernel. If lower on a memory-bound shape
+    -> PREDICT REGRESSION.
+  how: this is the step we skipped. Shipped=16 warps/SM (2 CTA x 8, producer/consumer).
+    Unified Wc=2=4 warps/SM (2 CTA x 2, lockstep). 4x deficit was on paper.
+- id: 6
+  q: Are the parallelism knob and the smem knob coupled? (design smell)
+  how: if raising Wc grows smem (Br=Wc*16) -> occupancy cliff. Decouple (Br=row-tiles*16,
+    split keys/D across warps) or accept the cap.
+- id: 7
+  q: What is the acceptance proof and does the redesign preserve it?
+  how: I8 uses bit-identical-to-shipped (max_diff=0). Key-split PV changes accumulation
+    order -> may break bit-identity -> fall back to FP64-oracle tolerance gate. Decide
+    BEFORE building. Prefer an OUTPUT-disjoint partition (D-split) to keep max_diff=0.
+- id: 8
+  q: WHICH dimension do the warps partition, and does that dimension have enough work?
+  how: 'count work units per dimension. Decode T=1: rows=6 (RowTiles=1), keys=160k.
+    A row-split leaves warps 1+ with ZERO real rows (row-starvation) -> rebuild as
+    D-split PV or producer/consumer. Rule: rows < warps => don''t row-split. B''s
+    29% regression was 100% this.'
+levers:
+- name: occupancy_ctas_per_sm
+  changes: independent latency-hiding streams
+  binds_when: memory-bound shape AND in-flight bytes already exceed Little's-law gate
+  measure: cudaOccupancyMaxActiveBlocksPerMultiprocessor; standalone bench ms
+  decision: cut smem_per_cta (shrink buffers, static->smaller, drop redundant staging)
+    to raise CTAs/SM
+  evidence: unified Wc=2 (2 CTA/SM, 4 warps) 0.538ms beats Wc=4 (1 CTA/SM, 4 warps)
+    0.803ms at EQUAL warps/SM -> CTAs/SM, not warps/SM, is the lever
+- name: warp_role_decoupling
+  changes: streams within a CTA (producer runs ahead of consumer)
+  binds_when: memory-bound AND CTAs/SM capped by smem
+  measure: nsys on single-GPU (no NCCL) kernel timeline; or standalone bench
+  decision: producer/consumer specialization is one way to reach 16 warps/SM in 37KB;
+    D-split PV is a second (validated). unified's all-warps-lockstep cannot reach
+    high occupancy without one of them
+  evidence: shipped 16 warps/SM (8x2, decoupled) = 407 GB/s; unified 4 warps/SM (2x2,
+    lockstep) = 314 GB/s; v2 D-split Wc=8 = 16 warps/SM = 0.416ms = shipped
+  cost: "producer/consumer could break the 'join not rewrite' invariant, but D-split\
+    \ PV does NOT (output-disjoint, bit-identity max_diff=0) \u2014 that is the preferred\
+    \ fix"
+- name: warp_partition_axis
+  changes: which dimension warps split (rows vs keys/D). The highest-ROI lever once
+    occupancy is understood.
+  binds_when: 'row-starved shapes (rows < warps): decode T=1/4 long-ctx.'
+  measure: standalone bench; count real work per warp; check empty rows.
+  decision: "if rows < warps, do NOT row-split. Use D-split PV (each warp owns a D-slice,\
+    \ sums all keys) \u2014 output-disjoint so bit-identity survives (max_diff=0)\
+    \ and no cross-warp reduction. This is exactly shipped's partition; porting it\
+    \ fixed B (v2: 16 warps/SM, 0.416ms = shipped, oracle max_err=0)."
+  evidence: row-split unified Wc=2 q rows=6/32 filled -> 4 warps/SM = 0.538ms; D-split
+    Wc=8 -> 16 warps/SM = 0.416ms, bit-identical to shipped.
+- name: inflight_bytes
+  changes: Little's-law numerator
+  binds_when: ONLY when in-flight < BW*latency (rare at decode; both kernels are above
+    it)
+  measure: count outstanding cp.async * bytes * threads * ctas/SM
+  decision: deeper cp.async pipeline / double-buffer; but watch smem cost
+  evidence: NOT the I8 gap (both 32 KiB/SM >> 7.7 KiB needed)
+- name: tile_size_Bc
+  changes: bytes/tile, barrier frequency, MMA n-dim efficiency
+  binds_when: barrier-serialized lockstep warps (unified) OR small-grid latency
+  measure: standalone bench sweep Bc in {16,32,64}
+  decision: Bc=64 = 1 CTA/SM on these shapes (smem); Bc=16 = more barriers; Bc=32
+    is the sweet spot here
+- name: split_count
+  changes: grid size / CTAs in flight across SMs
+  binds_when: grid too small to fill SMs (short ctx) or partial-wave tail
+  measure: gqa_small_t_split_count; standalone bench at model's real splits
+  decision: route-independent (both kernels get same splits from the launcher) ->
+    NOT a shipped-vs-unified differentiator
+- name: dtype_bytes
+  changes: bytes moved (int8 = half of bf16)
+  binds_when: always for memory-bound
+  measure: roofline floor
+  decision: the s8-QK port already halved K bytes (bf16->int8) -> that's why unified
+    went 53.4->56.6 t/s; the REMAINING gap is occupancy, not dtype
+anti_patterns:
+- claim: more threads always helps a memory-bound kernel
+  reality: only if issue-bound. Raising unified Wc 2->4->8 gave 0.538->0.803->2.235
+    ms (WORSE) because smem scales with Wc -> occupancy cliff. Match the lever to
+    the binding constraint.
+- claim: wall-clock t/s from the model is the kernel signal
+  reality: MTP tok/round varies with prompt (2.62-3.21) and session noise is +/-6%;
+    the model round mixes 36 layers + MLP. Use the standalone bench (isolated kernel,
+    deterministic) to find the gap, then convert to round-gap via attribution.
+- claim: nsys is the way to get kernel times
+  reality: nsys HANGS on TP2+NCCL on this box (one GPU idles, other spins) and distorts
+    wall-clock +/-12%. Use a single-GPU cudaEvent bench instead; nsys kernel-TOTALS
+    (not wall) are OK only on 1-GPU.
+- claim: a within-gate result (<=1.15x) is acceptable
+  reality: owner bar is >= parity (no degrade). 1.069x is a degrade. Predict the ceiling;
+    don't ship a measured loss and call it green.
+- claim: bit-identity to the incumbent survives any partition change
+  reality: 'bit-identity survives ONLY if each output element is accumulated over
+    all its reduction dim in ONE warp. Row-split preserves it; D-split PV (warp owns
+    a D-slice, sums all keys) PRESERVES it (validated: v2-vs-shipped max_diff=0);
+    key-split (PV sums over keys across warps) BREAKS it. Choose output-disjoint partitions.'
+- claim: row-splitting the Q rows is a fine way to use many warps at decode
+  reality: 'FALSE when rows < warps (decode T=1: 6 rows, can be 8+ warps). A row-split
+    leaves warps 1..Wc-1 with ZERO real rows; they still run the full key loop on
+    invalid rows -> pure waste (Wc=8 = 8x compute for 6 useful rows = 75 GB/s). Row-split
+    is only valid when rows >> warps. Switch to D-split PV or producer/consumer. This
+    was B''s root cause.'
+- claim: an illegal-address crash is always a kernel bug
+  reality: "FALSE \u2014 and it is the #1 time-waster. An illegal-address error at\
+    \ a cudaFree/cudaDeviceSynchronize is USUALLY a STICKY ASYNC error from an EARLIER\
+    \ kernel (or a stale .so/.binary still on disk), surfacing at a later sync, NOT\
+    \ the kernel you think. Diagnose with the `illegal_address_diagnostic` procedure\
+    \ below before touching your real logic."
+  golden_evidence: 'v2 D-split prototype: crashed + illeg.address at cudaFree in one
+    run; compute-sanitizer --tool memcheck = 0 errors; CUDA_LAUNCH_BLOCKING=1 = runs
+    clean; fresh plain run = 0.413ms (matches shipped). The crash was a stale pre-fix
+    binary''s async error, not a v2 bug.'
+- claim: a fixed iteration count is what the algorithm needs
+  reality: 'iterative solvers (Sinkhorn, power iteration, diffusion) often CONVERGE
+    in far fewer iterations than the hardcoded count. Before trusting a fixed `kIterations`,
+    run a CONVERGENCE study: re-derive the loop with a max_iters parameter and measure
+    the output delta vs iteration count. KVarN''s quantizer Sinkhorn hardcoded 16
+    but converged by ~4 (delta 3.3e-7) -> 4x fewer iterations, +8% prefill, zero accuracy
+    loss, all 4 oracle suites PASS. Pre-flight for ANY iterative kernel.'
+- claim: the wall-clock / throughput t/s line is the right metric
+  reality: server logs emit BOTH an authoritative per-request `[req] done ... prefill=X
+    tok/s decode=Y tok/s` total AND a noisy `throughput(1.2s) prefill=A tok/s` interval
+    line. ALWAYS use the `[req] done` field (server-authored per-request total). The
+    `throughput(1.2s)` line measures a ~1-2s window and misled me into reading 34010
+    tok/s when the real prefill was 663 tok/s (a ~50x error). Read the log field names,
+    not the first number that matches.
+- claim: a cache dtype is chosen for its speed
+  reality: "KVarN 4/2-bit is chosen for MEMORY DENSITY, not speed. But the common\
+    \ claim that it is '3x slower per key than int8' is a DOC ERROR: kernel-measured\
+    \ KVarN = 3.74 ns/key @160k vs int8 2.60 (1.44x), at HALF the bytes (264 vs 528\
+    \ B/key). So KVarN is NOT intractably slow \u2014 closing the 1.44x would make\
+    \ it BEAT int8 (fewer bytes). Keep the value proposition (compression) separate,\
+    \ and re-measure per-key cost directly (never trust a secondhand ns/key table)."
+- claim: a K/V or K/Q kernel that shares scale-field offsets is symmetric/safe
+  reality: "K and V quantize use DIFFERENT scale-field offsets (K: s_row=+512; V:\
+    \ s_row_V=+1088) even though they LOOK symmetric. Reusing a K offset for V (or\
+    \ vice versa) silently corrupts the scale layout: the codes stay bit-identical\
+    \ but the SCALES are wrong \u2014 the model reads stale scales -> wrong output\
+    \ -> MTP accept=0%. This cost a long debug. ALWAYS verify the per-field scale\
+    \ map for EACH of K and V before batching/refactoring their launcher."
+illegal_address_diagnostic:
+  priority_1_isolate_from_stale_state:
+  - Rebuild and re-run. A stale .o/.so/binary from a PREVIOUS code state (often with
+    undeclared dynamic smem, e.g. I8DBG/append) carries an async OOB that surfaces
+    in the NEXT run's cudaFree. `make clean` + full rebuild the standalone target
+    first.
+  - "Kill stray GPU processes: `nvidia-smi` \u2014 a hung compute-sanitizer / nsys\
+    \ / leftover server holds VRAM -> later allocs fail as illegal-address not OOM.\
+    \ `pkill -f ninfer-serve; pkill -f compute-sanitizer`."
+  priority_2_force_sync_at_source:
+  - Re-run with CUDA_LAUNCH_BLOCKING=1. This makes every kernel synchronous, so an
+    OOB faults AT the offending kernel, not the next sync. If it runs clean under
+    BLOCKING, your kernel is fine and the crash was sticky/async.
+  - Alternatively call cudaDeviceSynchronize() + cudaGetLastError() immediately after
+    each launch in a debug build.
+  priority_3_binary_search_launches:
+  - 'Run the kernels under compute-sanitizer: `compute-sanitizer --tool memcheck ./bench`.
+    It reports the EXACT source line + address of any real OOB and prints an ERROR
+    SUMMARY. 0 errors = memory-correct (trust this over the async panic).'
+  - "compute-sanitizer is INCOMPATIBLE with TP2+NCCL (cudaErrorNoKernelImageForDevice)\
+    \ \u2014 run it on the SINGLE-GPU standalone bench, never the 2-GPU model. It\
+    \ also slows runs ~40x (numbers are relative only)."
+  - 'use_memcheck=False caveat: memcheck reports shared-memory and global OOB; default
+    on sm_120 it does NOT need race detector.'
+  priority_4_real_bug_checks (only if memcheck reports errors):
+  - 'Undersized dynamic smem: the launch''s third kernel arg / cudaFuncSetAttribute
+    MUST equal the kernel''s full extern __shared__ layout. Under-count a bf16 buffer
+    (2B/elem) -> tail OOB. ALWAYS size smem via a constexpr helper, never inline arithmetic,
+    and print it beside __shared__ layout.'
+  - 'grid/block under-run: a shape that launches blocks where a warp/split index computes
+    an out-of-range partial_* write. Neutral/early-return paths MUST cover every launched
+    block (missing -> stale partial -> later OOB in the reduce kernel).'
+  - 'Mask/window edge: a key index k0+col can exceed split_end at the last tile when
+    window is not a multiple of Bc; guard scores and partial writes.'
+  sticky_error_marker:
+  - cudaErrorIllegalAddress surfaced at cudaFree/cudaDeviceSynchronize is the flag;
+    if CUDA_LAUNCH_BLOCKING or memcheck shows the kernel is clean, the error came
+    from an EARLIER async launch's already-queued OOB that only faults on the next
+    sync. Fix the earliest kernel, not the one named in the stack.
+  - A prior crash can leave the context in an error state; the NEXT launch silently
+    returns and the error only surfaces at the next sync. Start a fresh process (don't
+    reuse a crashed one).
+measurement_toolkit:
+  standalone_bench:
+    file: tests/slice3_i8_bench.cu
+    what: single-GPU cudaEvent timing of one kernel at the EXACT model config (geometry,
+      ctx, splits). Seconds per run. The primary lever-finding loop.
+    build: cd build && make -j4 ninfer_slice3_i8_bench && ./tests/ninfer_slice3_i8_bench
+    rule: isolate the kernel here BEFORE touching the model; the model adds TP2/NCCL/MLP/MTP
+      confounds
+  occupancy_probe:
+    pattern: cudaOccupancyMaxActiveBlocksPerMultiprocessor(&occ, kernel, threads,
+      smem) -> warps/SM = occ * warps_per_cta
+    example: /tmp/occ.cu, /tmp/occ2.cu (throwaway nvcc -std=c++20 -arch=sm_120 -I
+      src -I include -I third_party --expt-relaxed-constexpr)
+    rule: ALWAYS probe occupancy; never eyeball CTAs/SM from the smem number
+  model_ab:
+    script: /tmp/i8ab2.sh (same-session interleaved shipped/unified x2 @160k)
+    metric: ms/round = tok/round / decode_tps (server's own decode= line). NOT raw
+      t/s (confounded by tok/round).
+    rule: interleave to cancel session drift; >=2 reps per side; if variance >3% the
+      box is contended (check nvidia-smi for stray servers)
+  guard_sweep:
+    script: tools/bench/decode_guard.sh
+    env: ITERS=1 DG_SPECS="int8|10000 25000 40000 80000 160000"
+    rule: "1 iteration per owner directive; all context lengths; kill stray servers\
+      \ first (they OOM each other). ITERS default is now 2 and the LARGEST context\
+      \ runs ONCE (prefill-dominated, no value repeating) \u2014 SINGLE_ITER_CTX overrides."
+  server_log_fields:
+    authoritative: '`[req N] done ... prefill=X tok/s decode=Y tok/s ttft=... wall=...`
+      (server-authored per-request TOTAL). Use `prefill=`/`decode=` from THIS line.'
+    misleading: '`throughput(1.2s) prefill=A tok/s` (a ~1-2s window interval). NEVER
+      use it. It misled a session into reading 34010 tok/s when the real prefill was
+      663.'
+    rule: read the log field names, not the first number that matches a regex. Total
+      vs interval are ~50x apart on this box.
+  oracle:
+    file: 'tests/slice3_i8_test.cu (ctest #113); reference tests/slice3_i8_s8qk_cpu_ref.cpp'
+    gate: unified-vs-shipped max_diff==0 (bit-identical) AND unified-vs-oracle <=
+      shipped-vs-oracle (t6-disc invariant)
+  token_identity:
+    script: tools/parity/prefill_byte_identity.sh (Agent 1); --dump-tokens IDS-ONLY
+      compare
+case_studies:
+- id: kvarn_slice4_staging_copy_decay
+  date: '2026-09-01'
+  design: KVarN slice4/UNIFIED decode kernel, per-page synchronous global->reg->smem code
+    copy (cause-3 staging), 2 blocks/SM, Wc=2 at T=1
+  incumbent: int8 shipped decode kernel (cp.async-free but per-key pipelined dequant reads)
+  predicted_before_build: 'NOT DONE. Retrospective: Little''s law on the staging loop (4B
+    LDG.32, 2-4 outstanding/thread, 128 threads/SM resident) predicts ~80 GB/s; the kernel
+    measured 88. A copy loop that MOVES BYTES IS NOT FREE just because it is coalesced —
+    synchronous LDG+STS chains are latency-bound and barrier-serialized.'
+  measured:
+    standalone_160k_t1_ms_pre_fix: 1.351
+    standalone_160k_t1_int8_reference: 0.417
+    phase_attribution_pre_fix_pct: {code_staging: 51.5, k_deq_incl_dce_staging: 55.7,
+      v_deq: 28.5, qk_mma: 7.9, softmax: 12.4, pv_mma: 9.1, fwht_writeback: 0}
+    block_table_scatter_effect_pct: 0.3   # identity vs shuffled: NIL
+    per_key_ns_vs_ctx: flat 4.2-4.6       # decay is LINEAR attention growth dominating
+                                         # the round, not a per-key cliff
+    fix: per-tile double-buffered cp.async banks + 8B-aligned conflict-free K-row swizzle
+      (16d+8*(d>>4)+j) + dynamic smem 12544B (occupancy stays 2 blk/SM) + T=1 Wc=4
+    standalone_160k_post_fix_ms: {t1_wc2: 1.065, t1_wc4: 0.905, t4_wc4: 0.938}  # after keypair K-deq (ac6b3f61)
+    model_guard_greedy_tps: {10k: [69.1, 74.7], 40k: [64.0, 67.3], 160k: [47.1, 53.2]}
+    prefill_impact: none (807/738/583 tok/s = max-prefill lineage)
+  verdict: FIXED (c631f7f1). The KVarN long-ctx decode decay was the staging COPY
+    MECHANISM, not which codes (K vs V) were staged — explains why both prior V-staging
+    attempts were neutral. Packed already had the right pattern (cp.async); porting it to
+    slice4 recovered 8-13% decode t/s at every context.
+  transferable_lessons:
+  - 'A coalesced synchronous copy loop is latency-bound, not bandwidth-bound: count
+    outstanding bytes in flight (threads x MLP x 4B) and apply Little''s law BEFORE
+    believing a copy is cheap. 128 threads/SM x 3 x 4B / 700ns = ~2 GB/s/SM.'
+  - 'cp.async + double-buffer + prefetch-one-tile-ahead converts a barrier-serialized
+    copy into background DMA; the issue-cost of cp.async ops scales with threads/CTA,
+    so raising Wc pays when the copy dominates (T=1 Wc2->Wc4: 1.068->0.943 ms).'
+  - 'Smem bank swizzles must respect the cp.async alignment granularity: 8B ops need
+    8B-aligned skewed rows (16d+8*(d>>4)); the resulting LDS pattern (lane l reads
+    d=8l+i) hits 32 distinct banks — conflict-free, BETTER than the padded-row trick
+    (36B pad = 8-way conflict) it replaced.'
+  - 'cudaFuncSetAttribute is PER-DEVICE (applies to the function on the caller''s current
+    device). In a multi-thread TP server, a once-per-process `static bool configured`
+    guard is a RACE: the first rank thread consumes the flag and the second rank launches
+    with the attribute UNSET on ITS device -> cudaErrorInvalidValue, timing-dependent
+    (crashed 2/2 under the guard, 0/2 manual starts). Use `static thread_local bool`.'
+  - 'Phase-skip attribution on the ACTUAL model kernel (compile-time bitmask template
+    param, default 0) is the cheapest reliable profiler when ncu counters are blocked
+    (ERR_NVGPUCTRPERM, no sudo): 8 variants x 1 bench run localized the decay to one
+    loop.'
+  - 'PACKED CODE BYTES ARE KEY-PAIRS: process both keys of a byte in ONE warp (keypair
+    iteration) — splitting the pair across warps doubles the LDS + unpack of every byte.'
+  - 'Standalone-vs-model gap resolved: a standalone bench that MATCHES the model kernel
+    + config (exact geometry, splits, page count) reproduces model per-key costs; the
+    earlier misleading bench measured a different kernel with a synthetic layout.'
+- id: i8_unified_long_ctx_regression
+  date: '2026-08-31'
+  design: unified all-warps-producer I8 decode body, Br=Wc*16, dynamic smem, cp.async
+    staging, s8-QK
+  incumbent: shipped producer/consumer I8 tiled kernel, Wc=8, static smem 37KB
+  predicted_before_build: 'NOT DONE (the miss). Retrospective: smem formula 44KB@Wc=2
+    -> 2 CTA/SM -> 4 warps/SM lockstep; incumbent 16 warps/SM decoupled -> 4x stream
+    deficit on a memory-bound shape -> regression was predictable.'
+  measured:
+    standalone_t1_ms:
+      shipped: 0.416
+      unified_wc2: 0.538
+      unified_wc4: 0.803
+      unified_wc8: 2.235
+    standalone_t4_ms:
+      shipped: 0.442
+      unified_wc4: 0.86
+    model_ab_ms_per_round_160k:
+      shipped: 53.2
+      unified: 61.3
+      gap_pct: 15
+    guard_tps:
+      unified_wc2:
+        10k: 71.6
+        25k: 68.6
+        40k: 65.6
+        80k: 60.1
+        160k: 56.6
+      shipped_p0_greedy:
+        10k: 69.6
+        25k: 70.0
+        40k: 66.4
+        80k: 63.4
+        160k: 60.0
+  root_cause: 'independent latency-hiding streams/SM: unified 4 (2 CTA x 2 lockstep
+    warps) vs shipped 16 (2 CTA x 8 producer/consumer warps). NOT in-flight bytes
+    (both 32 KiB/SM). NOT thread count (Wc up = worse via occupancy cliff).'
+  root_cause_v2: "ROW-STARVATION is the deepest cause. At T=1, row_count=6 but br=Wc*16.\
+    \ Warp 0 holds the 6 real rows; every other warp holds ZERO real rows yet runs\
+    \ the FULL key loop and does full QK+softmax+PV on invalid (masked-to-inf) rows.\
+    \ So warps split on a dimension (rows) that has no work \u2014 the dimension with\
+    \ infinite work (KEYS, ~160k) is never partitioned across warps. Shipped avoids\
+    \ this via producer/consumer (extra warps stage K/V, work exists). B must give\
+    \ non-row warps real work by splitting KEYS."
+  evidence_row_starvation: W=8 measured 75 GB/s = 7/8 warps running the whole key
+    loop on invalid rows; it is 8x the compute of W=1 for 6 useful rows. bw_probe2
+    shows 8 warps/SM pure-read = 397 GB/s, so the barrier+wasted-rows overhead, not
+    BW, is what sinks the real kernel at W=8.
+  occupancy_measured:
+    shipped_T1_Wc8:
+      warps_per_sm: 16
+      occ_cta: 2
+      smem: 37KB static
+      ms: 0.416
+    unified_T1_Wc2:
+      warps_per_sm: 4
+      occ_cta: 2
+      smem: 44288
+      ms: 0.538
+    unified_T1_Wc4:
+      warps_per_sm: 4
+      occ_cta: 1
+      smem: 55040
+      ms: 0.803
+    unified_T1_Wc8:
+      warps_per_sm: 8
+      occ_cta: 1
+      smem: 76544
+      ms: 2.235
+  design_flaw: 'unified br=Wc*16 couples smem to warp count; shipped br=RowTiles*16
+    (=16 for T=1) keeps q_s/p_s small so Wc=8 fits 2 CTAs. The fix that reaches 16
+    warps/SM is shipped''s partition: decouple br from Wc AND D-split PV across warps
+    (consumer_tile=warp%RowTiles, consumer_slice=warp/RowTiles) so every warp does
+    real output work, plus a producer warp for QK+softmax.'
+  context_dependence: 'gap is LONG-CTX ONLY: unified FASTER at 10k (71.6 vs 69.6),
+    ~equal 25-40k, slower 80-160k. Short ctx is not memory-bound enough to expose
+    the stream deficit.'
+  invariant_cost: '''join not rewrite'' costs ~29% on I8 T=1 long-ctx decode. Quantified.'
+  fix_path_B: 'decouple Br from Wc (Br=row-tiles*16) and split keys/D across warps
+    so Wc can rise to 8 at 2 CTA/SM (16 warps/SM) WITHOUT smem blowup; OR add producer/consumer
+    decoupling to the I8 variant. Risk: key-split PV breaks bit-identity -> acceptance
+    shifts to FP64-oracle tolerance.'
+  fix_path_B_v2: 'Adopt shipped''s D-split-PV partition into gqa_decode_slice3_i8_kernel:
+    RowTiles=ceil(row_count/16), Br=RowTiles*16 (DECOUPLED from Wc), consumer_tile=warp%RowTiles,
+    consumer_slice=warp/RowTiles, PVNtPerWarp=D/(ConsumerWarpsPerTile*8), producer
+    warp(s) (warp<RowTiles) do QK+softmax->p_s+alpha_s, non-producers dequant V, ALL
+    warps D-split PV. Reaches 16 warps/SM (2 CTA x 8) at 0.416ms.'
+  de_risk: gqa_decode_slice3_i8_kernel is a STANDALONE kernel (gqa_decode_slice3_i8.cuh),
+    used only by launch_tc_partial_unified_i8. bf16 uses gqa_attention_small_t_tc_partial_bf16_kernel;
+    KVarN uses kvarn kernels -> redesigning the I8 body does NOT touch bf16/KVarN.
+    Bit-identity preserved because PV output is D-disjoint per warp (each output element
+    accumulated over all keys in one warp).
+  status: 'B SHIPPED as default I8 decode route (commit e3fe66a4). Server @160k: decode=70.9
+    tok/s (guard), vs shipped 66.0-66.1 and old row-split unified 53.4 (PRIOR same-ctx,
+    tok/round may differ). Standalone ~0.416ms T1 = shipped. Full comment below.'
+  b_prototype_evidence:
+    occupancy:
+      wc8_rowtiles1: 2 CTA/SM x 8 = 16 warps/SM
+    smem_dynamic: 30528
+    perf_t1_160k_ms:
+      v2_dsplit_wc8: 0.413
+      shipped: 0.416
+      unified_wc2: 0.538
+    perf_t4_160k_ms:
+      v2_dsplit_wc8: 0.445
+      shipped: 0.445
+      unified_wc4: 0.867
+    correctness:
+      v2_vs_shipped_max_diff: 0
+      unified_vs_v2_max_diff: 0
+      v2_vs_oracle_max_err: 0
+  production_result:
+    median_decode_tps:
+      10000: 73.0
+      25000: 71.6
+      40000: 69.5
+      80000: 66.2
+      160000: 66.1
+    context_decay_10k_to_160k_pct: -9.5
+    comparison_prior_same_route: prior shipped A/B (i8-ab-shipped) @160k = 66.0-66.1
+      @ tok/round 3.21/accept 73.5; old row-split unified (i8-ab-unified) = 53.4.
+      Same-session interleaved A/B for the ms/round gate; raw t/s differs with tok/round.
+      Standalone kernel is bit-identical to shipped (0.416ms), so the server win is
+      occupancy-driven.
+- id: kvarn_thread_count_not_binding
+  date: '2026-08-31'
+  finding: KVarN unified runs 64/128 threads, zero warp specialization, at parity
+    with packed 256-thread producer/consumer. Thread count NOT binding for KVarN.
+  contrast: 'does NOT transfer to I8 T=1: I8 T=1 is the one shape both memory-bound
+    AND row-starved (6 rows), so it needs streams it can''t get from row-split warps.
+    KVarN''s binding cost was memory access pattern, not occupancy.'
+  lesson: a 'lever X doesn't matter' conclusion is SHAPE-SPECIFIC. Re-derive per shape;
+    never port a negative result across cache types.
+- id: i8_s8qk_port
+  date: 2026-08-30/31
+  finding: bf16-QK unified (53.4 t/s @160k, 1.237x RED) -> s8-QK port (int8 K via
+    cp.async, mma.s8 QK, next-tile-before-PV overlap) -> 56.6 t/s. dtype+overlap recovered
+    ~6%; the residual gap is occupancy (case 1).
+  lesson: halving bytes (bf16->int8) and adding transfer/compute overlap are the two
+    biggest memory-bound wins; both were in the port. Occupancy was the hidden third.
+- id: kvarn_sinkhorn_convergence
+  date: '2026-08-31'
+  design: KVarN prefill quantizer's sinkhorn_balance_log hardcodes kSinkhornIters=16
+  finding: 'a CONVERGENCE STUDY (tests/kvarn_sinkhorn_convergence.cpp, pure CPU, mirrors
+    the codec) showed the Sinkhorn converges by ~4 iters: reconstruct rel-l2 vs the
+    16-iter result = 0 @12, 2.7e-7 @8/6, 3.3e-7 @4, 1.2e-4 @2. The kernel''s best_spread
+    selection freezes the best scale at convergence, so later iters change nothing.'
+  measured: GPU quantize 693 us/page @16 iters -> 318 us/page @4 iters (2.2x). Server
+    prefill +8% (663->715 @40k, 598->658 @80k). ALL 4 KVarN oracle suites PASS at
+    4 iters.
+  lesson: 'iterative kernels converge far earlier than their hardcoded count. Re-derive
+    with a max_iters param + measure delta vs iters ON CPU as a pre-flight. Make the
+    count a #ifndef CMake define. This found a 2.2x kernel win from a 5-line CPU test
+    with no GPU rebuild.'
+  caveat: "C4 in docs/120, nominally OWNER-GATED (numerics change) \u2014 the greedy\
+    \ byte-identity anchor should be re-run before final. Also: it IMPROVED prefill\
+    \ but did NOT close the Phase-3 D1 gate (\xB15% of bf16; KVarN still ~-7.3% behind).\
+    \ Don't conflate 'improved' with 'gate met'."
+  also_corrected: 'the doc''s ''the sync is the blocker'' assumption was WRONG: bench_kvarn_quantize
+    showed the per-append D2H+sync is ~6 us/page (negligible), the 3.61s is Sinkhorn
+    COMPUTE. So C2 (sync removal) is worth ~nothing; C3 (side-stream) is still the
+    only path to close the 12.4% gap.'
+- id: kvarn_decode_decay_resolved
+  date: '2026-08-31'
+  design: the doc claimed KVarN decode 'decays -37% from 10k to 250k' and 'is 3x int8
+    per-key compute'
+  finding: "BOTH were MEASUREMENT ARTIFACTS. Kernel ns/key is FLAT (~3.8, linear R^2~0.999)\
+    \ \u2014 the kernel does not decay. The '-37% decay' was raw t/s vs ms/round (acceptance/tok_per_round\
+    \ noise). The '3x per-key' came from a ~40x-wrong cost table (153 vs 51 ns/key)."
+  measured: "KVarN kernel 3.74 ns/key vs int8 2.60 ns/key = 1.44x, at HALF the bytes\
+    \ (264 vs 528 B/key). ms/round: KVarN = 1.06-1.09x bf16, 1.09-1.18x int8 at EVERY\
+    \ context \u2014 a uniform ~6-9% gap, not a growing decay."
+  lesson: "ALWAYS use ms/round (= 1000*tok_per_round/tps) to compare decode cost,\
+    \ NEVER raw t/s. Raw t/s = C/keys (more keys/step) AND is confounded by acceptance/tok_per_round\
+    \ drift. And NEVER trust a secondhand ns/key table \u2014 re-measure at the kernel\
+    \ level. This reframed 'intractable 3x compute reduction' into 'a bounded, allowed\
+    \ ~6-9% prologue delta.'"
+  also: "the QK MMA type is the real differentiator (int8=mma_s8, KVarN=mma_bf16).\
+    \ The s8-code fold fix (doc83 lever1) is a MEASURED DEAD END (+13%) \u2014 do\
+    \ not re-attempt."
+- id: kvarn_batched_quantize
+  date: '2026-08-31'
+  design: batch the prefill quantize_tile_kernel from <<<1,256,73KB>>> (1 block/SM,
+    34x SM-starvation) to <<<heads,256>>> via a per-head grid in gqa_kvarn_commit_completed
+  finding: the batch was bit-identical CODES (validated in-model, head0+head1 diff=0)
+    but broke MTP (accept=0%, garbage) because the V quantize scale field offset was
+    wrong.
+  root_cause: V scale field map has s_row_V at +1088, but the batch launcher passed
+    s_row_v at +512 (which is s_row_K). So V wrote s_row_V to +512 (corrupting s_row_K)
+    and never landed at +1088 (hydrate read stale). K used s_row_K=+512 (correct);
+    V uses s_row_V=+1088 (different!).
+  fix: kvarn_quantize_vheads_launch passes s_row_v=scales+1088 (not +512).
+  result: 'green: correct output, MTP accept=69.8%, tok/round=3.10, prefill 802 tok/s.
+    slice4/materialize/codec all PASS.'
+  lesson: 'K and V quantize use DIFFERENT scale-field offsets (s_row_K=+512, s_row_V=+1088)
+    even though they LOOK symmetric. A batch/launch that shares one offset for both
+    K and V silently corrupts the V scale layout (bit-identical codes, WRONG scales).
+    ALWAYS verify the K-vs-V scale field map per kernel/launch. Also: the in-model
+    A/B (batch codes vs sequential codes diff=0, then compare SCALES) is what finally
+    isolated it; codes alone are not sufficient validation.'
+open_questions:
+- 'B RESOLVED (2026-08-31): key-split/D-split DOES reach 16 warps/SM within 100KB
+  smem (30.5KB), and bit-identity SURVIVES (v2-vs-shipped max_diff=0). The winning
+  partition shipped as the default I8 route (commit e3fe66a4). No FP64-oracle fallback
+  needed.'
+- "Is the producer/consumer decoupling factor the true limiter, or is it the 2x __syncthreads/tile\
+  \ barrier serialization of lockstep warps? (Now moot for I8 \u2014 D-split fixed\
+  \ it \u2014 but still open as a general question for bf16/KVarN row-starved shapes.)"
+- dram_latency_ns_est=700 is unverified on this box; a measured latency would tighten
+  the Little's-law gate.
+- T=6 I8 uses Wc=12 (RowTiles=3). Confirm via the full int8 guard that T=6 (MTP verify
+  at +5 has no T=6 emit, so this is the T=5/6 dispatch) holds parity, not just T=1/T=4.
+process_lessons:
+- 'WHEN A LAUNCHER INFERS A PARAMETER that a callee re-derives from a struct, write the
+  inference back into the struct. The unified decode route silently returned ZEROS for
+  isolation-test callers (packed_pages=-1 -> key_base=-64 -> every tile treated as empty
+  tail) because the launcher inferred the value into a local but forwarded the struct
+  unchanged. Live paths masked it (they always set the field); only the test battery
+  caught it — and it had been failing unnoticed since the route became the default.
+  Re-run the FULL test battery after any default-route flip.'
+- 'PREDICT OCCUPANCY BEFORE BUILDING. The one-line pre-flight that would have caught
+  B: count warps/SM from the smem formula + launch_bounds, compare to the incumbent.
+  B''s design was lost on paper in ~10min; we built it and measured a 29% regression
+  instead. Encode as `preflight_checklist` step 4-5, step on every kernel design.'
+- "A NEGATIVE/DEGRADED result is a design smell, not a tuning problem. Wc 2->4->8\
+  \ got WORSE (0.538->0.803->2.235), so the knob was coupled to a constraint (smem).\
+  \ When raising a parallelism knob makes things worse, the knobs are COUPLED \u2014\
+  \ redesign the partition, don't tune harder."
+- 'SHAPE-SPECIFICITY: ''KVarN thread-count doesn''t matter'' did NOT transfer to I8
+  T=1 (which is row-starved). Re-derive per shape; never port a negative result across
+  cache types.'
+- STANDALONE BENCH BEFORE THE MODEL. The 29% kernel gap was found in seconds on tests/slice3_i8_bench.cu;
+  the model A/B confounds it with MTP tok/round + session noise. Isolate the kernel,
+  then attribute to the round.
+- 'KERNEL-BENCH NEUTRAL != FULL-MODEL NEUTRAL. A change measured perf-neutral on the
+  standalone kernel bench can STILL regress the full model (KVarN: swizzle+V-staging
+  was neutral @9k/@160k on the bench but the decode_guard showed a GROWING regression
+  10k -2% -> 160k -18%). The bench exercises one kernel in isolation; the full model
+  adds the reduce kernel, real page/memory layout, L2 working set, and split/window
+  math. ALWAYS A/B at the decode_guard level before trusting a kernel change.'
+- 'Concurrent-agents collision: two agents on the same repo/GPU can take down each
+  other''s server mid-run (this session: a misdirected message to another agent freed
+  the GPU while the guard was running). Guard long runs with `setsid` so they survive
+  tool-call boundaries; check `nvidia-smi` for a stray server before judging a wall-clock
+  number.'
+- 'CONVERGENCE STUDY BEFORE TRUSTING A FIXED ITERATION COUNT. Any iterative/kernel
+  with a hardcoded loop count (Sinkhorn, power-iter, coarsening): re-derive with a
+  max_iters param, measure output delta vs iters on CPU (fast, no GPU, no rebuild).
+  If it converges early (e.g. Sinkhorn by 4 of 16), the iters are the lever. This
+  is a pure pre-flight: seconds of CPU time reveals a 2-4x kernel win. Always make
+  the count a `#ifndef` CMake define so a quick sweep doesn''t need to edit the kernel.'
+- "GATE-DISCIPLINE: a win that helps, but doesn't close the gate, is still just progress\
+  \ \u2014 say so. The Sinkhorn 16->4 gave +8% prefill, but the Phase-3 D1 gate is\
+  \ '+/-5% of bf16' and KVarN is still ~-7.3% behind bf16. Don't confate 'improved'\
+  \ with 'gate met'. Track the gate number explicitly next to the deltas."
+- CI RUN-TIME is a real cost. The full decode_guard sweep at ITERS=3 x 6 contexts
+  was ~60min; running the largest (prefill-dominated, ~9min) context once instead
+  of 3x + ITERS=2 cut it ~33-40%. Long-running unittests/benchmarks should have a
+  'largest case runs once' rule.
+- "COMPOUNDING LAW \u2014 evaluate a lever by WALL impact per context, not kernel\
+  \ t/s delta. Prefill share of wall grows with ctx (KVarN: 86% @10k -> 99.5% @250k,\
+  \ measured). So at high ctx: (a) PREFILL optimizations compound (near-direct wall\
+  \ win), and (b) DECODE optimizations are ~worthless (decode is 0.5% of wall @250k).\
+  \ A kernel-bench decode win (V-staging -18%) multiplied by 0.5% weight = ~nothing\
+  \ at long ctx, and the scattered-access/reduce-kernel interactions made it net-negative.\
+  \ NEVER chase a 'decode decay' at 250k; it's a decoy. Wall impact = prefill_share*prefill_delta\
+  \ + (1-prefill_share)*decode_delta."
+
+kvarn_knowledge:
+  beellama_kvarn_decode:
+    _comment: 'External fork (valujin/beellama-kvarn) that fixed the high-context KVarN decode
+      decay to q8_0 parity. The single biggest lesson: KVarN decode decay is REDUCIBLE, not an
+      intrinsic per-key-compute floor. Single slot 23.87->32.50 tok/s (x1.36) at depth 65k.'
+    mma_fragment_row_permute:
+      _comment: 'mma.m16n8k16 operand-A layout is hardware-fixed: a thread holds rows t/4 and
+        t/4+8. In KVarN storage those are tokens 8 apart -> each needs its own 32-bit word, so a
+        5-bit element costs 1.125 loads and only 4.4 useful bits per 32 read. Re-declaring the
+        fragment row r as token (2*(r%8)+r/8) makes a thread two rows ADJACENT tokens, one load
+        fetches both. Reversible on the C write; bit-identical. This is a dequant-BANDWIDTH win
+        that scales with ctx (more keys -> more waste).'
+      applicable_to_ninfer_decode: false
+      reason: 'Ninfer packed decode stages codes into SMEM (k_s/v_s) then ldmatrix_x4, so the
+        full fragment is fetched in one ldmatrix; the "one load per 2 fragment rows" is already
+        captured. We are 4/2-bit byte/uint16-granular, so we lack the 5-bit 32-bit-word waste. Do
+        NOT port KVARN_FRAG_ROW — it is a no-op here.'
+    skip_fully_masked_splits:
+      _comment: 'When kv-unified, another sequence is -inf masked. The kernel still unpacked the
+        tile then discarded it (+27% dual-slot win). Pre-check the mask: all tokens -inf -> write
+        -INF partial and return. Skipping == adding zero (zero softmax -> zero partial).'
+    read_plan_not_rbtree:
+      _comment: '+9.8% single-slot / +13.7% dual. Build a compact sequential read plan instead of
+        walking a red-black tree per cell + host-side bookkeeping. Shows the single-slot decay is
+        dominated by the read/traversal PLAN, not per-key dequant FLOPs.'
+    register_cap_two_blocks: 0
+    block_128_to_1024_threads:
+      _comment: 'descriptor kernel 128->1024 threads cut step time 13%. Occupancy/parallelism can
+        be a big lever on the descriptor/plan pass independent of dequant. Check the descriptor
+        grid vs SM count.'
+    big_lesson:
+      _comment: 'KVarN decode decay is reducible. Our decay sources (V-deq grows 4%->24%,
+        prefetch ~26%, K-deq ~21%, PV-MMA ~17%) are INTERNAL kernel inefficiencies, not an
+        intrinsic floor. The fork proves parity with q8_0 is reachable. Where their data path
+        differs (inline-fragment dequant), ours already uses smem-staging, so port the CONCEPT
+        (reduce per-token work / plan efficiency / occupancy) not the literal fragment-row index.'
+
+  standalone_bench_vs_model_decay:
+    _comment: 'bench_kvarn_attention (synthetic contiguous layout) shows decode_split is
+      per-page FLAT: 0.263/0.178/0.201 us/page across 10k/156p, 40k/625p, 160k/2504p. But the
+      model guard sees ms/round decay 1.015->1.156 vs int8 with context. This is the classic
+      standalone-vs-model gap: the synthetic bench uses a contiguous page layout (L2-friendly),
+      while the model reads block_table-scattered pages whose working set exceeds L2 at long ctx.
+      So per-key kernel ns is flat; the decay is a MEMORY-HIERARCHY (L2/DRAM miss) effect from
+      real page scatter, NOT per-key compute. NEVER use the standalone bench to judge a
+      long-context decay; the model guard is the arbiter. Mitigations target page locality
+      (prefetch, page order, block_table contiguity), not per-key ALU.'
+
+  i8_160k_decode_tps:
+    value: 66.1
+    unit: tok/s
+    measured: '2026-08-31'
+    gate: '>= shipped 60.5-60.6 t/s @160k (user hard requirement). Result 66.1 = +9.2% -> GREEN.'
+    _comment: 'int8 160k decode is 66.1 t/s, comfortably above the 60.5-60.6 shipped requirement.'
+
+  slice4_v_staging_neutral:
+    _comment: 'The MODEL default decode is the UNIFIED slice4 kernel (gqa_decode_slice4_kvarn), NOT
+      the packed split/merge the standalone bench measures. slice4 prologue stages K codes (cause-3)
+      but read V codes from GLOBAL -> added a 4096B vcode_s smem stage + coalesced copy + V-deq from
+      smem. Correct (slice4_kvarn_test PASS) but MODEL-NEUTRAL: 10k 70.9 (+2.6%), 40k 63.3 (~-1%).'
+    lesson: 'V-code L2-miss staging is NOT the long-ctx decode decay source, in EITHER the packed or
+      the slice4 kernel. The decay (kvarn 48.4 vs int8 66.1 @160k) is elsewhere: online-softmax
+      merge (runs per-key, grows with keys) / PV-MMA / non-dequant overhead. The beellama fork proves
+      it is reducible, but not via V-code staging.
+      RESOLVED 2026-09-01 (c631f7f1): the decay WAS the staging mechanism — the SYNCHRONOUS
+      global->reg->smem copy loop (latency-bound ~88 GB/s, barrier-serialized), not WHICH codes.
+      Double-buffered cp.async per-tile prefetch fixed it: 160k 47.1->53.2 t/s, 10k 69.1->74.7.
+      See case study kvarn_slice4_staging_copy_decay.'
+    critical_route_reframe: 'The standalone bench (bench_kvarn_attention) measures the PACKED decode
+      kernel, but the MODEL uses the slice4/UNIFIED kernel. ANY packed-decode optimization (incl.
+      V-staging) is measured on the wrong code path. Verify which kernel the model dispatches before
+      trusting a bench result.'
+
+  last_known_good_commits_wo_kv_uniform:
+    decay_fix:
+      commit: c631f7f1
+      label: 'cp.async double-buffered tile staging in slice4 + T=1 Wc=4'
+      decode_tps: {10000: 74.8, 40000: 67.7, 160000: 53.7, 250000: 46.4}
+      prefill_tok: {10000: 806.7, 40000: 740.1, 160000: 583.4, 250000: 503.3}
+      note: 'NEW max decode at every measured ctx; prefill preserved. Supersedes both prior
+        last-known-good points as the working base.'
+    max_prefill:
+      commit: 7917a1de
+      label: 'materialize K-smem staging in the materialize kernel'
+      prefill_tok: {10000: 808.0, 40000: 741.1, 160000: 584.1}
+      decode_tps: {10000: 72.2, 40000: 67.6, 160000: 48.4}
+      note: 'HIGHEST prefill measured on wo/kv-uniform. Revert target for the max-prefill state.'
+    max_decode_10k:
+      commit: 75c416e4
+      label: 'decode V-staging (smem)'
+      decode_tps_10k: 73.8
+      prefill_tok: {10000: 802.6, 80000: 677.3}
+      mtp: '3.12 tok/round (70.7%)'
+      note: 'MAX decode @10k (73.8 t/s, the ~1 t/s above the max-prefill commit). Later reverted
+        (808f19b4) + superseded by slice4 V-staging (bae529c6). @80k is noisy (57.5 vs 49.8).'
+    kernel_bench_no_model:
+      commit: 1478715b
+      note: '~17-21% decode kernel speedup but FULL-MODEL regression (reverted 7dda93c9). Classic
+        standalone-vs-model gap: the bench improved, the model did not.'
+    caveat: 'Do not mix these two measurement setups when comparing: 7917a1de used the guard gen=64 at
+      10k/40k/160k; 75c416e4 used a manual gen=155/104 at 10k/80k. Decode t/s is per-step so it is the
+      fair cross-compare only at matching contexts.'
