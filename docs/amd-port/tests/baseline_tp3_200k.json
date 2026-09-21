@@ -11,7 +11,7 @@
     "kv_dtype": "q4_0",
     "fa": "on",
     "batch_size": 512,
-    "ubatch_size": 128,
+    "ubatch_size": 512,
     "temperature": 0.0,
     "untraced_no_spec_reference_tps": 12.24
   },
@@ -26,8 +26,8 @@
   "cells": {
     "prefill_2k": {
       "prompt_tokens_target": 2075,
-      "prompt_per_second": 96.5,
-      "description": "Prefill throughput on 2k prompt (probe_2k.txt prose)"
+      "prompt_per_second": 113.5,
+      "description": "Prefill throughput on 2k prompt (promoted ub512 config)"
     },
     "prefill_8k": {
       "prompt_tokens_target": 7857,
@@ -37,7 +37,7 @@
     "decode_8k_10k": {
       "ctx_target": 7857,
       "completion_tokens": 128,
-      "decode_per_second": 15.57,
+      "decode_per_second": 14.94,
       "mtp_accept_ratio": 0.667,
       "mtp_mean_len": 3.00,
       "description": "Decode throughput at 8k-10k primed context with draft-mtp (PLOG-101)"
