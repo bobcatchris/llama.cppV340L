@@ -292,6 +292,10 @@ extern "C" {
         // NULL-terminated list of devices to use for offloading (if NULL, all available devices are used)
         ggml_backend_dev_t * devices;
 
+        // device for the MTP/nextn layers of the model (weights and KV cache)
+        // used to run the MTP draft head on a separate device; NULL = follow the normal split [EXPERIMENTAL]
+        ggml_backend_dev_t dev_mtp;
+
         // NULL-terminated list of buffer types to use for tensors that match a pattern
         const struct llama_model_tensor_buft_override * tensor_buft_overrides;
 
@@ -392,6 +396,11 @@ extern "C" {
         // a source/target/parent context
         // can be utilized in various ways, for example by sharing results or llama_memory between 2 contexts
         struct llama_context * ctx_other;
+
+        // extra device to add to this context's backend list (after the model's devices, skipped
+        // if the device is already among them); combine with dev_mtp to run an MTP draft context
+        // on a separate device; NULL = none [EXPERIMENTAL]
+        ggml_backend_dev_t extra_device;
     };
 
     struct llama_model_tensor_override {

@@ -524,7 +524,8 @@ llama_model_loader::llama_model_loader(
         bool check_tensors,
         bool no_alloc,
         const llama_model_kv_override * param_overrides_p,
-        const llama_model_tensor_buft_override * param_tensor_buft_overrides_p)
+        const llama_model_tensor_buft_override * param_tensor_buft_overrides_p,
+        ggml_backend_dev_t param_dev_mtp)
         : metadata(meta), set_tensor_data(set_tensor_data), set_tensor_data_ud(set_tensor_data_ud) {
     int trace = 0;
     if (getenv("LLAMA_TRACE")) {
@@ -538,6 +539,7 @@ llama_model_loader::llama_model_loader(
     }
 
     tensor_buft_overrides = param_tensor_buft_overrides_p;
+    dev_mtp = param_dev_mtp;
 
     if (!fname.empty()) {
         // Load the main GGUF
@@ -1183,6 +1185,15 @@ struct ggml_tensor * llama_model_loader::create_tensor(
                     break;
                 }
             }
+        }
+
+        // MTP/nextn layers go to dev_mtp when set (e.g. draft-device offload),
+        // unless the tensor was already matched by an explicit override above
+        if (!buft && dev_mtp && tn.bid != -1 && tn.bid >= (int) hparams.n_layer()) {
+            buft = ggml_backend_dev_buffer_type(dev_mtp);
+
+            LLAMA_LOG_DEBUG("tensor %s buffer type set to %s (MTP device)\n",
+                    tn.str().c_str(), ggml_backend_buft_name(buft));
         }
 
         if (!buft) {

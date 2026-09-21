@@ -1016,6 +1016,21 @@ private:
                                         COMMON_SPECULATIVE_TYPE_DRAFT_MTP) != params_base.speculative.types.end();
         const bool has_spec = has_draft || spec_mtp;
 
+        if (params_base.dev_mtp && !spec_mtp) {
+            SRV_WRN("%s\n", "spec-mtp-device is set but draft-mtp is not enabled - ignoring it\n");
+            params_base.dev_mtp = nullptr;
+        }
+
+        if (params_base.dev_mtp) {
+            for (auto * dev : params_base.devices) {
+                if (dev == params_base.dev_mtp) {
+                    SRV_ERR("%s\n", "spec-mtp-device must not be one of the target devices (-dev)\n");
+                    return false;
+                }
+            }
+            SRV_INF("MTP draft device: %s\n", ggml_backend_dev_name(params_base.dev_mtp));
+        }
+
         if (callback_state) {
             std::vector<std::string> stages = {"text_model"};
             if (has_spec) {
@@ -1095,6 +1110,8 @@ private:
                     params_dft.cache_type_k          = params_spec.cache_type_k;
                     params_dft.cache_type_v          = params_spec.cache_type_v;
                     params_dft.tensor_buft_overrides = params_spec.tensor_buft_overrides;
+                    // the draft model placement is owned by --spec-draft-device
+                    params_dft.dev_mtp               = nullptr;
                 } else {
                     // MTP draft context lives on the target model, only context+compute are new
                     measure_model_bytes = false;
@@ -1108,6 +1125,7 @@ private:
                     cparams_dft.ctx_type = LLAMA_CONTEXT_TYPE_MTP;
                     cparams_dft.type_k   = params_base.speculative.draft.cache_type_k;
                     cparams_dft.type_v   = params_base.speculative.draft.cache_type_v;
+                    cparams_dft.extra_device = params_base.dev_mtp;
                 }
                 cparams_dft.n_rs_seq = 0;
 
@@ -1188,6 +1206,8 @@ private:
             params_dft.n_gpu_layers = params_spec.n_gpu_layers;
             params_dft.cache_type_k = params_spec.cache_type_k;
             params_dft.cache_type_v = params_spec.cache_type_v;
+            // the draft model placement is owned by --spec-draft-device
+            params_dft.dev_mtp      = nullptr;
 
             if (params_spec.cpuparams.n_threads > 0) {
                 params_dft.cpuparams.n_threads       = params_spec.cpuparams.n_threads;
@@ -1241,11 +1261,17 @@ private:
             cparams_mtp.n_rs_seq      = 0;
             cparams_mtp.n_outputs_max = params_base.n_parallel;
             cparams_mtp.ctx_other     = ctx_tgt;
+            cparams_mtp.extra_device  = params_base.dev_mtp;
 
             ctx_dft.reset(llama_init_from_model(model_tgt, cparams_mtp));
             if (ctx_dft == nullptr) {
                 SRV_ERR("%s", "failed to create MTP context\n");
                 return false;
+            }
+
+            if (params_base.dev_mtp) {
+                SRV_INF("MTP draft context runs on %s (nextn weights + KV pinned to the draft device)\n",
+                        ggml_backend_dev_name(params_base.dev_mtp));
             }
 
             params_base.speculative.draft.ctx_tgt = ctx_tgt;

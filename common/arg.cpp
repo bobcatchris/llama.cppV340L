@@ -933,6 +933,33 @@ static std::vector<ggml_backend_dev_t> parse_device_list(const std::string & val
     return devices;
 }
 
+// resolve a single device by name (e.g. "CUDA3") or by index into the visible GPUs
+static ggml_backend_dev_t parse_single_device(const std::string & value) {
+    ggml_backend_load_all();
+
+    if (!value.empty() && isdigit(value[0])) {
+        // bare integer: index into the visible GPU devices
+        std::vector<ggml_backend_dev_t> gpus;
+        for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+            auto * dev = ggml_backend_dev_get(i);
+            if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU) {
+                gpus.push_back(dev);
+            }
+        }
+        const int idx = std::stoi(value);
+        if (idx < 0 || idx >= (int) gpus.size()) {
+            throw std::invalid_argument(string_format("invalid GPU index: %s (%zu GPUs visible)", value.c_str(), gpus.size()));
+        }
+        return gpus.at(idx);
+    }
+
+    auto * dev = ggml_backend_dev_by_name(value.c_str());
+    if (!dev || ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU) {
+        throw std::invalid_argument(string_format("invalid device: %s", value.c_str()));
+    }
+    return dev;
+}
+
 static void add_rpc_devices(const std::string & servers) {
     auto rpc_servers = string_split<std::string>(servers, ',');
     if (rpc_servers.empty()) {
@@ -3737,6 +3764,21 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.speculative.draft.devices = parse_device_list(value);
         }
     ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    add_opt(common_arg(
+        {"--spec-mtp-device", "-devm", "--device-mtp"}, "<DEV>",
+        "device for the MTP draft context, e.g. CUDA3: the nextn-layer weights, the draft KV cache and\n"
+        "the draft compute run there while the target keeps its own split (none = run the draft on the\n"
+        "target devices; requires --spec-type draft-mtp; the device must not be part of the target split)\n"
+        "use --list-devices to see a list of available devices",
+        [](common_params & params, const std::string & value) {
+            params.dev_mtp = parse_single_device(value);
+            for (auto * dev : params.devices) {
+                if (dev == params.dev_mtp) {
+                    throw std::invalid_argument("--spec-mtp-device must not be one of the target devices (-dev)");
+                }
+            }
+        }
+    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_MTP_DEVICE"));
     GGML_ASSERT(params.speculative.draft.n_gpu_layers < 0); // string_format would need to be extended for a default >= 0
     add_opt(common_arg(
         {"--spec-draft-ngl", "-ngld", "--gpu-layers-draft", "--n-gpu-layers-draft"}, "N",
