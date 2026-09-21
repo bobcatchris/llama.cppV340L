@@ -582,3 +582,24 @@ to Gemini's guard battery, die 3 is the dev cell.
   If >2 GB/device confirms, the serving-die savings at TP2/200k are
   ~10x the historical 151 MiB shortfall - TP2+MTP@200k becomes
   comfortably viable, and TP3 gains ~2 GB/die of context headroom.
+- E-027 2026-09-21 Promoted ub512 baseline re-stamp + T4 producer correctness gate banked (Gemini lane, dies 0-2):
+  (1) Re-stamped baseline on promoted ub512 config via cold battery run with --ratchet
+  (receipt: results/tp3_guards_20260921_171802.jsonl). 5/5 GREEN: prefill 115.21 t/s (ratcheted),
+  decode 14.93 t/s, MTP accept 0.6667, determinism PASS, needle 3/3. tests/baseline_tp3_200k.json updated.
+  (2) T4 Step 1 (env unset): 5/5 GREEN (receipt: results/tp3_guards_20260921_170742.jsonl).
+  (3) T4 Step 2 (cache-ON gate, GGML_CUDA_Q81_ACT_CACHE=1): 5/5 GREEN (receipt:
+  results/tp3_guards_20260921_172641.jsonl). Greedy determinism is BYTE-IDENTICAL to cache-off
+  (sha256: 4beb1ba25219ee9b), MTP canary 0.6667, needle 3/3.
+  (4) Teardown assertion noted: GGML_ASSERT(pool_size == 0) triggers at server exit due to
+  un-freed q81_act_cache pool buffers (clean fix: call clear() in cache destructor).
+  (5) Resource arbitration: window granted on dies 0-2 for TP2-feasibility desk MTP VRAM profiling.
+  T4 Step 3 (3-rep perf A/B) paused until TP2 desk completes.
+
+- E-027 2026-09-21 T4 SERVED GATE PASSED (Gemini, dies 0-2): cache-ON
+  greedy determinism BYTE-IDENTICAL to cache-off (sha256 4beb1ba25219ee9b),
+  accept 0.6667, needle 3/3, 5/5 guards on rebuilt a62fc0f5a. Baseline
+  re-stamped on promoted ub512: prefill ratcheted to 115.21 t/s, decode
+  14.93 (receipt tp3_guards_20260921_171802.jsonl). OPEN BUG: teardown
+  GGML_ASSERT(pool_size == 0) - q81 cache buffers not returned at context
+  free; fix assigned to the T4 desk (gates promotion, not the running
+  OFF/ON perf A/B). Remaining for T4 promotion: 3-rep OFF/ON A/B >= +2%.
