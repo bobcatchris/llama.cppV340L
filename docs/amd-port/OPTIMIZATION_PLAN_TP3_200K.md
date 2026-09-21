@@ -352,3 +352,9 @@ to Gemini's guard battery, die 3 is the dev cell.
   packed-fp16 tile route OPENS. Small shapes worst (attn k/v ~1.6-2.1 TF/s).
   Custom tile must beat 4.62 TF/s/die to promote. Full output:
   results/W5_gemm_run_2026-09-21.txt; harness tests/bench_gemm_gfx900.cu.
+- E-016 2026-09-21 Two parallel desks dispatched (user granted 2-agent
+  assist): wt-tile-fp16 on amd/w5-tile-fp16 (W5 custom packed-fp16 GEMM
+  tile, die 3 PRIMARY - promotion bar 4.62 TF/s/die) and wt-t4-producer on
+  amd/t4-producer (T4 per-layer q8_1 activation-quant cache + fp16x2/V_DOT2
+  producer design; ZERO die-3 access until the tile desk completes - GPU
+  arbitration: tile desk owns die 3 first).
