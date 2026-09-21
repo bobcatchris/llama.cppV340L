@@ -352,3 +352,37 @@ to Gemini's guard battery, die 3 is the dev cell.
   packed-fp16 tile route OPENS. Small shapes worst (attn k/v ~1.6-2.1 TF/s).
   Custom tile must beat 4.62 TF/s/die to promote. Full output:
   results/W5_gemm_run_2026-09-21.txt; harness tests/bench_gemm_gfx900.cu.
+- E-016 2026-09-21 T4 producer desk dispatched (worktree wt-t4-producer,
+  branch amd/t4-producer; ZERO-GPU phase while die 3 is busy). Target: kill
+  the redundant activation re-quantization in decode (quantize_q8_1 =
+  7.1% of kernel budget, ~1400 launches/step; 8+ vec-q matmuls per layer
+  re-quantize the same 2-3 unique x). DESIGN BANKED: per-ubatch q8_1
+  activation cache in ggml_backend_cuda_context, env-gated
+  GGML_CUDA_Q81_ACT_CACHE=1 (static-once getenv). Key = (producing tensor
+  NODE, src1 data ptr, ne10-13, strides, device, stream): the node field is
+  the load-bearing safety choice - ggml-alloc free-block reuse can hand a
+  freed intermediate's address to a later same-shape tensor WITHIN one
+  compute, so a data-pointer-only key can false-hit; a node pointer cannot.
+  Entries are freed at every graph_compute entry, so nothing spans two
+  computes or outlives the compute buffer; cache is force-inactive during
+  CUDA graph capture/replay (captured quantizes must stay in-graph, replays
+  skip the host side). Vec-q path only; mul_mat_id excluded (ids!=nullptr
+  and op==NONE scratch slices). Bit-exact by construction: same kernel +
+  same key params + unchanged x = identical bytes (kernel is deterministic,
+  full padded rows written).
+- E-017 2026-09-21 T4 implementation banked (zero-GPU): ggml-cuda/common.cuh
+  ggml_cuda_q81_act_cache (64 MiB cap, hit/miss counters, INFO line every
+  256 computes) + hooks at both quantize sites (ggml_cuda_op_mul_mat split
+  path = the TP3 route, ggml_cuda_mul_mat_vec_q non-split) + begin_compute
+  gate in ggml_backend_cuda_graph_compute. Env unset = zero behavior
+  change (find/insert early-return, no counters). Compile-validated:
+  ggml-cuda.cu and mmvq.cu for gfx900 (rocm 6.2 clang, build-mirrored
+  flags) both clean. Host unit test
+  docs/amd-port/tests/test_q81_cache_host.cpp ALL PASS: hit bytes ==
+  fresh-quantize bytes (byte-exact quantize mirror incl. warp-reduce
+  butterfly), node-recycle must-miss, shape/stride/stream/device
+  sensitivity, per-compute invalidation frees 100% of pool memory, byte
+  cap stops inserts without eviction, nbytes() == both upstream size
+  formulas. Receipt: results/T4_producer_2026-09-21.md. DEFERRED to the
+  die-3 window: served greedy determinism byte-identical vs cache-off arm,
+  rocprof quantize_q8_1 count ~1400 -> ~450-500/step, decode t/s A/B.

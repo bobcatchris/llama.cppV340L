@@ -1958,14 +1958,38 @@ static void ggml_cuda_op_mul_mat(
             if (quantize_src1 == quantize_mmq_q8_1_cuda) {
                 src_1_ddq_size += get_mmq_x_max_host(dev[id].cc)*sizeof(block_q8_1_mmq);
             }
-            dev[id].src1_ddq = dev[id].src1_ddq_alloc.alloc(ctx.pool(id), src_1_ddq_size);
 
-            if (src1_on_device && src1_is_contiguous) {
-                quantize_src1(
-                    dev[id].src1_ddf, nullptr, dev[id].src1_ddq, src0->type, ne10,
-                    nb11/sizeof(float), nb12/sizeof(float), nb13/sizeof(float),
-                    src1_padded_col_size, ne11, ne12, ne13, stream);
-                CUDA_CHECK(cudaGetLastError());
+            // GGML_CUDA_Q81_ACT_CACHE: matmuls that share the same src1 within one
+            // graph compute share one q8_1 quantization of it (vec-q path only)
+            const bool q81_try = quantize_src1 == quantize_row_q8_1_cuda && src1_on_device && src1_is_contiguous
+                && ggml_cuda_q81_act_cache::cacheable(src1);
+            ggml_cuda_q81_act_cache::key q81_key{};
+            const ggml_cuda_q81_act_cache::entry * q81_hit = nullptr;
+            if (q81_try) {
+                q81_key = ggml_cuda_q81_act_cache::make_key(src1, id, stream);
+                q81_hit = ctx.q81_act_cache.find(q81_key);
+            }
+
+            if (q81_hit) {
+                dev[id].src1_ddq = (char *) q81_hit->buf;
+            } else {
+                if (q81_try) {
+                    if (ggml_cuda_q81_act_cache::entry * q81_slot =
+                            ctx.q81_act_cache.insert(q81_key, src_1_ddq_size, ctx.pool(id))) {
+                        dev[id].src1_ddq = (char *) q81_slot->buf;
+                    }
+                }
+                if (dev[id].src1_ddq == nullptr) {
+                    dev[id].src1_ddq = dev[id].src1_ddq_alloc.alloc(ctx.pool(id), src_1_ddq_size);
+                }
+
+                if (src1_on_device && src1_is_contiguous) {
+                    quantize_src1(
+                        dev[id].src1_ddf, nullptr, dev[id].src1_ddq, src0->type, ne10,
+                        nb11/sizeof(float), nb12/sizeof(float), nb13/sizeof(float),
+                        src1_padded_col_size, ne11, ne12, ne13, stream);
+                    CUDA_CHECK(cudaGetLastError());
+                }
             }
         }
 
@@ -4465,6 +4489,20 @@ static bool ggml_cuda_graph_set_enabled(ggml_backend_cuda_context * cuda_ctx, co
 }
 #endif // USE_CUDA_GRAPH
 
+// GGML_CUDA_Q81_ACT_CACHE=1 enables reuse of the q8_1 quantization of an activation
+// across the vec-q matmuls that consume it within one graph compute
+static bool ggml_cuda_q81_act_cache_enabled() {
+    static const bool q81_act_cache_enabled = [] {
+        const char * env = getenv("GGML_CUDA_Q81_ACT_CACHE");
+        const bool enabled = env != nullptr && atoi(env) == 1;
+        if (enabled) {
+            GGML_LOG_INFO("%s: q8_1 activation cache enabled (GGML_CUDA_Q81_ACT_CACHE=1)\n", __func__);
+        }
+        return enabled;
+    }();
+    return q81_act_cache_enabled;
+}
+
 static enum ggml_status ggml_backend_cuda_graph_compute(ggml_backend_t backend, ggml_cgraph * cgraph) {
     ggml_backend_cuda_context * cuda_ctx = (ggml_backend_cuda_context *) backend->context;
 
@@ -4518,6 +4556,10 @@ static enum ggml_status ggml_backend_cuda_graph_compute(ggml_backend_t backend, 
 
         CUDA_CHECK(cudaStreamBeginCapture(cuda_ctx->stream(), cudaStreamCaptureModeRelaxed));
     }
+
+    // the q8_1 activation cache is only valid for direct execution: during CUDA graph
+    // capture every quantize must run in-graph, and replays skip the host side
+    cuda_ctx->q81_act_cache.begin_compute(ggml_cuda_q81_act_cache_enabled() && !use_cuda_graph);
 
     ggml_cuda_graph_evaluate_and_capture(cuda_ctx, cgraph, use_cuda_graph, cuda_graph_update_required, graph_key);
 
