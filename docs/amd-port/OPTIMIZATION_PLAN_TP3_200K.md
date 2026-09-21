@@ -386,3 +386,15 @@ to Gemini's guard battery, die 3 is the dev cell.
   formulas. Receipt: results/T4_producer_2026-09-21.md. DEFERRED to the
   die-3 window: served greedy determinism byte-identical vs cache-off arm,
   rocprof quantize_q8_1 count ~1400 -> ~450-500/step, decode t/s A/B.
+- E-018 2026-09-21 T4 CORRECTION (served gate PASSED, teardown bug fixed):
+  determinism gate GREEN on the merged rebuilt branch - cache-ON greedy
+  output sha256 4beb1ba25219ee9b identical to cache-off, accept 0.6667,
+  needle 3/3, 5/5 guards. BUG: on clean server shutdown
+  GGML_ASSERT(pool_size == 0) fired - q81_act_cache buffers are raw
+  pool->alloc's, freed only at the next begin_compute, so at context
+  teardown the pools still had outstanding allocations when their
+  destructors ran the accounting. FIX: ggml_backend_cuda_context dtor now
+  calls q81_act_cache.clear() first - pools are context members destroyed
+  after the dtor body, so every entry returns to its live pool; unset-env
+  path untouched (empty map, no-op). Fix gates PROMOTION only; Gemini
+  proceeds with the OFF/ON 3-rep perf A/B on the pre-fix binary.
