@@ -3,6 +3,7 @@
 #include "unary.cuh"
 #include "vecdotq.cuh"
 
+#include <algorithm>
 #include <cstdint>
 
 typedef float (*vec_dot_q_cuda_t)(const void * __restrict__ vbq, const block_q8_1 * __restrict__ bq8_1, const int & kbx, const int & iqs);
@@ -674,6 +675,104 @@ static __global__ void mul_mat_vec_q(
     }
 }
 
+// GGML_CUDA_MMVQ_GROUP: one row of one member of a grouped decode GEMV.
+// Exact copy of the solo mul_mat_vec_q<type, ncols_dst=1, has_fusion=false,
+// small_k=false> schedule for one row (rows_per_cuda_block == 1 whenever
+// small_k is off), with nwarps read from the launch configuration: the host
+// gates grouped launches to members whose solo geometry is uniform, so
+// blockDim.y always equals calc_nwarps(type, 1, table_id) here and the kbx
+// partition, shared-memory order and reduction are bit-identical to solo.
+template <ggml_type type>
+static __device__ __forceinline__ void mmvq_group_row(
+        const void * __restrict__ vx, const block_q8_1 * __restrict__ y, float * __restrict__ dst_row,
+        const uint32_t ncols_x, const uint32_t stride_row_x, const int row) {
+
+    constexpr int qk  = ggml_cuda_type_traits<type>::qk;
+    constexpr int qi  = ggml_cuda_type_traits<type>::qi;
+    constexpr int vdr = get_vdr_mmvq(type);
+    constexpr int warp_size = ggml_cuda_get_physical_warp_size();
+
+    constexpr vec_dot_q_cuda_t vec_dot_q_cuda = get_vec_dot_q_cuda(type);
+
+    const int nwarps = blockDim.y;
+    const int tid    = warp_size*threadIdx.y + threadIdx.x;
+    const int blocks_per_row_x  = ncols_x / qk;
+    const int blocks_per_iter   = vdr * nwarps * warp_size / qi;
+
+    float tmp = 0.0f;
+
+    const int kbx_offset = row*stride_row_x;
+
+    for (int kbx = tid / (qi/vdr); kbx < blocks_per_row_x; kbx += blocks_per_iter) {
+        const int kby = kbx * (qk/QK8_1); // y block index that aligns with kbx
+
+        // x block quant index when casting the quants to int
+        const int kqs = vdr * (tid % (qi/vdr));
+
+        tmp += vec_dot_q_cuda(vx, y + kby, kbx_offset + kbx, kqs);
+    }
+
+    __shared__ float tmp_shared[7][64]; // [nwarps-1][warp_size], nwarps <= 8, warp_size <= 64
+
+    if (threadIdx.y > 0) {
+        tmp_shared[threadIdx.y-1][threadIdx.x] = tmp;
+    }
+    __syncthreads();
+    if (threadIdx.y > 0) {
+        return;
+    }
+
+    // sum up partial sums and write back result (same order as solo)
+    for (int l = 0; l < nwarps-1; ++l) {
+        tmp += tmp_shared[l][threadIdx.x];
+    }
+    tmp = warp_reduce_sum<warp_size>(tmp);
+
+    if (threadIdx.x == 0) {
+        *dst_row = tmp;
+    }
+}
+
+// Grid: (max member rows, n_members). Block: (warp_size, nwarps), with the
+// uniform per-member geometry established by ggml_cuda_mmvq_group_geometry_ok.
+__launch_bounds__(GGML_CUDA_MMVQ_GROUP_MAX*64, 1)
+static __global__ void mul_mat_vec_q_grouped(
+        const ggml_cuda_mmvq_group_params params, const block_q8_1 * __restrict__ vy) {
+
+    const uint32_t m = blockIdx.y;
+    if (m >= params.n_members || blockIdx.x >= params.nrows_x[m]) {
+        return;
+    }
+
+    float * dst_row = params.dst[m] + blockIdx.x; // T=1: single src1 row, no channel/sample offsets
+
+    switch ((ggml_type) params.type[m]) {
+        case GGML_TYPE_Q1_0:    mmvq_group_row<GGML_TYPE_Q1_0>   (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_Q4_0:    mmvq_group_row<GGML_TYPE_Q4_0>   (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_Q4_1:    mmvq_group_row<GGML_TYPE_Q4_1>   (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_Q5_0:    mmvq_group_row<GGML_TYPE_Q5_0>   (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_Q5_1:    mmvq_group_row<GGML_TYPE_Q5_1>   (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_Q8_0:    mmvq_group_row<GGML_TYPE_Q8_0>   (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_MXFP4:   mmvq_group_row<GGML_TYPE_MXFP4>  (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_NVFP4:   mmvq_group_row<GGML_TYPE_NVFP4>  (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_Q2_K:    mmvq_group_row<GGML_TYPE_Q2_K>   (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_Q3_K:    mmvq_group_row<GGML_TYPE_Q3_K>   (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_Q4_K:    mmvq_group_row<GGML_TYPE_Q4_K>   (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_Q5_K:    mmvq_group_row<GGML_TYPE_Q5_K>   (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_Q6_K:    mmvq_group_row<GGML_TYPE_Q6_K>   (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_IQ2_XXS: mmvq_group_row<GGML_TYPE_IQ2_XXS>(params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_IQ2_XS:  mmvq_group_row<GGML_TYPE_IQ2_XS> (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_IQ2_S:   mmvq_group_row<GGML_TYPE_IQ2_S>  (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_IQ3_XXS: mmvq_group_row<GGML_TYPE_IQ3_XXS>(params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_IQ1_S:   mmvq_group_row<GGML_TYPE_IQ1_S>  (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_IQ1_M:   mmvq_group_row<GGML_TYPE_IQ1_M>  (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_IQ4_NL:  mmvq_group_row<GGML_TYPE_IQ4_NL> (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_IQ4_XS:  mmvq_group_row<GGML_TYPE_IQ4_XS> (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        case GGML_TYPE_IQ3_S:   mmvq_group_row<GGML_TYPE_IQ3_S>  (params.vx[m], vy, dst_row, params.ncols_x[m], params.stride_row_x[m], blockIdx.x); break;
+        default: break;
+    }
+}
+
 // Dedicated MoE multi-token kernel.
 // Grid: (ceil(nrows_x / c_rows_per_block), nchannels_dst)
 // Block: (warp_size, ncols_dst) - each warp handles one token independently.
@@ -1266,4 +1365,114 @@ void ggml_cuda_op_mul_mat_vec_q(
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, stream);
 
     GGML_UNUSED_VARS(src1, dst, src1_ddf_i, src1_ncols, src1_padded_row_size);
+}
+
+// small_k would change the solo schedule (rows_per_cuda_block > 1); grouped
+// members must not take it. Mirrors should_use_small_k in
+// mul_mat_vec_q_switch_ncols_dst for ncols_dst == 1.
+template <ggml_type type>
+static bool mmvq_group_small_k_would_trigger(const int64_t ncols_x, const int cc, const int warp_size) {
+    constexpr int qk  = ggml_cuda_type_traits<type>::qk;
+    constexpr int qi  = ggml_cuda_type_traits<type>::qi;
+    constexpr int vdr = get_vdr_mmvq(type);
+
+    const mmvq_parameter_table_id table_id = get_device_table_id(cc);
+    const int nwarps               = calc_nwarps(type, 1, table_id);
+    const int blocks_per_row_x     = (int) (ncols_x / qk);
+    const int blocks_per_iter_1warp = vdr * warp_size / qi;
+
+    bool use = nwarps > 1 && blocks_per_row_x < nwarps * blocks_per_iter_1warp;
+
+    constexpr std::array<ggml_type, 2> iq_slow_turing = {
+        GGML_TYPE_IQ3_XXS,
+        GGML_TYPE_IQ3_S,
+    };
+    constexpr std::array<ggml_type, 8> iq_slow_pascal = {
+        GGML_TYPE_IQ1_S, GGML_TYPE_IQ1_M,   GGML_TYPE_IQ2_XXS, GGML_TYPE_IQ2_XS,
+        GGML_TYPE_IQ2_S, GGML_TYPE_IQ3_XXS, GGML_TYPE_IQ3_S,   GGML_TYPE_IQ4_XS,
+    };
+
+    if (use && GGML_CUDA_CC_IS_NVIDIA(cc)) {
+        if (cc >= GGML_CUDA_CC_TURING) {
+            if (std::find(iq_slow_turing.begin(), iq_slow_turing.end(), type) != iq_slow_turing.end()) {
+                use = false;
+            }
+        } else if (cc < GGML_CUDA_CC_VOLTA) {
+            if (std::find(iq_slow_pascal.begin(), iq_slow_pascal.end(), type) != iq_slow_pascal.end()) {
+                use = false;
+            }
+        }
+    }
+
+    return use;
+}
+
+static bool mmvq_group_small_k_would_trigger(ggml_type type, const int64_t ncols_x, const int cc, const int warp_size) {
+    switch (type) {
+        case GGML_TYPE_Q1_0:    return mmvq_group_small_k_would_trigger<GGML_TYPE_Q1_0>   (ncols_x, cc, warp_size);
+        case GGML_TYPE_Q4_0:    return mmvq_group_small_k_would_trigger<GGML_TYPE_Q4_0>   (ncols_x, cc, warp_size);
+        case GGML_TYPE_Q4_1:    return mmvq_group_small_k_would_trigger<GGML_TYPE_Q4_1>   (ncols_x, cc, warp_size);
+        case GGML_TYPE_Q5_0:    return mmvq_group_small_k_would_trigger<GGML_TYPE_Q5_0>   (ncols_x, cc, warp_size);
+        case GGML_TYPE_Q5_1:    return mmvq_group_small_k_would_trigger<GGML_TYPE_Q5_1>   (ncols_x, cc, warp_size);
+        case GGML_TYPE_Q8_0:    return mmvq_group_small_k_would_trigger<GGML_TYPE_Q8_0>   (ncols_x, cc, warp_size);
+        case GGML_TYPE_MXFP4:   return mmvq_group_small_k_would_trigger<GGML_TYPE_MXFP4>  (ncols_x, cc, warp_size);
+        case GGML_TYPE_NVFP4:   return mmvq_group_small_k_would_trigger<GGML_TYPE_NVFP4>  (ncols_x, cc, warp_size);
+        case GGML_TYPE_Q2_K:    return mmvq_group_small_k_would_trigger<GGML_TYPE_Q2_K>   (ncols_x, cc, warp_size);
+        case GGML_TYPE_Q3_K:    return mmvq_group_small_k_would_trigger<GGML_TYPE_Q3_K>   (ncols_x, cc, warp_size);
+        case GGML_TYPE_Q4_K:    return mmvq_group_small_k_would_trigger<GGML_TYPE_Q4_K>   (ncols_x, cc, warp_size);
+        case GGML_TYPE_Q5_K:    return mmvq_group_small_k_would_trigger<GGML_TYPE_Q5_K>   (ncols_x, cc, warp_size);
+        case GGML_TYPE_Q6_K:    return mmvq_group_small_k_would_trigger<GGML_TYPE_Q6_K>   (ncols_x, cc, warp_size);
+        case GGML_TYPE_IQ2_XXS: return mmvq_group_small_k_would_trigger<GGML_TYPE_IQ2_XXS>(ncols_x, cc, warp_size);
+        case GGML_TYPE_IQ2_XS:  return mmvq_group_small_k_would_trigger<GGML_TYPE_IQ2_XS> (ncols_x, cc, warp_size);
+        case GGML_TYPE_IQ2_S:   return mmvq_group_small_k_would_trigger<GGML_TYPE_IQ2_S>  (ncols_x, cc, warp_size);
+        case GGML_TYPE_IQ3_XXS: return mmvq_group_small_k_would_trigger<GGML_TYPE_IQ3_XXS>(ncols_x, cc, warp_size);
+        case GGML_TYPE_IQ1_S:   return mmvq_group_small_k_would_trigger<GGML_TYPE_IQ1_S>  (ncols_x, cc, warp_size);
+        case GGML_TYPE_IQ1_M:   return mmvq_group_small_k_would_trigger<GGML_TYPE_IQ1_M>  (ncols_x, cc, warp_size);
+        case GGML_TYPE_IQ4_NL:  return mmvq_group_small_k_would_trigger<GGML_TYPE_IQ4_NL> (ncols_x, cc, warp_size);
+        case GGML_TYPE_IQ4_XS:  return mmvq_group_small_k_would_trigger<GGML_TYPE_IQ4_XS> (ncols_x, cc, warp_size);
+        case GGML_TYPE_IQ3_S:   return mmvq_group_small_k_would_trigger<GGML_TYPE_IQ3_S>  (ncols_x, cc, warp_size);
+        default:                return true; // not a vec-q type: never group it
+    }
+}
+
+bool ggml_cuda_mmvq_group_geometry_ok(const ggml_type * types, const int64_t * ncols_x, const int n,
+                                      const int cc, const int warp_size, int * nwarps_out) {
+    const mmvq_parameter_table_id table_id = get_device_table_id(cc);
+
+    int nwarps = -1;
+    for (int i = 0; i < n; ++i) {
+        const int nw = calc_nwarps(types[i], 1, table_id);
+        if (nwarps == -1) {
+            nwarps = nw;
+        }
+        if (nw != nwarps) {
+            return false; // grouped launch needs one uniform block geometry
+        }
+        if (calc_rows_per_block(1, table_id, false, nw) != 1) {
+            return false; // grouped kernel processes exactly one row per block
+        }
+        if (mmvq_group_small_k_would_trigger(types[i], ncols_x[i], cc, warp_size)) {
+            return false; // solo would take the small_k schedule; keep it solo
+        }
+    }
+
+    if (nwarps <= 0 || nwarps > 8) {
+        return false;
+    }
+
+    *nwarps_out = nwarps;
+    return n > 0;
+}
+
+void ggml_cuda_mul_mat_vec_q_grouped(const ggml_cuda_mmvq_group_params & params, const block_q8_1 * vy,
+                                     const int nwarps, const int warp_size, cudaStream_t stream) {
+    uint32_t max_rows = 1;
+    for (uint32_t m = 0; m < params.n_members; ++m) {
+        max_rows = std::max(max_rows, params.nrows_x[m]);
+    }
+
+    const dim3 block_nums(max_rows, params.n_members, 1);
+    const dim3 block_dims(warp_size, nwarps, 1);
+    const ggml_cuda_kernel_launch_params launch_params(block_nums, block_dims, 0, stream);
+    ggml_cuda_kernel_launch(mul_mat_vec_q_grouped, launch_params, params, vy);
 }

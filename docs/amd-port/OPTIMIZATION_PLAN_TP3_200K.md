@@ -534,3 +534,41 @@ to Gemini's guard battery, die 3 is the dev cell.
   GGML_CUDA_TILE_FP16=1 at the cublas fallback branch point; die 3 open
   for its validation runs. Gemini ACKed E-021 ruling (msg #1325); ubatch
   re-stamp -> T4 validation -> W6 A/B queue stands.
+- E-019 2026-09-21 T3 grouped-GEMV implementation banked (zero-GPU, desk:
+  wt-t3-grouped, branch amd/t3-grouped; die 3 held by the tile desk). Env
+  GGML_CUDA_MMVQ_GROUP=1 (static-once getenv, unset = zero change): one
+  launch computes a batch of 2-8 small quantized vec-q MUL_MATs sharing the
+  same src1 (byte-identical x). Grouping point = graph node loop (try_fuse
+  precedent): same-src1-pointer members within a 16-node window, members
+  excluded if any try_fuse MUL_MAT pattern would consume/span them, early-
+  dst-write liveness enforced (intermediate WAW/WAR vs candidate dst, src1
+  mutation, pairwise member-dst overlap - the T4 node-pointer lesson applied
+  to allocator range recycling). Kernel = mmvq_group_row<type>: verbatim solo
+  mul_mat_vec_q schedule per member (same kbx partition, reduce order,
+  vec_dot), mixed types per launch, geometry gate (uniform nwarps, 1
+  row/block, no small_k; gfx900 GCN = nwarps 2 all types) aborts to solo on
+  any mismatch; per-device row whitelist <= 256 (env-tunable MAX_ROWS).
+  Split-path runner mirrors ggml_cuda_op_mul_mat T=1 verbatim (row split,
+  events, peer copies; one shared q8_1 per device per group - composes with
+  T4 cache, same key). By-value member params = capture/replay-safe. Host
+  oracle docs/amd-port/tests/test_mmvq_group_host.cpp ALL PASS: 144 rows
+  float-BIT-identical solo-vs-grouped over census-shaped mixed batch
+  (q4_K/q8_0), f64 references honest, geometry + small_k gates verified.
+  Compile-clean gfx900 (ggml-cuda.cu, mmvq.cu). Saving bound: GDN
+  beta/alpha pairs 96 -> 48 launches/step (2x on the pair class), latency
+  overlap ~halves its floor time; ~3-4% of decode kernel time expected,
+  census optimistic bound 12-15%. Receipt: results/T3_grouped_2026-09-21.md.
+  DEFERRED to die-3 window: guards byte-identical determinism gate, census
+  launch-count check, 3-rep OFF/ON A/B (promote >= +2%), MAX_ROWS=384 sweep
+  for attn k/v pairs, occupancy check.
+- E-025 2026-09-21 Integration: amd/t3-grouped merged. T3 zero-GPU phase
+  ACCEPTED: GGML_CUDA_MMVQ_GROUP=1 graph-level grouping of same-src1 vec-q
+  MUL_MAT nodes (16-node scan, T4 node-key + dst-overlap recycling checks,
+  try_fuse span exclusion), grouped kernel bit-identical by construction
+  (verbatim solo schedule per member, mixed types per launch, by-value
+  params = replay-safe), host oracle 144 rows bit-identical, gfx900 compile
+  clean. Saving bound: pair class 96 -> 48 launches/step, ~3-4% of decode
+  kernel time expected, +2-5% t/s if fully realized. Served validation
+  queued on the Gemini lane AFTER T4 (same protocol class: env-unset GREEN
+  -> byte-identical determinism gate -> census launch counts -> 3-rep
+  OFF/ON A/B, promote >= +2%; MAX_ROWS=384 sweep for attn k/v pairs).
