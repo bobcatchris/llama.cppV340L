@@ -52,6 +52,7 @@
 #include "ggml-cuda/top-k.cuh"
 #include "ggml-cuda/mean.cuh"
 #include "ggml-cuda/tsembd.cuh"
+#include "ggml-cuda/tile-gemm.cuh"
 #include "ggml-cuda/topk-moe.cuh"
 #include "ggml-cuda/unary.cuh"
 #include "ggml-cuda/upscale.cuh"
@@ -1664,6 +1665,13 @@ static void ggml_cuda_op_mul_mat_cublas(
         ggml_is_contiguous(src0) &&
         row_diff == src0->ne[1] &&
         dst->op_params[0] == GGML_PREC_DEFAULT;
+
+    // W5 tile route (GGML_CUDA_TILE_FP16=1): packed-fp16 GEMM tile on the f16 weight
+    // buffer for census prefill shapes; off-whitelist falls through unchanged (E-022)
+    if (ggml_cuda_tile_fp16_mul_mat(ctx, id, src0, src1, dst, src0_dd_i, src1_ddf_i, dst_dd_i,
+                                    row_diff, src1_ncols, ldc, stream)) {
+        return;
+    }
 
     if (supports_bf16 && src0->type == GGML_TYPE_BF16 && ggml_is_contiguous(src0) && row_diff == src0->ne[1]) {
         ggml_cuda_pool_alloc<nv_bfloat16> src1_as_bf16(ctx.pool(id));

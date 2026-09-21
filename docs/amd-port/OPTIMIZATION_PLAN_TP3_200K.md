@@ -623,3 +623,56 @@ to Gemini's guard battery, die 3 is the dev cell.
   per-device MTP VRAM cost (>2 GB hypothesis) on TP3, which boots, plus
   --spec-mtp-device relocation savings there; one small-context TP2+device
   boot for flag mechanics.
+- E-024 2026-09-21 W5 tile-integ desk COMPLETE (worktree wt-tile-integ, branch
+  amd/tile-integ; die 3 only, ~11 min of windows; dies 0-2 untouched). The a8
+  tile is WIRED INTO ggml behind GGML_CUDA_TILE_FP16=1: branch at the top of
+  ggml_cuda_op_mul_mat_cublas (the dense fallback op), kernel ported verbatim
+  from bench_tile_gfx900.cu (one change: dst row stride ldc decoupled from N
+  for the strided main-device slice), static-once env, census whitelist
+  (gfx900, quantized src0, src1 f32, PREC_DEFAULT, M<=512 %128, K in
+  {5120,6144,17408}, N_d %64, 32-bit/align guards) with one-time WARN +
+  shipped fallback off-list. FINDING: use_fp16 requires row_diff ==
+  src0->ne[1] (ggml-cuda.cu:1660) so under TP3 split the shipped route is
+  dequant-to-f32 + cublasSgemm (NOT the h16 route E-012 named - that holds
+  only single-GPU); the branch therefore sits before the whole bf16/h16/f32
+  chain and the tile also deletes the 2x-byte f32 dequant tax in-server.
+  VALIDATION (die 3, integrated build, compile-clean gfx900 zero warnings):
+  (1) oracle on the PORTED kernel 10/10 bit-exact vs spec (max rel 0.00e+00),
+  L2-vs-f64 2.9e-3..6.1e-3 inside the banked band; (2) env-unset byte-identity
+  proven EMPIRICALLY: same bench linked against the pre-change served
+  build-hip lib, f32 dst dumps cmp 10/10 byte-identical; (3) integrated
+  per-shape GEMM-class TF/s (rocprof kernel-only, 3x20 median): call-weighted
+  die0 agg 6.10 TF/s/die vs same-session shipped h16 4.79 (+27.5%) - the 5.53
+  banked class REPRODUCED AND EXCEEDED, no kernel-level integration cost;
+  per-shape vs shipped: ffn_down 1.75x, attn k/v 1.86x, ssm_out 1.57x,
+  attn_out 1.51x, gdn_qkv 1.50x, attn_q+gate 1.31x, gdn_gate 1.20x,
+  ffn_gate/up 0.94-0.95x (parity class, control ran hot this session);
+  (4) wall op-level (v1 still pays per-call dequant + src1 convert): 3.52 ->
+  4.33 TF/s/die (+23.0%); (5) M=256/512 route and hold 5.0-5.6 wall class,
+  M=640 off-list -> one WARN + shipped. HONEST COUPLINGS: v1 GEMM reads f16
+  weights just written by the retained dequant (L2 credit, attn k/v most) -
+  5.53 stays the post-loader reference; numerics are the arm's own class
+  (L2 vs shipped arm 1.1-2.0e-2, tile 10-19x more accurate vs f64). DEFERRED
+  to the Gemini lane (dies 0-2): rebuild served binary, guards GREEN unset,
+  ON-arm greedy determinism WITHIN arm + accept >= 0.63 + needle 3/3 (NOT
+  byte-identity vs OFF - arm is numerics-changing by contract), TP3 trace
+  check (tile replaces SGEMM under split; no off-whitelist tile at ub512),
+  3-rep OFF/ON A/B; then the loader step deletes the retained dequant.
+  Receipt: results/W5_tile_integ_2026-09-21.md; traces:
+  results/W5_tile_integ_trace_{on,off}_2026-09-21.csv; harness:
+  tests/bench_tile_integ.cpp + tests/test_tile_integ_oracle.cu.
+- E-029 2026-09-21 Integration: amd/tile-integ merged (bd825a43e lineage).
+  a8 TILE IS IN-GGML behind GGML_CUDA_TILE_FP16=1: dispatch branch at the
+  top of ggml_cuda_op_mul_mat_cublas, census whitelist + fail-loud shipped
+  fallback, env-unset byte-identity proven empirically (f32 dst dumps cmp
+  10/10 vs pre-change lib). DISPATCH DISCOVERY OF RECORD: under TP3 split
+  use_fp16 is impossible (row_diff != ne[1], ggml-cuda.cu:1660) -> the
+  served shipped route was dequant-to-F32 + cublasSgemm all along; the
+  tile deletes the 2x-byte f32 dequant write tax under split. Integrated
+  per-shape (die 3, M=128): call-weighted 6.10 TF/s/die vs shipped 4.79
+  same-session (+27.5%), zero kernel integration cost; ffn_down 1.75x,
+  attn k/v 1.86x, gdn_qkv 1.50x; ffn gate/up parity-class (0.95x).
+  Numerics-changing by contract (tile 10-19x more accurate vs f64, but
+  different class from shipped h16/f32). Served validation queued on
+  Gemini lane (rebuild, within-arm determinism, census trace, OFF/ON
+  A/B); loader desk (delete retained per-call dequant) queued after.
