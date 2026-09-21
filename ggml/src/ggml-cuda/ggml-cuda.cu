@@ -85,6 +85,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 static_assert(sizeof(half) == sizeof(ggml_fp16_t), "wrong fp16 size");
@@ -4258,6 +4259,521 @@ static int ggml_cuda_try_fuse(ggml_backend_cuda_context * cuda_ctx, ggml_cgraph 
     return 0;
 }
 
+// GGML_CUDA_MMVQ_GROUP=1: grouped multi-tensor decode GEMV (T=1). One launch
+// computes a batch of small quantized vec-q MUL_MAT nodes that share the same
+// src1 (byte-identical x, hence one shared q8_1 quantization). Each member
+// keeps the exact solo mul_mat_vec_q schedule, so results are bit-identical;
+// the saving is launch count and the per-call DRAM latency floor.
+#define GGML_CUDA_MMVQ_GROUP_WINDOW 16 // max graph distance between group head and last member
+
+struct ggml_cuda_mmvq_group_cfg {
+    bool enabled = false;
+    int64_t max_rows = 256; // per-device row whitelist: only tiny tensors group
+};
+
+static const ggml_cuda_mmvq_group_cfg & ggml_cuda_mmvq_group_get_cfg() {
+    static const ggml_cuda_mmvq_group_cfg config = [] {
+        ggml_cuda_mmvq_group_cfg result;
+
+        const char * env = getenv("GGML_CUDA_MMVQ_GROUP");
+        result.enabled = env != nullptr && atoi(env) == 1;
+        if (result.enabled) {
+            GGML_LOG_INFO("%s: grouped mmvq decode path enabled (GGML_CUDA_MMVQ_GROUP=1)\n", __func__);
+        }
+
+        const char * env_rows = getenv("GGML_CUDA_MMVQ_GROUP_MAX_ROWS");
+        if (env_rows != nullptr) {
+            const int64_t rows = atoll(env_rows);
+            if (rows > 0) {
+                result.max_rows = rows;
+            }
+        }
+
+        return result;
+    }();
+
+    return config;
+}
+
+static bool ggml_cuda_mmvq_group_node_eligible(const ggml_tensor * node) {
+    if (node->op != GGML_OP_MUL_MAT || node->src[2] != nullptr) {
+        return false;
+    }
+
+    const ggml_tensor * src0 = node->src[0];
+    const ggml_tensor * src1 = node->src[1];
+
+    if (!src0 || !src1 || src1->type != GGML_TYPE_F32 || node->type != GGML_TYPE_F32) {
+        return false;
+    }
+    if (!ggml_is_quantized(src0->type)) {
+        return false;
+    }
+
+    // decode T=1 shape whitelist; anything else runs the solo path
+    if (src1->ne[1] != 1 || src1->ne[2] != 1 || src1->ne[3] != 1) {
+        return false;
+    }
+    if (node->ne[1] != 1 || node->ne[2] != 1 || node->ne[3] != 1) {
+        return false;
+    }
+    if (src0->ne[2] != 1 || src0->ne[3] != 1) {
+        return false;
+    }
+    if (src1->ne[0] % QK8_1 != 0) {
+        return false;
+    }
+    if (!ggml_is_contiguous(src0) || !ggml_is_contiguous(src1)) {
+        return false;
+    }
+
+    // recycled padding needs the solo padding-clear machinery
+    if (ggml_backend_buffer_get_usage(src0->buffer) == GGML_BACKEND_BUFFER_USAGE_COMPUTE
+        && ggml_nbytes(src0) != ggml_backend_buffer_get_alloc_size(src0->buffer, src0) && src0->view_src) {
+        return false;
+    }
+
+    // FWHT shortcut consumes src1, not dst; keep those nodes solo
+    if (ggml_get_op_params_i32(node, 1) == GGML_HINT_SRC0_IS_HADAMARD) {
+        return false;
+    }
+
+    return true;
+}
+
+static bool ggml_cuda_mmvq_group_overlap(const ggml_tensor * a, const ggml_tensor * b) {
+    if (!a->data || !b->data) {
+        return true; // unknown placement: treat as overlapping
+    }
+    const int64_t a_start = (int64_t) a->data;
+    const int64_t a_end   = a_start + ggml_backend_buft_get_alloc_size(a->buffer->buft, a);
+    const int64_t b_start = (int64_t) b->data;
+    const int64_t b_end   = b_start + ggml_backend_buft_get_alloc_size(b->buffer->buft, b);
+
+    return (b_start <= a_start && a_start < b_end) || (a_start <= b_start && b_start < a_end);
+}
+
+// Mirrors the MUL_MAT entries of ggml_cuda_try_fuse: if a fusion would consume
+// this node, it must run solo so the fusion stays exclusive. Returns the fusion
+// span (number of nodes consumed) or 0.
+static int ggml_cuda_mmvq_group_fusion_span_at(const ggml_cgraph * cgraph, const int idx) {
+    const ggml_tensor * node = cgraph->nodes[idx];
+
+    const auto vec_fuses = [](const ggml_tensor * t) {
+        return t && t->op == GGML_OP_MUL_MAT &&
+            (ggml_cuda_should_fuse_mul_mat_vec_f(t) || ggml_cuda_should_fuse_mul_mat_vec_q(t));
+    };
+
+    if (idx + 4 < cgraph->n_nodes &&
+        ggml_cuda_can_fuse(cgraph, idx, { GGML_OP_MUL_MAT, GGML_OP_ADD, GGML_OP_MUL_MAT, GGML_OP_ADD, GGML_OP_GLU }, {}) &&
+        (vec_fuses(node) || vec_fuses(cgraph->nodes[idx + 2]))) {
+        return 5;
+    }
+
+    if (idx + 2 < cgraph->n_nodes &&
+        (ggml_cuda_can_fuse(cgraph, idx, { GGML_OP_MUL_MAT, GGML_OP_MUL_MAT, GGML_OP_GLU }, {}) ||
+         ggml_cuda_can_fuse(cgraph, idx, { GGML_OP_MUL_MAT_ID, GGML_OP_MUL_MAT_ID, GGML_OP_GLU }, {})) &&
+        (vec_fuses(node) || vec_fuses(cgraph->nodes[idx + 1]))) {
+        return 3;
+    }
+
+    if (idx + 1 < cgraph->n_nodes &&
+        (ggml_cuda_can_fuse(cgraph, idx, { GGML_OP_MUL_MAT, GGML_OP_ADD }, {}) ||
+         ggml_cuda_can_fuse(cgraph, idx, { GGML_OP_MUL_MAT_ID, GGML_OP_ADD_ID }, {})) &&
+        vec_fuses(node)) {
+        return 2;
+    }
+
+    return 0;
+}
+
+// An intermediate node between the head and a candidate member must neither
+// read nor write memory the candidate's early dst write would clobber, must
+// not mutate src1, and no fusion span starting at it may cover the candidate.
+static bool ggml_cuda_mmvq_group_safe_candidate(
+        const ggml_cgraph * cgraph, const int i, const int j, const ggml_tensor * src1) {
+
+    const ggml_tensor * dst_j = cgraph->nodes[j];
+
+    for (int k = i + 1; k < j; ++k) {
+        const ggml_tensor * nk = cgraph->nodes[k];
+
+        const bool computed = !ggml_is_empty(nk) && nk->op != GGML_OP_RESHAPE && nk->op != GGML_OP_TRANSPOSE &&
+            nk->op != GGML_OP_VIEW && nk->op != GGML_OP_PERMUTE && nk->op != GGML_OP_NONE;
+
+        if (computed) {
+            if (ggml_cuda_mmvq_group_overlap(nk, dst_j)) {
+                return false; // would write the candidate's dst range
+            }
+            if (ggml_cuda_mmvq_group_overlap(nk, src1)) {
+                return false; // would mutate the shared x in between
+            }
+            for (int s = 0; s < GGML_MAX_SRC; ++s) {
+                if (nk->src[s] && ggml_cuda_mmvq_group_overlap(nk->src[s], dst_j)) {
+                    return false; // would read the candidate's dst range
+                }
+            }
+        }
+
+        const int span = ggml_cuda_mmvq_group_fusion_span_at(cgraph, k);
+        if (span != 0 && j <= k + span - 1) {
+            return false; // the candidate is consumed by a fusion starting at k
+        }
+    }
+
+    return true;
+}
+
+// Executes a validated group; mirrors ggml_cuda_op_mul_mat restricted to the
+// vec-q path with T=1 (ne11 = ne12 = ne13 = 1, single src1 col block). Returns
+// false without side effects if any member fails the per-device checks.
+static bool ggml_cuda_group_mmvq_exec(ggml_backend_cuda_context & ctx, const ggml_tensor ** nodes, const int n) {
+    const ggml_cuda_mmvq_group_cfg & cfg = ggml_cuda_mmvq_group_get_cfg();
+
+    const ggml_tensor * src1 = nodes[0]->src[1];
+    const int64_t ne10 = src1->ne[0];
+    const int64_t src1_padded_col_size = GGML_PAD(ne10, MATRIX_ROW_PADDING);
+    const size_t q8_1_ts = sizeof(block_q8_1);
+    const size_t q8_1_bs = QK8_1;
+    const size_t src1_q8_1_nbytes = src1_padded_col_size*q8_1_ts/q8_1_bs; // nrows1 == 1
+
+    const bool split = ggml_backend_buft_is_cuda_split(nodes[0]->src[0]->buffer->buft);
+    const int src1_device = ((ggml_backend_cuda_buffer_context *) src1->buffer->context)->device;
+
+    const int ndev = ggml_backend_cuda_get_device_count();
+
+    int64_t row_low[GGML_CUDA_MMVQ_GROUP_MAX][GGML_CUDA_MAX_DEVICES] = {};
+    int64_t row_high[GGML_CUDA_MMVQ_GROUP_MAX][GGML_CUDA_MAX_DEVICES] = {};
+
+    for (int m = 0; m < n; ++m) {
+        const ggml_tensor * src0 = nodes[m]->src[0];
+
+        GGML_ASSERT(ggml_is_contiguous(src0) && src0->ne[2] == 1 && src0->ne[3] == 1);
+        GGML_ASSERT(ggml_backend_buft_is_cuda_split(src0->buffer->buft) == split);
+        GGML_ASSERT(nodes[m]->src[1] == src1);
+
+        std::array<float, GGML_CUDA_MAX_DEVICES> tensor_split;
+        tensor_split.fill(0.0f);
+        if (split) {
+            ggml_backend_cuda_split_buffer_type_context * buft_ctx =
+                (ggml_backend_cuda_split_buffer_type_context *) src0->buffer->buft->context;
+            tensor_split = buft_ctx->tensor_split;
+        } else {
+            tensor_split[ctx.device] = 1.0f;
+        }
+
+        for (int id = 0; id < ndev; ++id) {
+            row_low[m][id]  = 0;
+            row_high[m][id] = src0->ne[1];
+
+            if (split) {
+                const int64_t rounding = get_row_rounding(tensor_split);
+
+                if (id != 0) {
+                    row_low[m][id] = src0->ne[1]*tensor_split[id];
+                    if (row_low[m][id] < src0->ne[1]) {
+                        row_low[m][id] -= row_low[m][id] % rounding;
+                    }
+                }
+                if (id != ndev - 1) {
+                    row_high[m][id] = src0->ne[1]*tensor_split[id + 1];
+                    if (row_high[m][id] < src0->ne[1]) {
+                        row_high[m][id] -= row_high[m][id] % rounding;
+                    }
+                }
+            }
+
+            if (row_high[m][id] - row_low[m][id] > cfg.max_rows) {
+                return false; // outside the tiny-tensor whitelist
+            }
+        }
+    }
+
+    // per-device geometry gate: all members active on a device must share the
+    // solo launch geometry (uniform nwarps, 1 row/block, no small_k)
+    for (int id = 0; id < ndev; ++id) {
+        ggml_type types[GGML_CUDA_MMVQ_GROUP_MAX];
+        int64_t ncols_x[GGML_CUDA_MMVQ_GROUP_MAX];
+        int n_active = 0;
+        for (int m = 0; m < n; ++m) {
+            if (row_low[m][id] < row_high[m][id]) {
+                types[n_active]   = nodes[m]->src[0]->type;
+                ncols_x[n_active] = nodes[m]->src[0]->ne[0];
+                n_active++;
+            }
+        }
+        if (n_active == 0) {
+            continue;
+        }
+        int nwarps = 0;
+        if (!ggml_cuda_mmvq_group_geometry_ok(types, ncols_x, n_active,
+                ggml_cuda_info().devices[id].cc, ggml_cuda_info().devices[id].warp_size, &nwarps)) {
+            return false;
+        }
+    }
+
+    // prep: per-device row slices and the shared q8_1 of x
+    ggml_tensor_extra_gpu * extras[GGML_CUDA_MMVQ_GROUP_MAX] = {};
+    char * src0_dd[GGML_CUDA_MMVQ_GROUP_MAX][GGML_CUDA_MAX_DEVICES] = {};
+    float * dst_dd[GGML_CUDA_MMVQ_GROUP_MAX][GGML_CUDA_MAX_DEVICES] = {};
+
+    const auto dst_device = [&](int m) {
+        return ((ggml_backend_cuda_buffer_context *) nodes[m]->buffer->context)->device;
+    };
+
+    ggml_cuda_pool_alloc<char> src1_ddq_alloc[GGML_CUDA_MAX_DEVICES];
+    char * src1_ddq[GGML_CUDA_MAX_DEVICES] = {}; // shared q8_1 of x per device
+
+    bool used_devices[GGML_CUDA_MAX_DEVICES] = {};
+    int n_used_devices = 0;
+
+    for (int id = 0; id < ndev; ++id) {
+        bool device_active = false;
+        for (int m = 0; m < n; ++m) {
+            device_active = device_active || row_low[m][id] < row_high[m][id];
+        }
+        if ((!split && id != ctx.device) || !device_active) {
+            continue;
+        }
+
+        used_devices[id] = true;
+        n_used_devices++;
+
+        ggml_cuda_set_device(id);
+        cudaStream_t stream = ctx.stream(id, 0);
+
+        const bool src1_on_device = id == src1_device;
+
+        for (int m = 0; m < n; ++m) {
+            const ggml_tensor * src0 = nodes[m]->src[0];
+
+            if (split) {
+                extras[m] = (ggml_tensor_extra_gpu *) src0->extra;
+                src0_dd[m][id] = (char *) extras[m]->data_device[id];
+
+                if (src0->ne[0] % MATRIX_ROW_PADDING != 0 && ggml_is_quantized(src0->type) &&
+                    ggml_backend_buffer_get_usage(src0->buffer) == GGML_BACKEND_BUFFER_USAGE_COMPUTE &&
+                    src0->view_src == nullptr) {
+                    const size_t nbytes_data    = ggml_row_size(src0->type, (row_high[m][id] - row_low[m][id])*src0->ne[0]);
+                    const size_t nbytes_padding = ggml_row_size(src0->type, MATRIX_ROW_PADDING - src0->ne[0] % MATRIX_ROW_PADDING);
+                    CUDA_CHECK(cudaMemsetAsync(src0_dd[m][id] + nbytes_data, 0, nbytes_padding, stream));
+                }
+            } else {
+                src0_dd[m][id] = (char *) src0->data;
+
+                // solo ggml_cuda_mul_mat_vec_q clears compute-buffer padding
+                if (ggml_backend_buffer_get_usage(src0->buffer) == GGML_BACKEND_BUFFER_USAGE_COMPUTE) {
+                    const size_t size_data  = ggml_nbytes(src0);
+                    const size_t size_alloc = ggml_backend_buffer_get_alloc_size(src0->buffer, src0);
+                    if (size_alloc > size_data) {
+                        GGML_ASSERT(ggml_is_contiguously_allocated(src0));
+                        GGML_ASSERT(!src0->view_src);
+                        CUDA_CHECK(cudaMemsetAsync((char *) src0->data + size_data, 0, size_alloc - size_data, stream));
+                    }
+                }
+            }
+
+            if (id == dst_device(m)) {
+                dst_dd[m][id] = (float *) nodes[m]->data + row_low[m][id];
+            }
+        }
+
+        // one shared q8_1 quantization of x for the whole group on this device
+        if (src1_on_device && ggml_is_contiguous(src1)) {
+            const ggml_cuda_q81_act_cache::key q81_key = ggml_cuda_q81_act_cache::make_key(src1, id, stream);
+            char * q81_buf = nullptr;
+            if (const ggml_cuda_q81_act_cache::entry * q81_hit = ctx.q81_act_cache.find(q81_key)) {
+                q81_buf = (char *) q81_hit->buf;
+            } else if (ggml_cuda_q81_act_cache::entry * q81_slot =
+                           ctx.q81_act_cache.insert(q81_key, src1_q8_1_nbytes, ctx.pool(id))) {
+                q81_buf = (char *) q81_slot->buf;
+            }
+            if (q81_buf == nullptr) {
+                q81_buf = src1_ddq_alloc[id].alloc(ctx.pool(id), src1_q8_1_nbytes);
+            }
+            quantize_row_q8_1_cuda((const float *) src1->data, nullptr, q81_buf, nodes[0]->src[0]->type,
+                ne10, src1->nb[1]/sizeof(float), src1->nb[2]/sizeof(float), src1->nb[3]/sizeof(float),
+                src1_padded_col_size, 1, 1, 1, stream);
+            CUDA_CHECK(cudaGetLastError());
+
+            src1_ddq[id] = q81_buf;
+        } else {
+            // filled by the peer copy below, exactly like dev[id].src1_ddq in the solo path
+            src1_ddq[id] = src1_ddq_alloc[id].alloc(ctx.pool(id), src1_q8_1_nbytes);
+        }
+    }
+
+    // if multiple devices are used they need to wait for the main device
+    if (split && n_used_devices > 1) {
+        ggml_cuda_set_device(ctx.device);
+        for (int m = 0; m < n; ++m) {
+            CUDA_CHECK(cudaEventRecord(extras[m]->events[ctx.device][0], ctx.stream()));
+        }
+    }
+
+    ggml_cuda_pool_alloc<float> dst_ddf_alloc[GGML_CUDA_MMVQ_GROUP_MAX][GGML_CUDA_MAX_DEVICES];
+
+    // compute: one grouped launch per device
+    for (int id = 0; id < ndev; ++id) {
+        if (!used_devices[id]) {
+            continue;
+        }
+
+        ggml_cuda_set_device(id);
+        cudaStream_t stream = ctx.stream(id, 0);
+
+        if (split && (id != ctx.device)) {
+            for (int m = 0; m < n; ++m) {
+                CUDA_CHECK(cudaStreamWaitEvent(stream, extras[m]->events[ctx.device][0], 0));
+            }
+            // peers pull the shared q8_1 once for the whole group
+            CUDA_CHECK(cudaMemcpyPeerAsync(src1_ddq[id], id, src1_ddq[ctx.device], ctx.device, src1_q8_1_nbytes, stream));
+        }
+        const block_q8_1 * vy = (const block_q8_1 *) src1_ddq[id];
+        GGML_ASSERT(vy != nullptr);
+
+        ggml_cuda_mmvq_group_params params = {};
+        int nwarps = 0;
+
+        for (int m = 0; m < n; ++m) {
+            if (row_low[m][id] >= row_high[m][id]) {
+                continue;
+            }
+
+            const ggml_tensor * src0 = nodes[m]->src[0];
+
+            if (id != dst_device(m)) {
+                dst_dd[m][id] = dst_ddf_alloc[m][id].alloc(ctx.pool(id), row_high[m][id] - row_low[m][id]);
+            }
+
+            const int p = params.n_members++;
+            params.vx[p]           = src0_dd[m][id];
+            params.dst[p]          = dst_dd[m][id];
+            params.type[p]         = (uint32_t) src0->type;
+            params.ncols_x[p]      = (uint32_t) src0->ne[0];
+            params.nrows_x[p]      = (uint32_t) (row_high[m][id] - row_low[m][id]);
+            params.stride_row_x[p] = (uint32_t) (src0->nb[1] / ggml_type_size(src0->type));
+        }
+
+        {
+            ggml_type types[GGML_CUDA_MMVQ_GROUP_MAX];
+            int64_t ncols_x[GGML_CUDA_MMVQ_GROUP_MAX];
+            for (uint32_t p = 0; p < params.n_members; ++p) {
+                types[p]   = (ggml_type) params.type[p];
+                ncols_x[p] = params.ncols_x[p];
+            }
+            GGML_ASSERT(ggml_cuda_mmvq_group_geometry_ok(types, ncols_x, params.n_members,
+                ggml_cuda_info().devices[id].cc, ggml_cuda_info().devices[id].warp_size, &nwarps));
+        }
+
+        ggml_cuda_mul_mat_vec_q_grouped(params, vy, nwarps, ggml_cuda_info().devices[id].warp_size, stream);
+        CUDA_CHECK(cudaGetLastError());
+
+        // copy dst back to the device where each dst lives
+        for (int m = 0; m < n; ++m) {
+            if (row_low[m][id] >= row_high[m][id] || id == dst_device(m)) {
+                continue;
+            }
+            const int64_t row_diff = row_high[m][id] - row_low[m][id];
+            float * dhf_dst_i = (float *) ((char *) nodes[m]->data) + row_low[m][id];
+            CUDA_CHECK(ggml_cuda_Memcpy2DPeerAsync(
+                dhf_dst_i, dst_device(m), nodes[m]->ne[0]*sizeof(float), dst_dd[m][id], id,
+                row_diff*sizeof(float), row_diff*sizeof(float), 1, stream));
+        }
+
+        if (split && id != ctx.device) {
+            for (int m = 0; m < n; ++m) {
+                CUDA_CHECK(cudaEventRecord(extras[m]->events[id][0], stream));
+            }
+        }
+    }
+
+    // main device waits for all other devices to be finished
+    if (split && n_used_devices > 1) {
+        ggml_cuda_set_device(ctx.device);
+        for (int id = 0; id < ndev; ++id) {
+            if (!used_devices[id] || id == ctx.device) {
+                continue;
+            }
+            for (int m = 0; m < n; ++m) {
+                CUDA_CHECK(cudaStreamWaitEvent(ctx.stream(), extras[m]->events[id][0], 0));
+            }
+        }
+    }
+
+    return true;
+}
+
+// Tries to form and run a grouped decode GEMV starting at node i. Members are
+// later same-src1 MUL_MAT nodes; they are marked in `done` and skipped by the
+// graph loop. Returns false when no group was formed (nodes run solo).
+static bool ggml_cuda_try_group_mmvq(ggml_backend_cuda_context & cuda_ctx, const ggml_cgraph * cgraph, const int i,
+                                     std::unordered_set<const ggml_tensor *> & done) {
+    const ggml_cuda_mmvq_group_cfg & cfg = ggml_cuda_mmvq_group_get_cfg();
+    if (!cfg.enabled) {
+        return false;
+    }
+    if (!cuda_ctx.stream_context().concurrent_events.empty()) {
+        return false; // never reorder around the multi-stream machinery
+    }
+
+    const ggml_tensor * head = cgraph->nodes[i];
+    if (!ggml_cuda_mmvq_group_node_eligible(head)) {
+        return false;
+    }
+
+    const ggml_tensor * src1  = head->src[1];
+    const bool head_split = ggml_backend_buft_is_cuda_split(head->src[0]->buffer->buft);
+
+    const ggml_tensor * members[GGML_CUDA_MMVQ_GROUP_MAX] = { head };
+    int n = 1;
+
+    const int j_max = std::min(cgraph->n_nodes, i + GGML_CUDA_MMVQ_GROUP_WINDOW);
+    for (int j = i + 1; j < j_max && n < GGML_CUDA_MMVQ_GROUP_MAX; ++j) {
+        const ggml_tensor * cand = cgraph->nodes[j];
+
+        if (done.count(cand) > 0) {
+            continue;
+        }
+        if (!ggml_cuda_mmvq_group_node_eligible(cand) || cand->src[1] != src1) {
+            continue;
+        }
+        if (ggml_cuda_mmvq_group_fusion_span_at(cgraph, j) != 0) {
+            continue; // fusion would consume the candidate
+        }
+        if (ggml_backend_buft_is_cuda_split(cand->src[0]->buffer->buft) != head_split) {
+            continue;
+        }
+        if (!ggml_cuda_mmvq_group_safe_candidate(cgraph, i, j, src1)) {
+            continue;
+        }
+
+        bool overlaps_member = false;
+        for (int m = 0; m < n; ++m) {
+            overlaps_member = overlaps_member || ggml_cuda_mmvq_group_overlap(cand, members[m]);
+        }
+        if (overlaps_member) {
+            continue; // allocator may recycle a member's range for a later member
+        }
+
+        members[n++] = cand;
+    }
+
+    if (n < 2) {
+        return false;
+    }
+
+    if (!ggml_cuda_group_mmvq_exec(cuda_ctx, members, n)) {
+        return false;
+    }
+
+    for (int m = 1; m < n; ++m) {
+        done.insert(members[m]);
+    }
+
+    return true;
+}
+
 static void ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context * cuda_ctx, ggml_cgraph * cgraph, const bool use_cuda_graph, const bool cuda_graph_update_required, const void * graph_key) {
     bool graph_evaluated_or_captured = false;
 
@@ -4293,6 +4809,9 @@ static void ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context * cud
         // With the use of CUDA graphs, the execution will be performed by the graph launch.
         if (!use_cuda_graph || cuda_graph_update_required) {
             [[maybe_unused]] int prev_i = 0;
+
+            // nodes whose MUL_MAT was already computed by an earlier grouped launch (GGML_CUDA_MMVQ_GROUP=1)
+            std::unordered_set<const ggml_tensor *> mmvq_group_done;
 
             if (stream_ctx.concurrent_events.size() > 0) {
                 should_launch_concurrent_events = true;
@@ -4404,11 +4923,19 @@ static void ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context * cud
                     continue;
                 }
 
+                if (!mmvq_group_done.empty() && mmvq_group_done.erase(node) > 0) {
+                    continue; // already computed by an earlier grouped launch
+                }
+
                 int nodes_to_skip = ggml_cuda_try_fuse(cuda_ctx, cgraph, i);
 
                 if (nodes_to_skip != 0) {
                     i += nodes_to_skip;
                     continue;
+                }
+
+                if (ggml_cuda_try_group_mmvq(*cuda_ctx, cgraph, i, mmvq_group_done)) {
+                    continue; // the whole group, including this head node, is computed
                 }
 #ifndef NDEBUG
                 assert(node->buffer->buft == ggml_backend_cuda_buffer_type(cuda_ctx->device));
