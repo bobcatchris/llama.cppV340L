@@ -413,3 +413,22 @@ to Gemini's guard battery, die 3 is the dev cell.
   compile-validated implementation, served validation coordinated with
   Gemini). GPU arbitration: die 3 = tile desk -> T3 bench -> W6 validation
   windows (with Gemini).
+- E-020 2026-09-21 W1 ubatch sweep completed (interleaved 4-boot A/B, ub256 vs ub512 vs ub128 control, 8 reps total, dies 0-2):
+  ub256 wins on decode (15.51 t/s mean cold vs ub512 14.94 t/s, +3.8% higher decode throughput than ub512, +1.1% vs control)
+  with large prefill gains (107.52 t/s mean cold, +14.5% vs ctrl 93.87 t/s). ub512 wins pure prefill (114.06 t/s mean cold,
+  +21.5% vs ctrl) but regresses decode (-2.6% vs control, -3.8% vs ub256). MTP acceptance held at 0.6667 (gate >=0.63),
+  greedy determinism byte-identical (PASS 8/8), needle recall 3/3 (PASS 8/8). Recommendation: promote ub256 to launch
+  script of record for balanced decode/prefill optimization. Receipt: results/W1_ubatch_sweep_20260921_160303.md.
+
+- E-021 2026-09-21 W1 ubatch sweep RULING (receipt
+  results/W1_ubatch_sweep_20260921_160303.md): ub512 PROMOTED to the
+  launch script of record - prefill +20.6-22.4% (113.0-114.9 vs 93.87)
+  at decode -2.2 to -4.5% (14.87-15.00); acceptance 0.6667, determinism
+  PASS, needle 3/3 in all 8 arms. For 200k-context workloads the prefill
+  gain dominates the small decode give-back; rollback = revert the script
+  line. Baseline gates to be re-stamped on the promoted config via
+  --ratchet (prefill ~113.5, decode ~14.9 expected). DISCOVERY: server
+  warns "backend sampling not supported with SPLIT_MODE_TENSOR; using
+  CPU" - GPU-side draft sampling never engages under tensor split; logged
+  as a future server-side fix candidate, closes the W1 backend-sampling
+  item as not-applicable to this split mode.
