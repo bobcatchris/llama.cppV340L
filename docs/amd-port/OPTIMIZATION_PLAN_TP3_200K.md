@@ -404,3 +404,12 @@ to Gemini's guard battery, die 3 is the dev cell.
   results/T4_producer_2026-09-21.md: guards-off GREEN -> cache-ON byte-
   identical determinism + accept >= 0.63 + needle 3/3 -> census launch
   count check -> 3-rep OFF/ON A/B, promote at >= +2% decode.
+- E-019 2026-09-21 Two more desks dispatched (user directive, 2-agent
+  assist): wt-t3-grouped on amd/t3-grouped (T3 tiny-tensor tax: grouped
+  GEMV for the per-layer small tensors sharing one x; zero-GPU impl phase,
+  die-3 bench queued behind the tile desk) and wt-draft-dev on
+  amd/w6-draft-device (W6: dedicated draft-device support - run the MTP
+  draft context on the 4th die overlapping the TP3 verify pass; code +
+  compile-validated implementation, served validation coordinated with
+  Gemini). GPU arbitration: die 3 = tile desk -> T3 bench -> W6 validation
+  windows (with Gemini).
