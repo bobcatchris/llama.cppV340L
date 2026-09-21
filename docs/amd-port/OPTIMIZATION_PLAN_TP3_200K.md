@@ -615,3 +615,11 @@ to Gemini's guard battery, die 3 is the dev cell.
   after the dtor body, so every entry returns to its live pool; unset-env
   path untouched (empty map, no-op). Fix gates PROMOTION only; Gemini
   proceeds with the OFF/ON 3-rep perf A/B on the pre-fix binary.
+- E-028 2026-09-21 EMPIRICAL NEGATIVE: TP2+MTP at 200k does NOT boot even
+  with --spec-mtp-device (desk boot attempt died at allocation time; empty
+  logs = died before serving). Historical refusal class confirmed stronger
+  than the draft-block offload - TP2 at 200k is closed as a topology unless
+  a future KV/weights change lands. Desk re-scoped: measure the true
+  per-device MTP VRAM cost (>2 GB hypothesis) on TP3, which boots, plus
+  --spec-mtp-device relocation savings there; one small-context TP2+device
+  boot for flag mechanics.
