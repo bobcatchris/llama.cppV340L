@@ -276,10 +276,15 @@ llama_context::llama_context(
             backends.emplace_back(backend);
         }
 
-        // extra per-context device (e.g. MTP draft isolation); skipped if the
-        // device is already among the model's devices. it LEADS the backend
-        // list so the scheduler computes there: the loader duplicates the
-        // draft-visible shared weights onto it, making it self-sufficient
+        // extra per-context device (e.g. MTP draft device); skipped if the
+        // device is already among the model's devices. two modes, selected by
+        // LLAMA_SPEC_MTP_STRICT: full isolation LEADS the backend list so the
+        // scheduler computes there (the loader duplicates the draft-visible
+        // shared weights onto it, making it self-sufficient); the default
+        // draft-device mode (partial, v1) APPENDS it - the draft block
+        // computes on the extra device while the shared embeddings/LM head
+        // stay on the model split
+        static const bool mtp_full = getenv("LLAMA_SPEC_MTP_STRICT") != nullptr && atoi(getenv("LLAMA_SPEC_MTP_STRICT")) != 0;
         if (params.extra_device) {
             const bool dup = std::any_of(model.devices.begin(), model.devices.end(),
                     [&params](const llama_device & d) { return d.dev == params.extra_device; });
@@ -291,9 +296,14 @@ llama_context::llama_context(
                 if (backend == nullptr) {
                     throw std::runtime_error(format("failed to initialize %s backend", ggml_backend_dev_name(params.extra_device)));
                 }
-                LLAMA_LOG_INFO("%s: using extra device %s for this context (leading the backend list)\n",
-                        __func__, ggml_backend_dev_name(params.extra_device));
-                backends.emplace(backends.begin(), backend);
+                LLAMA_LOG_INFO("%s: using extra device %s for this context (%s)\n",
+                        __func__, ggml_backend_dev_name(params.extra_device),
+                        mtp_full ? "leading the backend list" : "appended after the model split");
+                if (mtp_full) {
+                    backends.emplace(backends.begin(), backend);
+                } else {
+                    backends.emplace_back(backend);
+                }
                 dev_extra = params.extra_device;
             }
         }
@@ -686,12 +696,15 @@ void llama_context::sched_reserve() {
         }
     }
 
-    // draft isolation audit: with an extra device leading the backend list,
-    // every compute buffer of this context should sit on it (the draft KV is
-    // pinned separately via dev_layer and the output buffer is host-pinned).
-    // a nonzero residue on the model's devices means the graph still reads a
-    // weight that was not duplicated - report it, optionally fail on it
-    if (dev_extra) {
+    // draft isolation audit (full mode only): with the extra device leading
+    // the backend list, every compute buffer of this context should sit on it
+    // (the draft KV is pinned separately via dev_layer and the output buffer
+    // is host-pinned). a nonzero residue on the model's devices means the
+    // graph still reads a weight that was not duplicated - hard-fail on it,
+    // the mode IS the strict gate. partial (v1) mode does not audit: the
+    // shared embeddings/LM head legitimately stay on the model split
+    static const bool mtp_full_audit = getenv("LLAMA_SPEC_MTP_STRICT") != nullptr && atoi(getenv("LLAMA_SPEC_MTP_STRICT")) != 0;
+    if (dev_extra && mtp_full_audit) {
         size_t size_extra = 0;
         size_t size_rest  = 0;
         for (size_t i = 0; i < backend_ptrs.size(); ++i) {
@@ -707,13 +720,10 @@ void llama_context::sched_reserve() {
                 size_extra / 1024.0 / 1024.0, ggml_backend_dev_name(dev_extra),
                 size_rest  / 1024.0 / 1024.0);
 
-        static const bool strict = getenv("LLAMA_SPEC_MTP_STRICT") != nullptr && atoi(getenv("LLAMA_SPEC_MTP_STRICT")) != 0;
         if (size_rest > 0) {
             LLAMA_LOG_WARN("%s: draft context allocates %.2f MiB outside %s - isolation incomplete\n",
                     __func__, size_rest / 1024.0 / 1024.0, ggml_backend_dev_name(dev_extra));
-            if (strict) {
-                throw std::runtime_error("LLAMA_SPEC_MTP_STRICT: draft context allocations outside the extra device");
-            }
+            throw std::runtime_error("LLAMA_SPEC_MTP_STRICT: draft context allocations outside the extra device");
         }
     }
 

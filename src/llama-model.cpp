@@ -1483,8 +1483,11 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
             output->type == GGML_TYPE_NVFP4 &&
             (output_s || output_in_s)));
     // resolve the MTP copies created by the loader (whole dup of the shared
-    // embeddings/LM head on the MTP device; nullptr when the arch has none)
-    ggml_backend_buffer_type_t buft_mtp = dev_mtp ? ggml_backend_dev_buffer_type(dev_mtp) : nullptr;
+    // embeddings/LM head on the MTP device; nullptr when the arch has none or
+    // when running the default draft-device mode (partial, v1), which keeps
+    // them on the model split)
+    static const bool mtp_full = getenv("LLAMA_SPEC_MTP_STRICT") != nullptr && atoi(getenv("LLAMA_SPEC_MTP_STRICT")) != 0;
+    ggml_backend_buffer_type_t buft_mtp = dev_mtp && mtp_full ? ggml_backend_dev_buffer_type(dev_mtp) : nullptr;
     if (buft_mtp) {
         auto it = ml.ctx_map.find(buft_mtp);
         if (it != ml.ctx_map.end()) {

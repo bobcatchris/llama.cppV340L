@@ -295,3 +295,73 @@ binding constraint (its B-vs-D saving is real but small: ~169 MiB/die over
 in-split, and in-split itself only leaves 63-67 MiB/die free at 10k).
 
 Artifacts: tp2feas_t2flag10k{5,6}_20260922_* (battery jsonl committed).
+
+## Result 7 - TP3 three-way at 10k on the isolation build (2026-09-22)
+
+Same protocol as Result 5, TP3 (dies 0/1/2; draft die 3 in arm C), -c 10000,
+b512/ub512, q4_0 KV, FA, 2 reps, STRICT=1, port 8083.
+
+| arm | boot-ready used c0,c1,c2 (free) | post-probe used (free) | pp 2k | decode ~7.9k | accept / mean |
+|-----|---------------------------------|------------------------|-------|--------------|---------------|
+| A MTP-OFF  r1,r2 | 4535.3/4501.3/4502.9 (3641-3675) | 5191.6/5105.7/5101.3 (2984-3075) | 122.58 / 120.74 | 12.17 / 12.18 | - |
+| B in-split r1,r2 | 5306.1/5264.1/5263.9 (2870-2912) | 6207.2/6117.4/6121.0 (1955-2059) | 117.39 / 118.48 | 15.38 / 15.58 | 0.66667 / 3.00 |
+| C draft-die r1,r2 | 5068.9/5046.8/5046.5 (3107-3129) + die3 1417.3 | 5673.4/5603.6/5607.3 (2503-2572) + die3 2297.2 (5878.8) | 117.64 / 117.88 | 7.57 / 7.58 | 0.66667 / 3.00 |
+
+Audit gate: 0.00 MiB on the model split expected in C; captured at boot in the
+TP2 runs - the TP3 10k boots ran without --verbose where the INFO-level audit
+line did not surface; VERBOSE=1 confirmation boots follow with the 200k arms
+(the physical signature is unambiguous: die 3 holds 1417.3 MiB at boot-ready =
+853.12 duplication + nextn 169.3 + KV + compute, and 2297.2 MiB post-probe).
+
+SAVED per serving die (boot-ready): in-split costs ~765 over OFF; the flag
+costs ~541 over OFF; the flag SAVES ~224/die vs in-split. Post-probe: in-split
+costs ~1015 over OFF; the flag SAVES ~503/die vs in-split.
+
+THE HEADLINE DEFECT CONFIRMED ON TP3: full-isolation decode at 10k is
+7.57/7.58 t/s = -51% vs in-split (15.38/15.58) and -38% vs MTP-OFF
+(12.17/12.18), with acceptance identical (0.66667/3.00) - the same collapse
+measured on TP2 (7.42/7.41). The draft cycle under full isolation roughly
+doubles its per-token cost: the duplicated embedding/LM-head run on the draft
+die at 1x bandwidth and two host-staged hops per draft step replace the
+3-die-bandwidth meta-side path. Prefill is unaffected (117.6-117.9 vs
+117.4-118.5 in-split).
+
+## TP3 200k arms (B in-split / C draft-die, 2 reps) - appended below when complete
+
+## Result 8 - TP3 200k: B in-split vs C draft-die, 2 reps (2026-09-22)
+
+A@200k stands closed (Result 1 / E-028/E-031: MTP-OFF alone is >=839 MiB/die
+short at boot). C audit gate captured at 200k with a VERBOSE boot:
+"sched_reserve: ROCm3 isolation audit: 263.52 MiB on ROCm3, 0.00 MiB on the
+model split" + the 335.3/517.8 duplication lines.
+
+| arm | boot-ready used (free) c0,c1,c2 | post-probe used | die 3 | pp 2k | decode ~7.9k | accept / mean |
+|-----|---------------------------------|-----------------|-------|-------|--------------|---------------|
+| B in-split r1,r2 | 7809.8 (366.2), 7582.0 (594.0), 7634.2 (541.8) | end-of-session not banked; decode-cell envelope sampled | - | 113.69 / 113.43 | 14.73 / 14.67 | 0.66667 / 3.00 |
+| C draft-die r1,r2 | 7070.8 (1105.2), 7048.9 (1127.2), 7101.0 (1075.0) | 7673.9/7606.1/7662.1 (decode-cell envelope) | 2288.8/2288.9 boot (5887 free); 3168.9 post-probe (5887->5087... see artifacts) | 117.61 / 117.88 | 7.58 / 7.58 | 0.66667 / 3.00 |
+
+SAVED per serving die at 200k boot-ready (C-vs-B): +739/+533/+533 MiB
+(mean ~602/die freed from the serving dies by the draft-die move). Decode
+penalty at 200k: -48.5% (7.58 vs 14.73/14.67) - the same collapse as 10k,
+full battery 5-cell quality guards PASS in every arm (canary 0.66667,
+determinism byte-identical, needle 3/3).
+
+TP3 200k VERDICT: the flag arm boots healthy at 200k with ~533-739 MiB/die
+more serving-die headroom than the config of record and identical acceptance
+- but at half the decode throughput. As a promotion candidate for the TP3
+200k serving lane: NO on decode-sensitive workloads; the config of record
+(14.7 t/s) stands. The headroom reading matters only if a future lane needs
+the serving-die margin (e.g. longer contexts or larger ubatch experiments).
+
+## Result 9 - STEP A restore verified served (2026-09-22)
+
+STEP A commit 3e576bca4 (v157, 15ebc5165 + mode split) verified on TP2@10k,
+port 8082, STRICT UNSET (partial/v1 default):
+- "load_model: draft-device mode: partial (v1)" (SRV_INF, default verbosity)
+- no duplication lines, no isolation audit line (audit is full-mode only)
+- decode probe (32 tokens after 2k prefill): 11.20 t/s, accept-path healthy;
+  the exact-cell v1-class measurement lands in STEP B on the merged tree
+  (9f4a4b19d) after the coordinator's merge.
+Full-mode engagement text ("full isolation" + duplication + audit 0.00) was
+verified earlier on the same tree (Results 4/7/8). Artifacts:
+mode_partial_smoke_20260922.log.

@@ -1562,3 +1562,25 @@ to Gemini's guard battery, die 3 is the dev cell.
   relaunch needs the TIMELINE attribution cell then device-side work.
   SERVED VALIDATION QUEUE: TIMELINE attribution cell, FAST_TOPK A/B
   (greedy byte-identical gate), backend-sampling abort capture.
+- E-039 2026-09-22 TP2/TP3 desk: FULL DRAFT-DEVICE LADDER on the isolation
+  build (binary v152, 7d3ab351a; 16 boots: TP2@10k A/B/C x2, TP3@10k A/B/C x2,
+  TP3@200k B/C x2 + audit-capture boots). TP3@10k (receipt Result 7): OFF
+  decode 12.17/12.18, in-split 15.38/15.58, draft-die 7.57/7.58 = -51% vs
+  in-split; boot-ready savings: in-split costs ~765 MiB/die over OFF, flag
+  saves ~224/die vs in-split; post-probe flag saves ~503/die vs in-split.
+  TP3@200k (Result 8): in-split (config of record) 14.73/14.67 t/s decode,
+  pp 113.69/113.43, 5/5 GREEN x2 - my binary reproduces the re-stamped
+  baseline; draft-die arm decodes 7.58/7.58 = -48.5% at HALF the serving-die
+  footprint (boot-ready C-vs-B saves ~602 MiB/die mean; die 3 carries 2.29 GiB
+  boot / 3.17 GiB post-probe). AUDIT GATE 0.00 on the model split captured at
+  200k (VERBOSE boot: "ROCm3 isolation audit: 263.52 MiB on ROCm3"), plus
+  die-3 physical signature on every C boot. ACCEPTANCE 0.66667/3.00 in every
+  arm of every topology; all quality guards PASS. CONSOLIDATED VERDICT: the
+  full-isolation decode collapse (-48 to -51%) reproduces at every topology
+  and context (TP2/10k 7.42/7.41, TP3/10k 7.57/7.58, TP3/200k 7.58/7.58) -
+  root cause class: the draft's embedding-row + LM-head run on the
+  1x-bandwidth draft die plus 2 host-staged hops per draft step; the v1-flag
+  (partial relocation, head on meta) does NOT pay this. PROMOTION: E-035 full
+  isolation is NOT a candidate for any latency-sensitive lane; its value is
+  headroom (~602 MiB/die at TP3/200k, ~177 MiB/die at TP2/10k vs in-split).
+  Voltage/clock sweep authorized next (Chris-directed, separate receipt).
