@@ -964,3 +964,15 @@ to Gemini's guard battery, die 3 is the dev cell.
   binary/libs mtimes unchanged through the last boot (battery fingerprint
   aa336055d4d73b00 constant; receipt commit field only reflects docs-HEAD
   moves by other desks).
+- E-044 2026-09-21 SERVED VALIDATION VERDICTS OF RECORD (13 batteries,
+  5/5 guards each, greedy sha identical everywhere, contamination audit
+  CLEAN on all arms): (1) T4 q8_1 cache +0.36% decode (engagement proven:
+  401 hits/427 misses) - NOT PROMOTED, honest negative, teardown fix
+  confirmed served; (2) a8 tile - ON arm CRASHED at 200k first request
+  (tile f16 pool allocs OOM at 200-400 MiB/die free; tile itself proven
+  working: displaces rocblas fully at -p 512) - NOT PROMOTED at 200k;
+  reopen path = pool-fitting or the loader residency that E-036 closed;
+  (3) T3 grouping -0.24% AND census shows ZERO grouped launches - the
+  grouping never forms under the TP3 multi-stream machinery - NOT
+  PROMOTED; reopen needs graph-level grouping design. Config of record
+  unchanged: ub512, prefill 115.21, decode ~14.95, accept 0.66667.

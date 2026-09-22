@@ -1,0 +1,18 @@
+census start Mon Sep 21 10:40:02 PM CDT 2026 cold-stamp:
+GPU[0]		: Temperature (Sensor edge) (C): 22.0
+GPU[0]		: Temperature (Sensor junction) (C): 24.0
+GPU[0]		: Temperature (Sensor memory) (C): 24.0
+GPU[1]		: Temperature (Sensor edge) (C): 33.0
+GPU[1]		: Temperature (Sensor junction) (C): 33.0
+GPU[1]		: Temperature (Sensor memory) (C): 36.0
+GPU[2]		: Temperature (Sensor edge) (C): 22.0
+GPU[2]		: Temperature (Sensor junction) (C): 23.0
+GPU[2]		: Temperature (Sensor memory) (C): 29.0
+GPU[3]		: Temperature (Sensor edge) (C): 27.0
+GPU[3]		: Temperature (Sensor junction) (C): 28.0
+GPU[3]		: Temperature (Sensor memory) (C): 32.0
+census end Mon Sep 21 10:40:43 PM CDT 2026
+-rw-rw-r-- 1 chris chris      2108 Sep 21 22:40 docs/amd-port/results/census_decode_20260921_224002_agent_info.csv
+-rw-rw-r-- 1 chris chris      1367 Sep 21 22:40 docs/amd-port/results/census_decode_20260921_224002.bench.log
+-rw-rw-r-- 1 chris chris 606885894 Sep 21 22:40 docs/amd-port/results/census_decode_20260921_224002_kernel_trace.csv
+-rw-rw-r-- 1 chris chris       676 Sep 21 22:40 docs/amd-port/results/census_decode_20260921_224002.stamp
