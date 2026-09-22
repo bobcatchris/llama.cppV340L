@@ -1601,3 +1601,27 @@ to Gemini's guard battery, die 3 is the dev cell.
   merged build, probe_2k_decode.py, mode-line artifacts, per-die
   VRAM) - answers Chris's origin question: was the draft device ever
   actually faster at 2k on real code.
+- E-067 2026-09-22 THERMAL PROGRAM FINAL FACTS + measurement reset
+  (Chris: "reduce heat now, all runs invalid if too hot"). (1) POWER
+  CAP: hard SKU ceiling 110 W/die (cannot raise); driver accepts
+  90-110; at 90 W decode CHOKES (card3 775 MHz, 9.04 t/s); at 100 W
+  busy dies slip (775-991 MHz under load); only ~105-110 W holds
+  1200 MHz on all serving dies - the dies were power-limited at 110 W
+  all along, stock and pinned. Cap reduction is NOT a heat lever at
+  maintained performance on this SKU. (2) UNDERVOLT PIN: proven at
+  10k only (morning sweep, 15.94 stable); at 200k ALL pinned cells
+  timed out (8/8 arms, no GPU-hang markers in server logs, prime
+  suspect manual-perf-level MCLK ramp inhibition at large-KV boots).
+  Pin at 200k = open investigation, not a serving option. (3)
+  MEASUREMENT RESET: every stock-clock number from ~07:30 onward is
+  VOID as thermally confounded (the 14.73->12.81->10.47->8.78 slide
+  across arms = die soak, idle-wait 0 back-to-back boots; stock boost
+  power-throttles at the 110 W cap). The only clean stock numbers
+  remain the 07:11-07:33 ladder era. (4) FINAL A/B CHAIN RUNNING
+  (exec_0334c85d, lane 8081): STOCK clocks, cooldown-gated (no boot
+  until hottest serving die < 60 C), interleaved 200k in-split vs
+  v1-flag x2, then 2k in-split vs v1-flag pair - Chris's origin
+  question (was the draft device ever faster at 2k). Mode lines +
+  per-arm junc/draw/sclk telemetry on every arm. This chain is the
+  table of record. Environment: stock restored (perf auto, OD stock,
+  cap 110).
