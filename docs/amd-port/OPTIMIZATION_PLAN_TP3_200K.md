@@ -1028,3 +1028,20 @@ to Gemini's guard battery, die 3 is the dev cell.
   exclusive die-3 window (~10 min) to optionally re-bank the iso decode t/s
   uncontended; all other cells closed. Receipt:
   results/TP3_iso_decode_2026-09-21.md.
+- E-048 2026-09-21 Integration: served-measurement lane COMPLETE (E-046/
+  E-047 receipts, commit 269cc31fa). ANSWERS OF RECORD: (1) true per-device
+  MTP cost at TP3/200k = ~1.06-1.26 GB/die (mean 1125.4 boot-ready) - the
+  >2 GB hypothesis does not reproduce at any measured scale; cost is nearly
+  ctx-independent (TP2/10k 1072.8 -> TP3/200k 1125.4, +4.9% for 20x ctx),
+  confirming draft-context-buffer dominance; die 0 carries ~195 MiB extra
+  (rank-0 draft-side buffers). (2) MTP-ON serves within 10.3-25.1 MiB/die
+  of ceiling at peak -> the tile-OOM threshold is now quantified (~10 MiB
+  per-call alloc aborts die 0) - direct input to the chunked-dequant desk.
+  (3) MTP value confirmed: +23.6% decode (12.23 -> 15.12). (4) Iso decode
+  cell CLOSED CLEAN on 8081: 5/5 guards, prefill 116.95, decode 15.21,
+  accept 0.66667 exact, zero retries - the E-037 "defect" is fully
+  attributed to port contamination. (5) Naming: --device takes ROCm0..3
+  on this HIP build, not CUDA0 (receipt-documented). ARBITRATION NOTE:
+  bench desks must hold /tmp/campaign_gpu_boot.lock too - the tile-chunked
+  bench was die-3-resident during the iso decode window (result banked as
+  lower-bound; uncontended re-bank optional via E-047 window request).
