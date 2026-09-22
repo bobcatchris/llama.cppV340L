@@ -852,6 +852,25 @@ struct server_metrics {
 // server_context_impl (private implementation)
 //
 
+// unified KV cells that a task still needs to place, after reusing the
+// candidate slot's cached prefix (one token entry = one cell, media included)
+static int32_t kv_unified_cells_needed(const server_slot & slot, const server_task & task) {
+    const size_t n_past = task.params.cache_prompt
+        ? slot.prompt.tokens.get_common_prefix(task.tokens)
+        : 0;
+
+    return std::max<int32_t>(0, (int32_t) task.tokens.size() - (int32_t) n_past);
+}
+
+// a task may only launch when its cells plus the cells still needed by every
+// other in-flight prompt fit in the remaining unified cache. per-slot n_ctx
+// admission cannot see this under kv_unified (each slot may use the full
+// cache), so an overcommit drives the cache to zero cells and fails every
+// request with "Context size has been exceeded"
+static bool kv_unified_admission_fits(int32_t n_need, int32_t n_ctx_total, int32_t n_used, int32_t n_pending) {
+    return n_need + n_pending <= n_ctx_total - n_used;
+}
+
 struct server_context_impl {
     friend struct server_context;
 
@@ -1730,7 +1749,7 @@ private:
     //       - smarter decision which slot to clear (LRU or longest prompt?)
     //       - move slot to level 2 cache instead of removing?
     //       - instead of purging, try to store and resume later?
-    bool try_clear_idle_slots() {
+    bool try_clear_idle_slots(const server_slot * skip = nullptr) {
         bool res = false;
 
         if (!params_base.kv_unified) {
@@ -1738,7 +1757,7 @@ private:
         }
 
         for (auto & slot : slots) {
-            if (slot.is_processing()) {
+            if (&slot == skip || slot.is_processing()) {
                 continue;
             }
 
@@ -2442,6 +2461,59 @@ private:
                         break;
                     }
 
+                    // with a unified KV cache, all slots share the n_ctx cells, so a
+                    // task can only launch if its prompt and the remaining prompts of
+                    // all in-flight requests fit in the free cells together
+                    if (params_base.kv_unified && params_base.kv_admission) {
+                        int32_t n_used    = 0;
+                        int32_t n_pending = 0;
+
+                        for (const server_slot & cur : slots) {
+                            n_used += cur.prompt.n_tokens();
+
+                            if (!cur.is_processing() || &cur == slot) {
+                                continue;
+                            }
+
+                            // cells still to be placed for in-flight prompts - a newcomer
+                            // must not take the last cells an older request still needs
+                            if (cur.state == SLOT_STATE_STARTED) {
+                                n_pending += kv_unified_cells_needed(cur, *cur.task);
+                            } else if (cur.state == SLOT_STATE_PROCESSING_PROMPT) {
+                                n_pending += std::max(0, cur.task->n_tokens() - cur.prompt.n_tokens());
+                            }
+                        }
+
+                        const int32_t n_need = kv_unified_cells_needed(*slot, task);
+
+                        // idle slots only hold reclaimable cached prompts - purge them
+                        // before deferring (same relief policy as the retry path in decode())
+                        while (!kv_unified_admission_fits(n_need, n_ctx, n_used, n_pending) && try_clear_idle_slots(slot)) {
+                            n_used = 0;
+                            for (const server_slot & cur : slots) {
+                                n_used += cur.prompt.n_tokens();
+                            }
+                        }
+
+                        if (!kv_unified_admission_fits(n_need, n_ctx, n_used, n_pending)) {
+                            if ((int32_t) task.tokens.size() > n_ctx) {
+                                send_error(task.id,
+                                           string_format("request (%d tokens) exceeds the available context size (%d tokens), try increasing it",
+                                                         (int) task.tokens.size(), n_ctx),
+                                           ERROR_TYPE_EXCEED_CONTEXT_SIZE,
+                                           task.tokens.size(), n_ctx);
+                                break;
+                            }
+
+                            // cells are held by in-flight requests - queue the task and
+                            // retry when one of them releases its slot
+                            SRV_WRN("unified KV occupancy is too high, defer task %d (n_need = %d, n_used = %d, n_pending = %d, n_ctx = %d)\n",
+                                    task.id, n_need, n_used, n_pending, n_ctx);
+                            queue_tasks.defer(std::move(task));
+                            break;
+                        }
+                    }
+
                     if (task.is_parent()) {
                         // try getting free slots for all child tasks
                         size_t n_child_tasks = task.child_tasks.size();
@@ -3091,7 +3163,20 @@ private:
         if (params_base.cont_batching || batch.size() == 0) {
             bool add_ok = true; // false means the batch is full, skip remaining slots
 
-            iterate(slots, [&](server_slot & slot) {
+            // fill order: oldest task first, so a newer request cannot starve
+            // an older mid-prompt one when batch space or unified KV cells run low
+            std::vector<server_slot *> fill_order;
+            for (auto & slot : slots) {
+                if (slot.is_processing()) {
+                    fill_order.push_back(&slot);
+                }
+            }
+            if (params_base.kv_fifo_fill) {
+                std::sort(fill_order.begin(), fill_order.end(),
+                        [](const server_slot * a, const server_slot * b) { return a->task->id < b->task->id; });
+            }
+
+            iterate(fill_order, [&](server_slot & slot) {
                 if (!add_ok || batch.size() >= n_batch) {
                     return; // batch is full, skip remaining slots
                 }

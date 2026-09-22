@@ -1178,3 +1178,47 @@ to Gemini's guard battery, die 3 is the dev cell.
   wt-t3-graph on amd/t3-graph (T3 reopen: design graph-level grouping that
   forms under the TP3 multi-stream machinery - the E-044 zero-launch
   finding). No die usage: both are impl + host-test desks.
+- E-054 2026-09-22 W-server-fixes desk COMPLETE (worktree wt-server-fixes,
+  branch amd/server-exposures; the E-053 zero-GPU dispatch; ZERO die time).
+  Both E-039 server exposures FIXED in tools/server/server-context.cpp with
+  host-test reproductions (no GPU anywhere): (1) GLOBAL UNIFIED KV ADMISSION
+  (default ON, --kv-admission / LLAMA_ARG_KV_ADMISSION, kv_unified-only):
+  process_single_task now launches a task only if its remaining prompt cells
+  (kv_unified_cells_needed: task tokens minus the candidate slot's cached
+  common prefix) PLUS the remaining prompt cells of every other in-flight
+  request fit in n_ctx - total occupied cells; failure path = purge idle
+  cached prompts first (try_clear_idle_slots gained a skip param so the
+  candidate's fresh prefix cache is never purged), 400
+  EXCEED_CONTEXT_SIZE if the request exceeds the whole cache, otherwise
+  DEFER into the existing deferred queue (re-admitted on the next slot
+  release) - clean queueing instead of the E-037 accept-then-starve that
+  ended in "Context size has been exceeded. off = 69" HTTP 500 for ALL
+  in-flight requests; (2) FIFO SLOT FILL ORDER (default ON, --kv-fifo-fill /
+  LLAMA_ARG_KV_FIFO_FILL): the pre_decode prompt-fill loop iterates
+  processing slots by task id (arrival order) instead of slot index, so the
+  older mid-prompt request wins the remaining cells first (the incident's
+  newer-on-slot-0 trickle-while-veteran-starves pattern). Default ON is
+  justified per exposure because the legacy behavior is objectively a
+  starvation bug; both knobs are documented escape hatches back to legacy;
+  admission engages only under kv_unified (non-unified slots own private
+  cells regions and per-slot admission is already exact). HOST TESTS
+  (docs/amd-port/tests/test_server_exposures_host.cpp, house convention,
+  ALL PASS): unit mirrors of both new pure functions; defect 1 reproduction
+  closing the incident to the exact cell (6587 + 3584 + 64+4+1 = 10240,
+  fatal at off = 69, both requests 500); defect 2 reproduction (legacy fill
+  round gives the whole 512 batch to the newer task, FIFO flips it);
+  admission decision table (defer on the incident geometry, admit empty,
+  prefix-reuse boundary flip, knobs-off legacy, REJECT_TOOBIG,
+  purge-then-admit); full fixed trajectory (task 35 deferred, task 14
+  completes 7857 + generates + releases, deferred popped, stale cache
+  purged, task 35 completes, zero aborts); FIFO-only control proving
+  admission is the load-bearing fix. Predecessor test_w6_isolation_host
+  re-run ALL PASS. Compile-clean: direct g++ -std=c++17 -O1 -c -Wall
+  -Wextra of server-context.cpp + common/arg.cpp exit 0 (only pre-existing
+  header-static warnings; cmake/ninja unavailable in this environment,
+  full linked build deferred). Receipt:
+  results/Server_exposures_2026-09-22.md (includes served-window validation
+  plan: 10k-class -kvu boot, two concurrent 7857-token prompts on one port,
+  expect defer line + zero retries + zero 500s; and residual exposures:
+  generation pressure vs the nb=1 TODO, parent/child copy_state_to cell
+  duplication not modeled at admission).

@@ -1513,6 +1513,22 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_env("LLAMA_ARG_CACHE_IDLE_SLOTS").set_examples({LLAMA_EXAMPLE_SERVER}));
     add_opt(common_arg(
+        {"--kv-admission"},
+        {"--no-kv-admission"},
+        "with unified KV, check the global cache occupancy before launching a task and defer it if the cache cannot supply its prompt (default: enabled)",
+        [](common_params & params, bool value) {
+            params.kv_admission = value;
+        }
+    ).set_env("LLAMA_ARG_KV_ADMISSION").set_examples({LLAMA_EXAMPLE_SERVER}));
+    add_opt(common_arg(
+        {"--kv-fifo-fill"},
+        {"--no-kv-fifo-fill"},
+        "fill slots in FIFO order (oldest task first), so a newer request cannot starve an older mid-prompt one (default: enabled)",
+        [](common_params & params, bool value) {
+            params.kv_fifo_fill = value;
+        }
+    ).set_env("LLAMA_ARG_KV_FIFO_FILL").set_examples({LLAMA_EXAMPLE_SERVER}));
+    add_opt(common_arg(
         {"--context-shift"},
         {"--no-context-shift"},
         string_format("whether to use context shift on infinite text generation (default: %s)", params.ctx_shift ? "enabled" : "disabled"),
