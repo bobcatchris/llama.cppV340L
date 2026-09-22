@@ -1625,3 +1625,24 @@ to Gemini's guard battery, die 3 is the dev cell.
   per-arm junc/draw/sclk telemetry on every arm. This chain is the
   table of record. Environment: stock restored (perf auto, OD stock,
   cap 110).
+- E-068 2026-09-22 REBOOT RECOVERY + CLEAN RE-STAMP BEGINS. Post-crash
+  forensics: 3x llama-server segfaults INSIDE libamdhip64.so.6.2
+  (dmesg, same IP) beginning with the OD-table churn on live cards;
+  sysfs GPU resets cleared the segfaults but left HIP enumeration
+  dead (0 devices; amdgpu unload refused, 13 dependency refs). Chris
+  rebooted; state after: 4/4 dies enumerate (8160 MiB free each),
+  junctions 22-27 C, stock OD/cap. DISCRIMINATOR + FIRST CLEAN CELL:
+  in-split @ 200k on the MERGED build (STEP A + mtp-overhead + T3 +
+  admission all in), stock clocks: decode 15.10 t/s PASS (+1.05% vs
+  14.94 baseline; 5-cell green). VERDICTS: (a) the morning crashes
+  were DRIVER CORRUPTION, all of today's code merges EXONERATED;
+  (b) 15.10 > both re-stamp waypoints (14.93, 15.57-era) on a cold
+  cooldown-gated machine - the "decode decline" at 200k was largely
+  thermal soak + driver decay, and the config of record holds ~15.1
+  when measured clean; (c) origin decomposition stands: 17.8@2k era
+  number remains context-scaling, not loss. FINAL A/B CHAIN running
+  (exec_221aa1c5): 200k flag-r1/on-r2/flag-r2 + 2k on/flag pair,
+  stock, cooldown-gated, mode lines + junc/draw/sclk telemetry per
+  arm. Table of record lands from these receipts. OD/cap experiments
+  are CLOSED on this hardware pending Chris's efficiency-trade
+  decision (cap floor ~95-100 W chokes clocks; 110 W = SKU max).
