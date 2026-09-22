@@ -2333,3 +2333,20 @@ to Gemini's guard battery, die 3 is the dev cell.
   teardown and lost 1154 MiB of KV alloc to OOM (dmesg clean); launch
   gates now check live llama-server + per-die VRAM use, not just the
   lock; convention text should add a post-teardown settle delay.
+- E-092 2026-09-22 T3 FIX INTEGRATED + ZOMBIE RELAUNCH + LOCK SETTLE
+  RULE. (1) amd/t3-graph merged (e7dbc7785): the copy-back size fix
+  (cb.nbytes = ggml_nbytes(member) - was the full 2-D area, ne[0]x
+  oversized; eager prefill silently tail-corrupted, decode capture
+  rejected) is in the campaign binary; served proof: grouped launches
+  in decode graphs, zero ROCm errors, decode 14.82 in-band, accept
+  0.66667, byte-exact sha. Remaining: a 3-rep A/B (single cell cannot
+  resolve under the 0.94% noise floor) - queued for the final
+  combined window. (2) LOCK SETTLE RULE adopted per the T3 desk's
+  route-back (its first boot raced a coordinator teardown and OOM'd):
+  a released lock does not imply a drained die - 60-90 s settle +
+  per-die VRAM verify before booting; kills PID-targeted only.
+  Automation text updated. (3) MMVQ kernel desk found ZOMBIE (4 h,
+  zero artifacts) and relaunched as wt-mmvq-kernel2 on
+  amd/mmvq-kernel2 with a 60-minute first-deliverable milestone and
+  an end-turn-on-blocker requirement; zombie check (>90 min silent,
+  zero artifacts) added to the automation.
