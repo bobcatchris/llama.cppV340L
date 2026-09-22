@@ -893,3 +893,74 @@ to Gemini's guard battery, die 3 is the dev cell.
   ignores global unified occupancy + slot fill order starves older
   requests - upstream-relevant server exposures, out of desk scope.
   Iso decode cell re-verification pending on a clean exclusive window.
+- E-040 2026-09-21 T4 q8_1 act cache SERVED 3-rep OFF/ON A/B COMPLETE (desk3,
+  dies 0-2, canonical ub512 boot per arm, 180s cold-stamp idle, settle window
+  edge <= 35C + min 120s; per-boot temps in desk3_ab_manifest.jsonl): decode
+  OFF 14.95/14.98/14.92 (mean 14.950) vs ON 14.97/14.97/15.07 (mean 15.003)
+  = +0.36%, prefill +0.03% (115.36 vs 115.39) - FAILS the +2% promotion gate.
+  6/6 boots all-guards PASS, accept 0.66667 everywhere, greedy sha
+  4beb1ba25219ee9b byte-identical in every arm (matches the E-027 gate of
+  record). ENGAGEMENT PROVEN via one -lv 4 diagnostic boot (ggml INFO is
+  verbosity-filtered at the default server thold, which is why no gate lines
+  appear in served logs): enable line present + begin_compute stats
+  "401 hits / 427 misses over 1024 computes" (~48% hit) - the cache populates,
+  hits, and still does not move served decode at ub512/TP3; honest negative.
+  (b) CLEAN-SHUTDOWN SMOKE GREEN on the fixed binary: 0 GGML_ASSERT lines of
+  any kind in all 6 logs - the E-018 pool_size teardown fix is confirmed
+  served. NOT PROMOTED (gate); teardown fix CONFIRMED. Receipts:
+  tp3_guards_20260921_{191620,192953,194338,195732,201059,202424}.jsonl;
+  diag log desk3_diag_q81_20260921_214339.log; full table
+  results/TP3_served_validation_2026-09-21.md.
+- E-041 2026-09-21 tile (GGML_CUDA_TILE_FP16=1) SERVED verdict: FAIL -
+  STOPPED per protocol. env-unset GREEN arm PASS (dec 15.10, pre 115.17, sha
+  4beb1ba25219ee9b). ON arm: env delivery proven (/proc environ), boot healthy,
+  then SIGABRT on the FIRST prefill request - "ROCm error: out of memory" at
+  ggml-cuda.cu:452 ggml_cuda_pool_leg::alloc inside ggml_cuda_tile_fp16_mul_mat
+  <- ggml_cuda_op_mul_mat_cublas (core dump); one off-whitelist WARN
+  ("shape off the census whitelist") fired 4s earlier, i.e. draft-model dense
+  shapes are OFF-list while target trunk ub512 shapes are ON-list. Mechanism:
+  E-031 boot-ready free VRAM is ~200-400 MiB/die at TP3/200k and the tile's
+  per-call f16 src0/src1 pool allocs abort die 0; the +27.5% bench-level win
+  does not survive the 200k memory envelope. Census cell: census_decode.sh
+  (-p 8) reaches NO dense GEMM under either arm (mmvq covers M <= 8 =
+  MMVQ_MAX_BATCH_SIZE; zero GEMM-class kernels in both -p 8 traces);
+  supplementary -p 512 -sm tensor rocprofv3 pair DOES show the replacement:
+  OFF 2976 rocblas Cijk launches / 6729 ms vs ON 1632
+  tile_fp16_gemm<128,64,4,8,32> (4325 ms) + 1632 tile_fp16_reduce (331 ms),
+  dominant MT128x128x16 class fully displaced, zero off-whitelist WARN at
+  -p 512. NOT PROMOTED; re-try gated on the E-036 loader-dequant residency
+  step deleting the per-call f16 alloc. Receipts:
+  tp3_guards_20260921_{203825,205202}.jsonl; traces
+  desk3_c2_p512_{off,on}_kernel_trace.csv.gz; server log
+  server_tp3_200k_20260921_205202.log (backtrace of record).
+- E-042 2026-09-21 T3 grouped mmvq (GGML_CUDA_MMVQ_GROUP=1) SERVED 3-rep A/B
+  COMPLETE: decode OFF 15.05/15.10/15.02 (mean 15.057) vs ON
+  14.89/15.11/15.06 (mean 15.020) = -0.24%, prefill -0.04% - FAILS +2%. 6/6
+  all-guards PASS, accept 0.66667, greedy sha byte-identical in every arm
+  (bit-identity contract holds). CENSUS launch-count cell NOT MET:
+  quantize_q8_1 358413 and mul_mat_vec_q 358413 launches IDENTICAL OFF vs ON,
+  zero mul_mat_vec_q_grouped launches (census_decode_20260921_224002 vs
+  _224043 traces) - the grouping never forms on the canonical config:
+  ggml_cuda_try_group_mmvq declines while stream_context().concurrent_events
+  is non-empty ("never reorder around the multi-stream machinery", active
+  under the TP3 meta-backend butterfly) and/or no eligible same-src1 window
+  survives the eligibility filters under split. NOT PROMOTED: mechanism inert
+  in this topology; candidate would need the concurrency gate relaxed plus a
+  demonstrated group formation before a re-run. Receipts:
+  tp3_guards_20260921_{205728,211330,214646,215954,221301,222609}.jsonl.
+- E-043 2026-09-21 served-lane incident + contamination audit (desk3): two
+  mid-battery SIGKILLs (21:11:15, 21:27:16) and one serving kill (21:34:14)
+  were collisions with the tp2-feasibility lane's boots on shared port 8080
+  (journal: WINDOW START 21:10:54, GAP CLAIM 21:25:09, GO boot 21:34:16);
+  affected manifest rows VOID-RETRIED, retries clean. Post-alert audit of all
+  14 completed arm server logs (tests/desk3_contamination_audit.py): exactly
+  7 tasks per battery, prompt-token signature [3122, 7857, 32, 32, 6043,
+  6043, 6043] identical everywhere, zero serial task overlaps, zero KV-retry
+  lines - NO foreign requests landed on any completed arm, so the E-040/E-041/
+  E-042 numbers stand as measured. Lane adopted the campaign GPU lock
+  convention (/tmp/campaign_gpu_boot.lock) mid-run: wrapper check-and-waits,
+  holds through teardown, removes at exit. Same-binary guarantee for every
+  arm above: single build-hip rebuild 19:14-19:15 from the b4ad90c5a tree,
+  binary/libs mtimes unchanged through the last boot (battery fingerprint
+  aa336055d4d73b00 constant; receipt commit field only reflects docs-HEAD
+  moves by other desks).
