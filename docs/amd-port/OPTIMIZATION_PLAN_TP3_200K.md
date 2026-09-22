@@ -1101,3 +1101,72 @@ to Gemini's guard battery, die 3 is the dev cell.
   amd/tile-nspan - the named E-049 next link (N-span windows with full-K
   contiguous slabs: no gather, keeps gridDim.z fill, targets memory-fit
   AND M=128 parity vs the 4.28-4.33 unchunked reference). Die 3.
+- E-050 2026-09-21 W5 tile-NSPAN desk COMPLETE (worktree wt-tile-nspan, branch
+  amd/tile-nspan; die 3 only, ~30 min of lock-held windows; dies 0-2 untouched).
+  E-049's named next link LANDED and CLEARED BOTH 200k GATES at bench level.
+  Behind GGML_CUDA_TILE_FP16=1 + GGML_CUDA_TILE_FP16_NSPAN=1 (tried before the
+  chunked arm) the a8 tile now dequantizes contiguous N-SPANS of weight rows with
+  the FULL K dimension straight from the quant tensor (rows are contiguous slabs;
+  the per-type to_fp16 kernels are linear over quant blocks, so the gather of the
+  chunked arm is deleted entirely) into ONE reusable window per stream (f16 slab
+  span x K + span partials ks x M x span; default budget 128 MiB total via
+  GGML_CUDA_TILE_FP16_NSPAN_MIB; raw cudaMalloc, grow-only, 64 MiB free-VRAM
+  margin, refusal -> shipped route with one WARN, never aborts). Every span GEMM
+  keeps the unchunked gridDim.z = ks partition and its P + fixed-order f32 reduce
+  (new tile_fp16_reduce_span: same slice-sum order, float4 mapped into strided
+  dst, needs ldc % 4 == 0); tile_fp16_gemm itself UNCHANGED (C base offset + N =
+  span rows are call-site params). Bit-identity CONTRACT MET: output columns are
+  disjoint across spans and each element's slice schedule + f32 sum order are the
+  unchunked ones - oracle 10/10 PASS twice (single-span AND forced multi-span
+  schedules; unchunked still 0.00e+00 vs host spec, L2 band 2.9-6.1e-3, chunked
+  and nspan bit-diff 0/N on every shape), full-glue f32 dst dumps cmp 10/10
+  byte-identical nspan-vs-unchunked at M=128 AND M=512 on real IQ3_S, env-unset
+  10/10 byte-identical vs the pre-change served library. BUG OF RECORD found +
+  fixed (2 lines, latent in the merged chunked arm too): in-place window growth
+  updated the buffers but not the cached entry sizes, so the next call re-entered
+  the realloc path and - on the CUDA-graph capture pass - the realloc's stream
+  sync aborted ("operation not permitted when stream is capturing"); reproduced
+  on gdn_qkv (first shape needing a bigger P slab), fixed in both arms, oracle
+  re-gated, crash scenario passes in the clean battery. PERF parity (die 3,
+  census, 3x20 median): M=128 wall call-weighted nspan 4.31 vs unchunk 4.32
+  same-session control (bar >= 4.28 MET; the E-024 4.33 class reproduced) = -0.2%
+  vs the chunked arm's -35%; M=512 5.65 vs 5.68 (-0.5%); kernel traces show
+  launch-count parity (1 gemm + 1 reduce + 1 dequant + 1 convert per compute,
+  reduce renamed tile_fp16_reduce_span) and GEMM-only within 1-3% per shape,
+  route call-weighted 4.44 vs 4.48 - the chunked z-fill tax is GONE by
+  construction. Budget dial banks the span-loop cost curve: NSPAN_MIB=8 forces
+  ffn_down to 9 spans x 192 rows (24 blocks/launch vs 208) = 2.15 TF/s on that
+  shape (-52%, same class as chunked's 2.18 - tight windows converge to the same
+  fill physics: blocks/launch ~ (span/64) x ks must stay >= ~112); NSPAN_MIB=16
+  refuses everything above attn_k/v -> clean shipped fallback. VRAM proof (0.4 ms
+  sampler): max census window 67.5 MiB @M=128 / 101.2 @M=512 (f16 56.25 + partials
+  11.8/47.2), one-time, refusal-protected; measured peak transient 102 MiB @M=128
+  / 140 @M=512 vs the 200 MiB envelope - FIT; steady 10-shape retention 88 MiB vs
+  unchunked 126 (M=128), 206 vs 248 (M=512) - the E-041/E-044 multi-size-class
+  per-call f16 pool class is deleted, the pool only sees small src1 blocks.
+  VERDICT: N-span gives memory-fit AND parity - the design door E-049 named is
+  REAL; the 200k tile question now reduces to the served boot confirmation
+  (Gemini lane: guards with both envs, in-arm greedy determinism, MTP accept,
+  p512 trace cell - tile_fp16_gemm + tile_fp16_reduce_span displacing cublas,
+  zero off-whitelist launches; watch die-0 first-prefill: window ask + 64 MiB
+  margin vs boot-ready free). Stretch 5.5+ remains M=512-only (5.65), as with the
+  unchunked arm - M=128 wall is dequant-bound, not a span effect. Endgame design
+  door unchanged: fused dequant-in-staging tile (per-quant-type kernel project).
+  Receipt: results/W5_tile_nspan_2026-09-21.md; run logs + traces:
+  results/W5_tile_nspan_{oracle,bench,capture_realloc_bug,trace_summary}_
+  2026-09-21.txt, results/W5_tile_nspan_trace_{nspan,unchunk}_2026-09-21.csv;
+  parser tests/parse_tile_nspan_trace.py.
+- E-051 2026-09-21 Integration: amd/tile-nspan merged (d3e9eda3f,
+  GGML_CUDA_TILE_FP16_NSPAN=1 composing with TILE_FP16=1). BOTH 200k
+  GATES MET at bench level: memory-fit (peak 102-140 MiB incl. one-time
+  window 67.5-101.2, vs unchunked 102-144 pool class that aborted) AND
+  parity (4.31 TF/s at M=128 vs 4.28 control; 5.65 at M=512; kernel
+  within 1-3% per shape; launches unchanged at 4). The multi-size-class
+  per-call f16 pool class that aborted die 0 is GONE. Bug of record
+  found+fixed (also latent in the merged chunked arm): in-place window
+  growth never updated cached entry sizes -> realloc re-entry + stream
+  sync abort on the graph-capture pass; fixed in both arms, oracle
+  re-gated. NAMED NEXT: served boot on the Gemini lane (guards both envs,
+  within-arm determinism, p512 trace cell, watch die-0 first-prefill vs
+  window ask + 64 MiB margin - clean refusal if tight). Endgame door:
+  fused dequant-in-staging tile deletes even the window.

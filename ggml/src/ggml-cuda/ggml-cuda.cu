@@ -618,6 +618,9 @@ ggml_backend_cuda_context::~ggml_backend_cuda_context() {
     // free the chunked-dequant slice windows (raw cudaMalloc'd, this ctx's device)
     tile_fp16_chunk.clear(device);
 
+    // free the N-span full-K dequant windows (raw cudaMalloc'd, this ctx's device)
+    tile_fp16_nspan.clear(device);
+
     if (copy_event != nullptr) {
         CUDA_CHECK(cudaEventDestroy(copy_event));
     }

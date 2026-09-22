@@ -6,6 +6,10 @@
 //      device mismatch < 0.1%, max rel < 1e-3
 //   2. fp64 reference over the same f16 inputs: L2 rel err reported
 //      (banked band for a8: 2.3-5.4e-3)
+//   3. chunked arm bit gate: per-slice launches vs the unchunked P + reduce,
+//      0 bit diffs on every shape
+//   4. N-span arm bit gate: full-K row-span launches (single span and forced
+//      multi-span) vs the unchunked P + reduce, 0 bit diffs on every shape
 // Run: HIP_VISIBLE_DEVICES=3 /tmp/test_tile_integ_oracle
 //
 // Build (flags mirrored from build-hip compile_commands, see T4 receipt; links the
@@ -218,6 +222,51 @@ int main() {
         CHECK(hipFree(Cd2));
         CHECK(hipFree(Wc));
 
+        // nspan arm: contiguous row spans with the FULL K dimension (the f16-level
+        // equivalent of the glue's slab dequant - a row-slab copy, no gather), each
+        // span GEMM keeping gridDim.z = ks and its span-local P + fixed-order
+        // reduce into strided dst. Output must be bit-identical to the unchunked
+        // P + reduce: elements are disjoint across spans and every element sees the
+        // same slice schedule and f32 sum order. Gate both a single full-N span and
+        // a forced multi-span schedule.
+        size_t bit_diff_nspan = 0;
+        for (int cfg = 0; cfg < 2; cfg++) {
+            int64_t nsp = cfg == 0 ? N : 3 * nt;
+            int nspans = 1;
+            if (nsp < N) {
+                nspans = (int) ((N + nsp - 1) / nsp);
+                nsp    = ((N + nspans - 1) / nspans + nt - 1) / nt * nt;
+            }
+            float * Cd3; __half * Wn; float * Pn;
+            CHECK(hipMalloc((void **) &Cd3, (size_t) M * N * 4));
+            CHECK(hipMalloc((void **) &Wn, (size_t) nsp * K * 2));
+            CHECK(hipMalloc((void **) &Pn, (size_t) ks * M * nsp * 4));
+            CHECK(hipMemset(Cd3, 0xFF, (size_t) M * N * 4));   // sentinel: catch non-writes
+            for (int s = 0; s < nspans; s++) {
+                const int64_t r0 = (int64_t) s * nsp;
+                const int64_t ns = std::min(nsp, N - r0);
+                CHECK(hipMemcpy2DAsync(Wn, K * 2, Wd + r0 * K, K * 2, K * 2, ns,
+                                       hipMemcpyDeviceToDevice, nullptr));
+                const dim3 gridn((unsigned) (ns / nt), (unsigned) (M / mt), (unsigned) ks);
+                tile_fp16_gemm<mt, nt, ty, tx, kc, false><<<gridn, block, 0, nullptr>>>(
+                    Wn, Xd, Cd3 + r0, Pn, (int) ns, (int) K, (int) (K / ks), N, (int) K);
+                if (ks > 1) {
+                    const int mn = (int) (M * ns);
+                    tile_fp16_reduce_span<<<(mn/4 + 255) / 256, 256, 0, nullptr>>>(
+                        Pn, Cd3, mn, ks, (int) ns, N, r0);
+                }
+            }
+            CHECK(hipDeviceSynchronize());
+            std::vector<float> out3((size_t) M * N);
+            CHECK(hipMemcpy(out3.data(), Cd3, out3.size() * 4, hipMemcpyDeviceToHost));
+            for (size_t i = 0; i < out.size(); i++) {
+                if (memcmp(&out[i], &out3[i], 4) != 0) bit_diff_nspan++;
+            }
+            CHECK(hipFree(Cd3));
+            CHECK(hipFree(Wn));
+            CHECK(hipFree(Pn));
+        }
+
         size_t bad = 0;
         double mx = 0;
         for (size_t i = 0; i < out.size(); i++) {
@@ -227,11 +276,11 @@ int main() {
         }
         const double l2 = l2_rel(out, ref);
         const double mismatch_pct = 100.0 * (double) bad / (double) out.size();
-        const bool pass = mismatch_pct < 0.1 && mx < 1e-3 && bit_diff == 0;
+        const bool pass = mismatch_pct < 0.1 && mx < 1e-3 && bit_diff == 0 && bit_diff_nspan == 0;
         if (!pass) failures++;
-        printf("  %-13s K=%5lld N_d=%4lld ks=%d: mismatch %6.3f%% max rel %.2e | L2 f64 %.3e | chunked bit-diff %zu/%zu -> %s\n",
+        printf("  %-13s K=%5lld N_d=%4lld ks=%d: mismatch %6.3f%% max rel %.2e | L2 f64 %.3e | chunked bit-diff %zu/%zu nspan bit-diff %zu/%zu -> %s\n",
                s.name, (long long) K, (long long) N, ks, mismatch_pct, mx, l2,
-               bit_diff, out.size(), pass ? "PASS" : "FAIL");
+               bit_diff, out.size(), bit_diff_nspan, out.size(), pass ? "PASS" : "FAIL");
         fflush(stdout);
 
         CHECK(hipFree(Wd)); CHECK(hipFree(Xd)); CHECK(hipFree(Cd)); CHECK(hipFree(Pd));

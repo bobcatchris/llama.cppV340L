@@ -22,6 +22,13 @@
 // cudaMalloc, not the per-call pool) and the slice GEMMs accumulate into dst in the
 // fixed slice order - bit-identical to the unchunked arm, but the f16 weight
 // footprint drops from the full slice to N_d x (ksl + bs) x 2 B.
+//
+// GGML_CUDA_TILE_FP16_NSPAN=1 adds an N-span full-K arm instead: the weight rows
+// are processed in contiguous N-spans with the FULL K dimension, dequantized
+// straight from the quant tensor (rows are contiguous slabs, no gather), each span
+// GEMM keeping gridDim.z = ks and its P + fixed-order reduce. Also bit-identical to
+// the unchunked arm, same f16 footprint class, and the per-launch block count
+// scales with ks again.
 
 // a8 geometry
 #define TILE_FP16_MT 128
