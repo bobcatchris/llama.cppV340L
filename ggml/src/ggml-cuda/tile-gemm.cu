@@ -149,6 +149,23 @@ __global__ void tile_fp16_reduce(const float * __restrict__ P, float * __restric
     }
 }
 
+// N-span arm: the same fixed-order f32 slice sum for one span's partials (ks x M x
+// nsp, row-major); the span's dst columns sit at row stride ldc, column offset coff
+// (a multiple of NT, like nsp, so the float4 mapping stays 16 B aligned when ldc is)
+__global__ void tile_fp16_reduce_span(const float * __restrict__ P, float * __restrict__ C,
+                                      int mn, int ks, int ncols, int64_t ldc, int64_t coff) {
+    const int i4 = (blockIdx.x * blockDim.x + threadIdx.x) * 4;
+    if (i4 + 3 < mn) {
+        float4 s = *reinterpret_cast<const float4 *>(P + i4);
+        for (int z = 1; z < ks; z++) {
+            const float4 v = *reinterpret_cast<const float4 *>(P + (size_t) z * mn + i4);
+            s.x += v.x; s.y += v.y; s.z += v.z; s.w += v.w;
+        }
+        const int row = i4 / ncols;
+        *reinterpret_cast<float4 *>(C + (size_t) row*ldc + coff + i4 - (size_t) row*ncols) = s;
+    }
+}
+
 // chunked arm: copy one row's k-slice worth of quantized blocks (enclosing blocks
 // when the slice start/end is not block-aligned) into the contiguous gather window,
 // so the vetted per-type to_fp16 dequant kernels run unchanged on it and produce
@@ -383,6 +400,7 @@ static bool tile_fp16_chunked_run(
             if (e->q) CUDA_CHECK(cudaFree(e->q));
             cache.total_bytes -= old;
             e->f16 = nf; e->q = nq;
+            e->f16_bytes = f16_bytes; e->q_bytes = q_bytes;
         } else {
             cache.entries.push_back(ggml_cuda_tile_fp16_chunk::entry { stream, nf, nq, f16_bytes, q_bytes });
             e = &cache.entries.back();
@@ -429,6 +447,159 @@ static bool tile_fp16_chunked_run(
                       __func__, (long long) ne00, (long long) row_diff,
                       (long long) src1_ncols, ks, (double) (f16_bytes + q_bytes) / (1024.0*1024.0),
                       (long long) ldc);
+    });
+    return true;
+}
+
+// N-span full-K arm: GGML_CUDA_TILE_FP16_NSPAN=1 on top of GGML_CUDA_TILE_FP16=1
+// processes the weight rows in contiguous N-spans with the FULL K dimension, so the
+// dequant runs on the quant tensor directly (contiguous row slabs, no gather) and
+// every span launch keeps the unchunked kernel's gridDim.z = ks partition plus its
+// P + fixed-order reduce. Output columns are disjoint across spans and each
+// element's slice schedule and f32 sum order are the unchunked ones, so the result
+// is bit-identical to the unchunked arm while the route never holds a whole f16
+// weight copy in the per-call pool (the E-044 OOM class). Window: one f16 slab
+// (span x K) plus one span partials slab (ks x M x span), per stream, grow-only,
+// freed at context teardown. Budget: GGML_CUDA_TILE_FP16_NSPAN_MIB (default 128)
+// total per stream AND free VRAM minus a 64 MiB margin at decision time; refusal
+// falls back to the chunked / shipped routes with one WARN - never aborts.
+static bool tile_fp16_nspan_env_enabled() {
+    static const bool enabled = [] {
+        const char * env = getenv("GGML_CUDA_TILE_FP16_NSPAN");
+        const bool on = env != nullptr && env[0] == '1';
+        if (on) {
+            GGML_LOG_INFO("ggml-cuda: GGML_CUDA_TILE_FP16_NSPAN=1, N-span full-K weight dequant into a reusable window\n");
+        }
+        return on;
+    }();
+    return enabled;
+}
+
+static size_t tile_fp16_nspan_cap_bytes() {
+    static const size_t cap = [] {
+        const char * env = getenv("GGML_CUDA_TILE_FP16_NSPAN_MIB");
+        const size_t mib = env != nullptr ? (size_t) atoll(env) : 128;
+        return mib * 1024 * 1024;
+    }();
+    return cap;
+}
+
+static bool tile_fp16_nspan_run(
+        ggml_backend_cuda_context & ctx, int id, cudaStream_t stream,
+        const ggml_tensor * src0, const ggml_tensor * src1,
+        const char * src0_dd_i, const float * src1_ddf_i, float * dst_dd_i,
+        int64_t row_diff, int64_t src1_ncols, int64_t ne00, int64_t ldc, int ks,
+        const to_fp16_cuda_t to_fp16_cuda) {
+    // the span reduce maps float4 lanes into strided dst rows; spans and column
+    // offsets are NT-aligned, the dst row stride must keep the writes 16 B aligned
+    if (ks > 1 && ldc % 4 != 0) {
+        return false;
+    }
+
+    // span size: the largest NT-aligned row count whose full-K f16 slab fits the
+    // window budget (a single span when the whole slice fits)
+    int64_t nsp = row_diff;
+    if (row_diff*ne00*sizeof(half) > tile_fp16_nspan_cap_bytes()) {
+        nsp = (int64_t) (tile_fp16_nspan_cap_bytes() / (ne00*sizeof(half))) / TILE_FP16_NT * TILE_FP16_NT;
+        if (nsp < TILE_FP16_NT) {
+            return false;
+        }
+    }
+
+    const int  bs  = ggml_blck_size(src0->type);
+    const int  tsz = ggml_type_size(src0->type);
+
+    const size_t f16_bytes = nsp*ne00*sizeof(half);
+    const size_t p_bytes   = (size_t) ks*src1_ncols*nsp*sizeof(float);
+
+    auto & cache = ctx.tile_fp16_nspan;
+    if (cache.cap_bytes == 0) {
+        cache.cap_bytes = tile_fp16_nspan_cap_bytes();
+    }
+    ggml_cuda_tile_fp16_nspan::entry * e = cache.find(stream);
+    if (e == nullptr || e->f16_bytes < f16_bytes || e->p_bytes < p_bytes) {
+        const size_t old = e ? e->f16_bytes + e->p_bytes : 0;
+        size_t free_b = 0, total_b = 0;
+        CUDA_CHECK(cudaMemGetInfo(&free_b, &total_b));
+        constexpr size_t margin = 64ull*1024*1024;   // compute headroom beyond the windows
+        if (cache.total_bytes - old + f16_bytes + p_bytes > cache.cap_bytes ||
+            f16_bytes + p_bytes + margin > free_b) {
+            static std::once_flag warn_flag;
+            std::call_once(warn_flag, []() {
+                GGML_LOG_WARN("%s: span window over budget or free VRAM, shipped route in use\n", __func__);
+            });
+            return false;
+        }
+        void * nf = nullptr;
+        void * np = nullptr;
+        if (cudaMalloc(&nf, f16_bytes) != cudaSuccess ||
+            (p_bytes > 0 && cudaMalloc(&np, p_bytes) != cudaSuccess)) {
+            (void) cudaGetLastError();
+            if (nf) CUDA_CHECK(cudaFree(nf));
+            static std::once_flag warn_flag;
+            std::call_once(warn_flag, []() {
+                GGML_LOG_WARN("%s: span window alloc failed, shipped route in use\n", __func__);
+            });
+            return false;
+        }
+        if (e) {
+            CUDA_CHECK(cudaStreamSynchronize(stream));   // the replaced window may be in flight
+            CUDA_CHECK(cudaFree(e->f16));
+            if (e->p) CUDA_CHECK(cudaFree(e->p));
+            cache.total_bytes -= old;
+            e->f16 = nf; e->p = np;
+            e->f16_bytes = f16_bytes; e->p_bytes = p_bytes;
+        } else {
+            cache.entries.push_back(ggml_cuda_tile_fp16_nspan::entry { stream, nf, np, f16_bytes, p_bytes });
+            e = &cache.entries.back();
+        }
+        cache.total_bytes += f16_bytes + p_bytes;
+        GGML_LOG_INFO("%s: span window %.1f MiB (f16 %zu B + p %zu B), %.1f MiB free\n",
+                      __func__, (double) (f16_bytes + p_bytes) / (1024.0*1024.0),
+                      f16_bytes, p_bytes, (double) (free_b - f16_bytes - p_bytes) / (1024.0*1024.0));
+    }
+
+    const to_fp16_cuda_t to_fp16_cuda_src1 = ggml_get_to_fp16_cuda(src1->type);
+    GGML_ASSERT(to_fp16_cuda_src1 != nullptr);
+    ggml_cuda_pool_alloc<half> src1_as_f16(ctx.pool(id), src1_ncols*ne00);
+    to_fp16_cuda_src1(src1_ddf_i, src1_as_f16.get(), src1_ncols*ne00, stream);
+
+    constexpr int mt = TILE_FP16_MT, nt = TILE_FP16_NT, ty = TILE_FP16_TY, tx = TILE_FP16_TX;
+    const dim3 block(mt * nt / (ty * tx));
+    const int  ksl = (int) (ne00 / ks);
+    const int64_t row_q_bytes = (int64_t) (ne00/bs)*tsz;
+
+    // even NT-aligned spans, the last takes the remainder; the GEMM reads the
+    // span's f16 rows at window row stride K and writes span-local partials
+    // (N param = ns), or dst columns directly when ks == 1 (C base offset r0)
+    int nspans = 1;
+    if (nsp < row_diff) {
+        nspans = (int) ((row_diff + nsp - 1) / nsp);
+        nsp    = ((row_diff + nspans - 1) / nspans + nt - 1) / nt * nt;
+    }
+
+    for (int s = 0; s < nspans; s++) {
+        const int64_t r0 = (int64_t) s*nsp;
+        const int64_t ns = std::min(nsp, row_diff - r0);
+        to_fp16_cuda(src0_dd_i + r0*row_q_bytes, (half *) e->f16, ns*ne00, stream);
+        const dim3 grid((unsigned) (ns / nt), (unsigned) (src1_ncols / mt), (unsigned) ks);
+        tile_fp16_gemm<mt, nt, ty, tx, TILE_FP16_KC, false><<<grid, block, 0, stream>>>(
+            (const half *) e->f16, src1_as_f16.get(), dst_dd_i + r0, (float *) e->p,
+            (int) ns, (int) ne00, ksl, ldc, (int) ne00);
+        if (ks > 1) {
+            const int mn = (int) (src1_ncols*ns);
+            tile_fp16_reduce_span<<<(unsigned) ((mn/4 + 255) / 256), 256, 0, stream>>>(
+                (const float *) e->p, dst_dd_i, mn, ks, (int) ns, ldc, r0);
+        }
+    }
+    CUDA_CHECK(cudaGetLastError());
+
+    static std::once_flag once_flag;
+    std::call_once(once_flag, [&]() {
+        GGML_LOG_INFO("%s: tile route engaged, N-span full-K dequant (K=%lld N_d=%lld M=%lld ks=%d spans=%d span=%lld window=%.1f MiB ldc=%lld)\n",
+                      __func__, (long long) ne00, (long long) row_diff,
+                      (long long) src1_ncols, ks, nspans, (long long) nsp,
+                      (double) (f16_bytes + p_bytes) / (1024.0*1024.0), (long long) ldc);
     });
     return true;
 }
@@ -486,11 +657,17 @@ bool ggml_cuda_tile_fp16_mul_mat(
     }
 
     // f16 weights: the resident steady-state copy when the budget admits the
-    // slice, else chunked dequant (GGML_CUDA_TILE_FP16_CHUNKED=1), else the
-    // per-call dequant the shipped cublas route produces
+    // slice, else N-span full-K dequant (GGML_CUDA_TILE_FP16_NSPAN=1), else
+    // chunked dequant (GGML_CUDA_TILE_FP16_CHUNKED=1), else the per-call dequant
+    // the shipped cublas route produces
     const to_fp16_cuda_t to_fp16_cuda = ggml_get_to_fp16_cuda(src0->type);
     GGML_ASSERT(to_fp16_cuda != nullptr);
     const half * w_f16 = tile_fp16_resident_weight(ctx, id, src0, src0_dd_i, row_diff, ne00, to_fp16_cuda, stream);
+    if (w_f16 == nullptr && tile_fp16_nspan_env_enabled() &&
+        tile_fp16_nspan_run(ctx, id, stream, src0, src1, src0_dd_i, src1_ddf_i, dst_dd_i,
+                            row_diff, src1_ncols, ne00, ldc, ks, to_fp16_cuda)) {
+        return true;
+    }
     if (w_f16 == nullptr && tile_fp16_chunked_env_enabled() &&
         tile_fp16_chunked_run(ctx, id, stream, src0, src1, src0_dd_i, src1_ddf_i, dst_dd_i,
                               row_diff, src1_ncols, ne00, ldc, ks, to_fp16_cuda)) {

@@ -1603,6 +1603,49 @@ struct ggml_cuda_tile_fp16_chunk {
     }
 };
 
+// N-span full-K dequant windows for the tile route (GGML_CUDA_TILE_FP16_NSPAN=1,
+// glue in tile-gemm.cu): the weight rows are processed in contiguous N-spans with
+// the FULL K dimension, so the dequant runs on the quant tensor directly (rows are
+// contiguous slabs, no gather) and the GEMM keeps the unchunked launch's
+// gridDim.z = ks partition. One f16 window (span x K) plus one span partials slab
+// (ks x M x span), reused across spans, shapes and computes; the route never holds
+// a whole f16 weight copy in the per-call pool (the E-044 OOM class). Keyed by
+// stream so ops on different streams never share a window. Raw cudaMalloc, NOT
+// graph-pool memory: the window must survive across pool resets inside a graph
+// compute. Grow-only in the max span size seen; steady state never reallocs.
+struct ggml_cuda_tile_fp16_nspan {
+    struct entry {
+        cudaStream_t stream = nullptr;
+        void * f16 = nullptr;      // span x K halves (K = row stride)
+        void * p   = nullptr;      // ks x M x span f32 slice partials
+        size_t f16_bytes = 0;
+        size_t p_bytes   = 0;
+    };
+
+    size_t cap_bytes = 0;
+    size_t total_bytes = 0;
+    std::vector<entry> entries;    // a handful at most; linear scan
+
+    entry * find(cudaStream_t stream) {
+        for (auto & e : entries) {
+            if (e.stream == stream) return &e;
+        }
+        return nullptr;
+    }
+
+    // runs in the context dtor with the owning device current
+    void clear(int device) {
+        if (entries.empty()) return;
+        ggml_cuda_set_device(device);
+        for (auto & e : entries) {
+            CUDA_CHECK(cudaFree(e.f16));
+            if (e.p) CUDA_CHECK(cudaFree(e.p));
+        }
+        entries.clear();
+        total_bytes = 0;
+    }
+};
+
 struct ggml_backend_cuda_context {
     int device;
     std::string name;
@@ -1677,6 +1720,8 @@ struct ggml_backend_cuda_context {
     ggml_cuda_tile_fp16_residency tile_fp16_residency;
 
     ggml_cuda_tile_fp16_chunk tile_fp16_chunk;
+
+    ggml_cuda_tile_fp16_nspan tile_fp16_nspan;
 
     ~ggml_backend_cuda_context();
 
