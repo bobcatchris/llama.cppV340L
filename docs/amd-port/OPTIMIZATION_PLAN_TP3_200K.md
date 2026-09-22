@@ -1946,3 +1946,18 @@ to Gemini's guard battery, die 3 is the dev cell.
   default stands per Chris's call; the v1 flag path is proven healthy
   at full battery and carries the ~490 MiB/die dividend whenever
   serving-die headroom is needed.
+- E-081 2026-09-22 COOLING UPGRADE + COMBINED VALIDATION DESK
+  DISPATCHED (Chris: "we increased cooling on gpus"). Idle junctions
+  now 26-28 C at 3-4 W. The two optimization desks (MMVQ kernel,
+  verify-transport) continue unchanged - their benches and arms
+  benefit directly. NEW: combined validation window on lane 8083
+  (drift-controlled: ref re-run between arms) for every env-gated fix
+  merged today - FAST_TOPK+PACKED_GET, +LIGHT_SYNC,
+  VERIFY_ROW_SAMPLING, PINNED_DEV_COPY, and the ALL composite - with
+  engagement signatures per arm (1-wait/step, -22 drains/round,
+  verify issue -2..-6 ms); then the T3 grouped-mmvq device validation
+  (GGML_CUDA_MMVQ_GROUP=1 + DEBUG: formation lines or named gate
+  declines - either is the deliverable) and the E-054 admission
+  validation (probe_kv_admission.py at 10k class). With the cooling
+  headroom, +0.5-3% class deltas are finally resolvable in a single
+  window instead of being eaten by soak.
