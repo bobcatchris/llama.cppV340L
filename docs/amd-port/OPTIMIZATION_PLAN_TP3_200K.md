@@ -1307,3 +1307,19 @@ to Gemini's guard battery, die 3 is the dev cell.
   head GEMV per step, and pipeline drains. Primary work item: make
   sampling run on-device under tensor split (env-gated), plus timeline
   instrumentation to attribute the rest.
+- E-057 2026-09-22 Coordinator: DESK LAW AMENDMENT (Chris direct).
+  Waits/status polls use single sleeps of up to 150 s; 10-second
+  busy-polling is banned (token waste, Chris: "150 second timeouts are
+  fine, 10 second is wasting token usage"). Relay complete: MTP-overhead
+  desk (ACKed, adopted), T3-reopen desk, Gemini hub #1357, and the
+  30-min automation prompt. Stay-active law unchanged (no indefinite
+  sleeps, no external ACK dependencies). Also: amd/server-exposures
+  (7b1e43505) confirmed merged in campaign HEAD lineage; its served
+  validation (10k-class dual 7857-token concurrent prompts on one port:
+  expect defer log line, second request completes after the first, zero
+  "Context size has been exceeded", zero 500s, then --no-kv-admission
+  legacy-failure control) is QUEUED behind the TP3 200k definitive
+  ladder, lane 8081, boot-lock convention. Probe script staged at
+  docs/amd-port/tests/probe_kv_admission.sh. TP3 200k ladder state:
+  t3on1 under lock since 07:11:57 (runner chain tp3def200_on1/flag1/
+  on2/flag2 in /home/chris/).
