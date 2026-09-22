@@ -1646,3 +1646,27 @@ to Gemini's guard battery, die 3 is the dev cell.
   arm. Table of record lands from these receipts. OD/cap experiments
   are CLOSED on this hardware pending Chris's efficiency-trade
   decision (cap floor ~95-100 W chokes clocks; 110 W = SKU max).
+- E-069 2026-09-22 PARITY VERDICT - THE DAY'S CONTAMINATED CONCLUSIONS
+  REVISED (post-reboot clean receipts, cooldown-gated, mode lines
+  verified "partial (v1)" on every flag boot). TP3 @ 200k, decode
+  guard, accept 0.66667/3.00 EVERYWHERE: in-split 15.10 / 15.23
+  (walls 88.1/88.4 s) vs v1-flag 15.18 / 15.08 (walls 89.2/89.2 s) -
+  PARITY within 0.7%. The morning's "-13% v1-flag" (12.81) and the
+  ladder-era "-18%" (12.24, wall 112 s) were the DEGRADING DRIVER +
+  thermal soak, not the mode: forensics = the flag1 jsonl holds both
+  cells (12.24 pre-reboot vs 15.18 post) on the same arm. TP3 @ 2k:
+  in-split 22.25 vs v1-flag 21.19 (-4.8%) - near-parity, and the
+  tree is +19% faster than the origin-era 17.8@2k draft-device code.
+  ANSWERS OF RECORD: (1) Chris's hypothesis REFUTED - the draft-device
+  path is healthy at 2k AND 200k; (2) full isolation remains the only
+  catastrophic mode (-49%, 7.58 x3, morning receipts); (3) the draft
+  device costs ~nothing at any depth measured today on healthy
+  silicon, so its VRAM dividend (v1 = partial relocation) is nearly
+  free - the operating-point question between in-split and v1-flag
+  reopens on VRAM grounds alone (in-split post-probe free was 17-114
+  MiB/die at 200k; v1's 200k VRAM capture queued next boot);
+  (4) OFF@200k clean cells in flight (fin_200k_off1/2) to complete
+  the 4-arm table - the morning 10.47/8.78 OFF numbers are VOID
+  (driver decay + soak). ENVIRONMENT LAW: after any OD/cap churn or
+  unexplained crash, dmesg first (libamdhip64 IP signature), and no
+  number banked post-incident without a clean-state discriminator.
