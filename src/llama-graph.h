@@ -796,7 +796,9 @@ public:
 
     void reset();
 
-    void set_inputs(const llama_ubatch * ubatch);
+    // the scheduler resolves tensor owners for the LLAMA_ASYNC_INPUT staged
+    // input sets; nullptr keeps every set on the blocking path
+    void set_inputs(const llama_ubatch * ubatch, ggml_backend_sched_t sched = nullptr);
     void set_outputs(const llm_graph_params & params);
 
     // try to update the existing graph result using the new graph parameters in order to reuse it

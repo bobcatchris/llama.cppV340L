@@ -1591,7 +1591,7 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
         // FIXME this call causes a crash if any model inputs were not used in the graph and were therefore not allocated
         const int64_t t_inputs_start = tl_on ? ggml_time_us() : 0;
 
-        res->set_inputs(&ubatch);
+        res->set_inputs(&ubatch, sched.get());
 
         if (tl_on) {
             t_set_inputs_us = ggml_time_us() - t_inputs_start;
