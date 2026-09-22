@@ -1670,3 +1670,21 @@ to Gemini's guard battery, die 3 is the dev cell.
   (driver decay + soak). ENVIRONMENT LAW: after any OD/cap churn or
   unexplained crash, dmesg first (libamdhip64 IP signature), and no
   number banked post-incident without a clean-state discriminator.
+- E-070 2026-09-22 TABLE OF RECORD - TP3 four-arm, clean silicon,
+  post-reboot, cooldown-gated, mode-verified (receipts fin_*.jsonl +
+  fin_*.log; walls 80-89 s class on every cell). MTP-OFF @ 200k x2:
+  12.19 / 12.16 t/s = the no-spec reference (12.24) EXACTLY - OFF
+  decode has NO context-scaling penalty (12.2 at 10k AND 200k; decode
+  is weight-bound, q4_0 KV reads are small) and the morning VOID
+  numbers (10.47/8.78) are confirmed as driver decay, closed.
+  DERIVED: MTP value at 200k = +24% over OFF (15.1-15.2 vs 12.17),
+  matching +26% at 10k; v1-flag = PARITY with in-split at 200k
+  (15.08-15.18 vs 15.10-15.23) and -4.8% at 2k, so on healthy
+  silicon the draft device's cost is ~zero and its VRAM dividend is
+  nearly free - the E-056 "v1 rejected" verdict is SUPERSEDED (it was
+  decided on mislabeled full-isolation + contaminated-driver data);
+  the in-split vs v1 operating-point decision now hinges on the v1
+  200k VRAM capture (in-split post-probe free was only 17-114
+  MiB/die). Path to the 36 t/s goal unchanged: MTP-overhead desk's
+  +40-61% modeled recovery (21.4-24.8 t/s class) via the ~20 ms/step
+  drain/relaunch attack, then kernel work.
