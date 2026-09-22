@@ -32,8 +32,22 @@ EOF
 done
 echo "[$LABEL] pre-boot temps: edge max ${MAXEDGE}C"
 
-# launch the guarded boot + battery with the arm env
+# launch the guarded boot + battery with the arm env, and sample the server
+# process environ in parallel (ggml INFO lines are verbosity-filtered from the
+# server log, so env delivery is proven via /proc instead)
 cd "$REPO"
+ENVF=/tmp/desk3_${LABEL}_env.txt
+( while kill -0 $$ 2>/dev/null; do
+    PID=$(pgrep -f 'build-hip/bin/llama-server' | head -1)
+    if [ -n "$PID" ]; then
+      sleep 2  # let the final process settle
+      tr '\0' '\n' < "/proc/$PID/environ" 2>/dev/null | grep '^GGML_CUDA' > "$ENVF" || true
+      break
+    fi
+    sleep 2
+  done ) &
+ENVSampler=$!
+
 RUNLOG=$RES/desk3_${LABEL}_$(date +%Y%m%d_%H%M%S).log
 if [ "$#" -gt 0 ]; then
   env "$@" bash "$TESTS/run_tp3_guards.sh" > "$RUNLOG" 2>&1
@@ -41,6 +55,8 @@ else
   bash "$TESTS/run_tp3_guards.sh" > "$RUNLOG" 2>&1
 fi
 EXIT=$?
+kill "$ENVSampler" 2>/dev/null
+ENVSEEN=$(tr '\n' ';' < "$ENVF" 2>/dev/null || echo "")
 
 # locate this boot's receipt and server log
 RECEIPT=$(grep -oE 'Receipt banked at: .*' "$RUNLOG" | awk '{print $NF}' | tail -1)
@@ -50,16 +66,23 @@ SLOG=$RES/${SLOG:-missing}
 VERDICT=$(grep -oE 'OVERALL VERDICT: .*' "$RUNLOG" | tail -1 | awk '{print $3}')
 GUARDEXIT=$EXIT
 
-# arm signature + assert scan
-SIG=absent
+# arm signature: env delivery via /proc + ggml WARN scan in server log
+EXPECT=""
 case "$CAND:$ARM" in
-  1:on)  grep -q "q8_1 activation cache enabled" "$SLOG" 2>/dev/null && SIG=present ;;
-  2:on)  grep -q "GGML_CUDA_TILE_FP16=1, packed-fp16 tile GEMM route enabled" "$SLOG" 2>/dev/null && SIG=present ;;
-  3:on)  grep -q "grouped mmvq decode path enabled" "$SLOG" 2>/dev/null && SIG=present ;;
-  *)     grep -q "GGML_CUDA_.*enabled" "$SLOG" 2>/dev/null || SIG=clean ;;
+  1:on)  EXPECT="GGML_CUDA_Q81_ACT_CACHE=1" ;;
+  2:on)  EXPECT="GGML_CUDA_TILE_FP16=1" ;;
+  3:on)  EXPECT="GGML_CUDA_MMVQ_GROUP=1" ;;
 esac
-ASSERTS=$(grep -c "GGML_ASSERT" "$SLOG" 2>/dev/null || echo 0)
-POOL0=$(grep -c "GGML_ASSERT(pool_size == 0)" "$SLOG" 2>/dev/null || echo 0)
+if [ -z "$EXPECT" ]; then
+  [ -z "$ENVSEEN" ] && SIG=clean || SIG=unexpected_env
+elif [ "$ENVSEEN" = "${EXPECT};" ] || [ "$ENVSEEN" = "$EXPECT" ]; then
+  SIG=delivered
+else
+  SIG=NOT_DELIVERED
+fi
+ASSERTS=$(grep -c "GGML_ASSERT" "$SLOG" 2>/dev/null); ASSERTS=${ASSERTS:-0}
+POOL0=$(grep -c "GGML_ASSERT(pool_size == 0)" "$SLOG" 2>/dev/null); POOL0=${POOL0:-0}
+TILEWARN=$(grep -c "shape off the census whitelist" "$SLOG" 2>/dev/null); TILEWARN=${TILEWARN:-0}
 
 # post-shutdown temps
 POST_TMP=/tmp/desk3_${LABEL}_post.json
@@ -96,12 +119,12 @@ EOF
 )
 IFS=, read DEC PRE ACC NDL SHA <<< "$METRICS"
 
-echo "[$LABEL] exit=$GUARDEXIT verdict=${VERDICT:-na} dec=$DEC pre=$PRE acc=$ACC needle=$NDL sha=$SHA sig=$SIG asserts=$ASSERTS pool0=$POOL0 temps=$MAXEDGE/$POSTEDGE C"
-ROW=$(python3 - "$CAND" "$ARM" "$REP" "$LABEL" "$GUARDEXIT" "${VERDICT:-na}" "$DEC" "$PRE" "$ACC" "$NDL" "$SHA" "$SIG" "$ASSERTS" "$POOL0" "$MAXEDGE" "$POSTEDGE" "$RECEIPT" "$SLOG" "$RUNLOG" <<'EOF'
+echo "[$LABEL] exit=$GUARDEXIT verdict=${VERDICT:-na} dec=$DEC pre=$PRE acc=$ACC needle=$NDL sha=$SHA sig=$SIG env_seen=${ENVSEEN:-none} tilewarn=$TILEWARN asserts=$ASSERTS pool0=$POOL0 temps=$MAXEDGE/$POSTEDGE C"
+ROW=$(python3 - "$CAND" "$ARM" "$REP" "$LABEL" "$GUARDEXIT" "${VERDICT:-na}" "$DEC" "$PRE" "$ACC" "$NDL" "$SHA" "$SIG" "$ENVSEEN" "$TILEWARN" "$ASSERTS" "$POOL0" "$MAXEDGE" "$POSTEDGE" "$RECEIPT" "$SLOG" "$RUNLOG" <<'EOF'
 import json, sys
-keys = ["candidate","arm","rep","label","battery_exit","verdict","decode_tps","prefill_tps","accept","needle","det_sha","sig","assert_lines","pool0_asserts","pre_edge_max_c","post_edge_max_c","receipt","server_log","run_log"]
+keys = ["candidate","arm","rep","label","battery_exit","verdict","decode_tps","prefill_tps","accept","needle","det_sha","sig","env_seen","tile_warn","assert_lines","pool0_asserts","pre_edge_max_c","post_edge_max_c","receipt","server_log","run_log"]
 row = dict(zip(keys, sys.argv[1:]))
-for k in ("battery_exit","assert_lines","pool0_asserts","pre_edge_max_c","post_edge_max_c","rep","candidate"):
+for k in ("battery_exit","tile_warn","assert_lines","pool0_asserts","pre_edge_max_c","post_edge_max_c","rep","candidate"):
     row[k] = int(row[k])
 print(json.dumps(row))
 EOF

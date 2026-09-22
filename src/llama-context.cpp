@@ -276,8 +276,10 @@ llama_context::llama_context(
             backends.emplace_back(backend);
         }
 
-        // extra per-context device (e.g. draft-device offload); skipped if the
-        // device is already among the model's devices
+        // extra per-context device (e.g. MTP draft isolation); skipped if the
+        // device is already among the model's devices. it LEADS the backend
+        // list so the scheduler computes there: the loader duplicates the
+        // draft-visible shared weights onto it, making it self-sufficient
         if (params.extra_device) {
             const bool dup = std::any_of(model.devices.begin(), model.devices.end(),
                     [&params](const llama_device & d) { return d.dev == params.extra_device; });
@@ -289,9 +291,10 @@ llama_context::llama_context(
                 if (backend == nullptr) {
                     throw std::runtime_error(format("failed to initialize %s backend", ggml_backend_dev_name(params.extra_device)));
                 }
-                LLAMA_LOG_INFO("%s: using extra device %s for this context\n",
+                LLAMA_LOG_INFO("%s: using extra device %s for this context (leading the backend list)\n",
                         __func__, ggml_backend_dev_name(params.extra_device));
-                backends.emplace_back(backend);
+                backends.emplace(backends.begin(), backend);
+                dev_extra = params.extra_device;
             }
         }
 
@@ -680,6 +683,37 @@ void llama_context::sched_reserve() {
             LLAMA_LOG_INFO("%s: %10s compute buffer size = %8.2f MiB\n", __func__,
                     ggml_backend_buft_name(buft),
                     backend_buf_exp_size[i] / 1024.0 / 1024.0);
+        }
+    }
+
+    // draft isolation audit: with an extra device leading the backend list,
+    // every compute buffer of this context should sit on it (the draft KV is
+    // pinned separately via dev_layer and the output buffer is host-pinned).
+    // a nonzero residue on the model's devices means the graph still reads a
+    // weight that was not duplicated - report it, optionally fail on it
+    if (dev_extra) {
+        size_t size_extra = 0;
+        size_t size_rest  = 0;
+        for (size_t i = 0; i < backend_ptrs.size(); ++i) {
+            if (ggml_backend_get_device(backend_ptrs[i]) == dev_extra) {
+                size_extra += backend_buf_exp_size[i];
+            } else if (ggml_backend_dev_type(ggml_backend_get_device(backend_ptrs[i])) != GGML_BACKEND_DEVICE_TYPE_CPU) {
+                size_rest += backend_buf_exp_size[i];
+            }
+        }
+
+        LLAMA_LOG_INFO("%s: %s isolation audit: %8.2f MiB on %s, %8.2f MiB on the model split\n", __func__,
+                ggml_backend_dev_name(dev_extra),
+                size_extra / 1024.0 / 1024.0, ggml_backend_dev_name(dev_extra),
+                size_rest  / 1024.0 / 1024.0);
+
+        static const bool strict = getenv("LLAMA_SPEC_MTP_STRICT") != nullptr && atoi(getenv("LLAMA_SPEC_MTP_STRICT")) != 0;
+        if (size_rest > 0) {
+            LLAMA_LOG_WARN("%s: draft context allocates %.2f MiB outside %s - isolation incomplete\n",
+                    __func__, size_rest / 1024.0 / 1024.0, ggml_backend_dev_name(dev_extra));
+            if (strict) {
+                throw std::runtime_error("LLAMA_SPEC_MTP_STRICT: draft context allocations outside the extra device");
+            }
         }
     }
 

@@ -3766,10 +3766,10 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
     ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-mtp-device", "-devm", "--device-mtp"}, "<DEV>",
-        "device for the MTP draft context, e.g. CUDA3: the nextn-layer weights, the draft KV cache and\n"
-        "the draft compute run there while the target keeps its own split (none = run the draft on the\n"
-        "target devices; requires --spec-type draft-mtp; the device must not be part of the target split)\n"
-        "use --list-devices to see a list of available devices",
+        "device for the MTP draft context, e.g. CUDA3: the draft runs fully isolated there - nextn-layer\n"
+        "weights, draft KV cache, draft compute, plus whole copies of the shared embeddings/LM head\n"
+        "(none = run the draft on the target devices; requires --spec-type draft-mtp; the device must not\n"
+        "be part of the target split) use --list-devices to see a list of available devices",
         [](common_params & params, const std::string & value) {
             params.dev_mtp = parse_single_device(value);
             for (auto * dev : params.devices) {

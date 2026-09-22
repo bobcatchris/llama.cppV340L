@@ -1270,7 +1270,7 @@ private:
             }
 
             if (params_base.dev_mtp) {
-                SRV_INF("MTP draft context runs on %s (nextn weights + KV pinned to the draft device)\n",
+                SRV_INF("MTP draft context runs on %s (fully isolated: nextn weights + KV + duplicated embeddings/LM head)\n",
                         ggml_backend_dev_name(params_base.dev_mtp));
             }
 

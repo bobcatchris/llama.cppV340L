@@ -730,3 +730,50 @@ to Gemini's guard battery, die 3 is the dev cell.
   to delete the retained per-call dequant; die-3 bench vs 6.10/4.79
   references). Die-3 primary user: served-validation desk (boots are on
   0-2; die 3 free between its censuses).
+- E-034 2026-09-21 W6-isolation FULL DRAFT ISOLATION banked (zero-GPU, desk:
+  wt-draft-isolation, branch amd/draft-isolation, base b4ad90c5a; receipt
+  results/W6_isolation_2026-09-21.md). Closes the E-032 follow-up
+  ("draft-context buffer placement must prefer the extra device"): when
+  --spec-mtp-device is set the draft context now allocates NOTHING on the TP
+  meta group. Four changes: (1) llama_context ctor inserts params.extra_device
+  at index 0 - the draft backend list LEADS [die3, meta, CPU] so the sched
+  resolves ops to the device holding the weights; (2) loader create_tensor
+  duplicates the draft-visible shared tensors WHOLE onto the MTP device at
+  load time (TOKEN_EMBD + OUTPUT, name-dedup for tied embeddings, bytes added
+  to size_data not n_created, copies kept OUT of tensors_by_name so
+  get_tensor/meta split-state still resolve the originals; originals untouched
+  - the target verify pass is not moved or re-buffered); exact GGUF sizes of
+  record via offset deltas: output.weight Q6_K 542,942,400 B = 517.79 MiB,
+  token_embd.weight IQ4_XS 351,619,840 B = 335.33 MiB, combined 853.12 MiB
+  (inside the ~0.9 GiB budget); (3) graph_mtp builders (qwen35, qwen35moe,
+  step35, cohere2moe) prefer model.tok_embd_mtp/model.output_mtp -> single
+  die3 split, zero meta-group draft allocations; (4) sched_reserve isolation
+  audit logs "<dev> isolation audit: A MiB on dev, B MiB on the model split"
+  (B must read 0.00), LLAMA_SPEC_MTP_STRICT=1 turns B>0 into a boot failure.
+  Flag unset = byte-for-byte unchanged (no dup, no reorder, no audit). PREDICTIONS
+  at TP3/200k ub512: serving dies free ~548 MiB/die vs the current flag arm
+  (1643.4 MiB meta-side draft compute / 3 dies; ~785 MiB/die vs the no-flag
+  arm) -> served 8419/8131/8130 used of 8573 drops to ~7870/7583/7582, free
+  154/442/443 -> ~703/990/991 MiB; die 3 residency 1.44 GiB today (10k
+  post-probe anchor) + 208.6 KV 10k->200k + 853.1 dups + 387.1 relocated
+  compute = ~2.82 GiB central (2.6-3.4 range; the task's ~2.4 GiB guess is
+  optimistic), die 3 keeps ~5.3-5.6 GiB free. Per-step PCIe improves slightly:
+  the two ~20 KiB meta<->die3 activation hops disappear; the 517,088-byte
+  logits row (vocab 129,272 x f32) changes bus side only. Host evidence: test
+  test_w6_isolation_host.cpp ALL PASS (dup rule, name dedup, loader
+  accounting, tensors_by_name exclusion, backend leading, sched placement
+  matrix, audit/STRICT bucketing) + predecessor W6 suite still ALL PASS;
+  full clean build-hip gfx900 (ROCm 6.2.0) llama-server 100% exit 0 ZERO
+  warnings. NOT RUN: served A/B queued for a negotiated die-3 window
+  (protocol in the receipt; smoke = boot-log dup/audit lines with 0.00 MiB
+  residue, rocm-smi banked against the analytic numbers).
+- E-035 2026-09-21 Integration: amd/draft-isolation merged (8a4ebbcaa).
+  FULL DRAFT ISOLATION implemented behind --spec-mtp-device: backend list
+  leads with the dedicated die, token_embd+output duplicated whole there
+  (853.12 MiB, offset-delta sizes), graph redirects to the mtp copies,
+  sched audit logs meta-group residual (STRICT=1 hard-gates 0.00).
+  Compile-clean, host suite ALL PASS, unset = byte-identical. PREDICTED
+  (200k): serving dies free 154/442/443 -> ~703/990/991 MiB (+548/die);
+  die-3 residency ~2.82 GiB. Awaiting die-3 served window (coordinated
+  with Gemini) + A/B per the receipt protocol. Desk served its window
+  request to Gemini on the hub.

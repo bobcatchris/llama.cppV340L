@@ -629,6 +629,12 @@ struct llama_model {
     // device for the MTP/nextn layers (weights and KV cache); NULL = follow the normal split
     ggml_backend_dev_t dev_mtp = nullptr;
 
+    // whole-tensor copies of the shared embeddings/LM head on dev_mtp, set only
+    // when dev_mtp is used: the MTP draft graph reads these so it never
+    // allocates on the target split
+    struct ggml_tensor * tok_embd_mtp = nullptr;
+    struct ggml_tensor * output_mtp   = nullptr;
+
     int64_t t_load_us  = 0;
     int64_t t_start_us = 0;
 

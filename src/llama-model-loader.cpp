@@ -1297,6 +1297,23 @@ struct ggml_tensor * llama_model_loader::create_tensor(
         n_created++;
     }
 
+    // full MTP isolation: the draft reads the shared embeddings/LM head, so also
+    // create a whole copy on the MTP device (dedup by name for tied embeddings);
+    // the original tensor and its placement are untouched
+    if (dev_mtp && (tn.tensor == LLM_TENSOR_TOKEN_EMBD || tn.tensor == LLM_TENSOR_OUTPUT)) {
+        ggml_context * ctx_mtp = ctx_for_buft(ggml_backend_dev_buffer_type(dev_mtp));
+        if (!ggml_get_tensor(ctx_mtp, ggml_get_name(tensor))) {
+            ggml_tensor * tensor_mtp = ggml_dup_tensor(ctx_mtp, cur);
+            ggml_set_name(tensor_mtp, ggml_get_name(cur));
+
+            // loaded in addition to the original - keep the progress accounting exact
+            size_data += ggml_nbytes(cur);
+
+            LLAMA_LOG_DEBUG("tensor %s buffer type set to %s (MTP copy)\n",
+                    tn.str().c_str(), ggml_backend_buft_name(ggml_backend_dev_buffer_type(dev_mtp)));
+        }
+    }
+
     return tensor;
 }
 

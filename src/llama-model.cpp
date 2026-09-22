@@ -1482,8 +1482,29 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
             strcmp(output->name, tok_embd->name) == 0 &&
             output->type == GGML_TYPE_NVFP4 &&
             (output_s || output_in_s)));
-    // populate tensors_by_name
-    for (auto & [_, ctx_ptr] : ml.ctx_map) {
+    // resolve the MTP copies created by the loader (whole dup of the shared
+    // embeddings/LM head on the MTP device; nullptr when the arch has none)
+    ggml_backend_buffer_type_t buft_mtp = dev_mtp ? ggml_backend_dev_buffer_type(dev_mtp) : nullptr;
+    if (buft_mtp) {
+        auto it = ml.ctx_map.find(buft_mtp);
+        if (it != ml.ctx_map.end()) {
+            ggml_context * ctx_mtp = it->second.get();
+            tok_embd_mtp = tok_embd ? ggml_get_tensor(ctx_mtp, ggml_get_name(tok_embd)) : nullptr;
+            output_mtp   = output   ? ggml_get_tensor(ctx_mtp, ggml_get_name(output))   : nullptr;
+        }
+
+        LLAMA_LOG_INFO("%s: MTP device %s: duplicated %s (%.1f MiB) and %s (%.1f MiB) for the draft context\n", __func__,
+                ggml_backend_dev_name(dev_mtp),
+                tok_embd ? ggml_get_name(tok_embd) : "none", tok_embd_mtp ? ggml_nbytes(tok_embd_mtp)/1024.0/1024.0 : 0.0,
+                output   ? ggml_get_name(output)   : "none", output_mtp   ? ggml_nbytes(output_mtp)/1024.0/1024.0   : 0.0);
+    }
+
+    // populate tensors_by_name (the MTP copies stay out of it: get_tensor()
+    // answers meta split-state queries by name and must resolve the originals)
+    for (auto & [buft, ctx_ptr] : ml.ctx_map) {
+        if (buft == buft_mtp) {
+            continue;
+        }
         for (auto * cur = ggml_get_first_tensor(ctx_ptr.get()); cur != NULL; cur = ggml_get_next_tensor(ctx_ptr.get(), cur)) {
             tensors_by_name.emplace_back(ggml_get_name(cur), cur);
         }
