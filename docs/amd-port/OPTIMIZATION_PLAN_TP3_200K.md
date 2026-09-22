@@ -2174,7 +2174,6 @@ to Gemini's guard battery, die 3 is the dev cell.
   both admission paths + purge idle slots before denying a deferred
   task; probe re-run in both modes as validation. (3) RCCL transport
   and MMVQ kernel desks continue (the +15-25% and unknown-big levers).
-=======
 
 - E-085 2026-09-22 VERIFY-TRANSPORT DESK COMPLETE (wt-verify-transport on
   amd/verify-transport, campaign HEAD dd9b275f6; RCCL spike run under the
