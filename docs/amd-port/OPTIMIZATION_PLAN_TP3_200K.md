@@ -1688,3 +1688,20 @@ to Gemini's guard battery, die 3 is the dev cell.
   MiB/die). Path to the 36 t/s goal unchanged: MTP-overhead desk's
   +40-61% modeled recovery (21.4-24.8 t/s class) via the ~20 ms/step
   drain/relaunch attack, then kernel work.
+- E-071 2026-09-22 GAINS OFFENSIVE DISPATCHED (Chris: "launch your
+  agents and get to work on the mtp and other items to make those
+  gains"). Three lanes: (1) MTP-GAINS SERVED DESK (lane 8083, main
+  tree, docs-only commits): the E-065 deferred protocol - TIMELINE
+  attribution cell (CPU chain vs drain/relaunch verdict),
+  FAST_TOPK interleaved 2x2 A/B with timeline-drop engagement proof,
+  Arm G backend-sampling abort capture, and the v1 VRAM capture at
+  200k (completes the E-070 table's VRAM column - decides
+  in-split-vs-v1 serving on VRAM grounds). (2) DRAFT-STEP DRAIN
+  ATTACK DESK (wt-mtp-drain on amd/mtp-drain, zero-GPU): packed
+  single-copy head get (LLAMA_DRAFT_PACKED_GET), synchronize audit
+  (LLAMA_DRAFT_LIGHT_SYNC), drain-budget table, step-batched design
+  doc if needed - targeting the 21-25 t/s class. (3) GEMINI (hub
+  #1363): GO for the ub512-vs-b512 decode-recovery A/B on lane 8080
+  (Priority Zero refund test; clean reference now 15.10/15.23).
+  Environment: post-reboot clean state; stock clocks; OD/cap
+  experiments closed.
