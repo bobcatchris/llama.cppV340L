@@ -1236,3 +1236,65 @@ to Gemini's guard battery, die 3 is the dev cell.
   prompts: second defers with log line, completes after first, zero
   context-exceeded). Residual exposures documented (generation pressure,
   parent/child n_cmpl>1 cell duplication) - out of desk scope, ledgered.
+- E-037 2026-09-22 TP2 desk: E-035 full-isolation build VERIFIED on TP2 at
+  10k (worktree wt-tp2-mtp synced to 7d3ab351a, binary v152; receipt
+  results/TP2_feasibility_2026-09-21.md Result 4). AUDIT GATE PASSES:
+  "ROCm2 isolation audit: 132.02 MiB on ROCm2, 0.00 MiB on the model split"
+  (STRICT=1 armed), duplication lines confirm token_embd 335.3 + output 517.8
+  moved whole to the draft die. VRAM (boot-ready -> post-probe): serving dies
+  7344.3/7343.9 -> 7930.2/7929.8 used (v1 flag: 7348.5/7347.9 -> 7945.3/7944.7);
+  draft die 1412.5 -> 2290.8 (v1: 558.0 -> 1437.1). Duplication delta exact
+  (+854.5 vs 853.12); draft-die total matches the ~2.3 GiB prediction; the
+  serving-die ~800 MiB further-drop prediction is REFUTED (measured -15 MiB):
+  serving-die request-time footprint is TARGET-compute dominated, identical in
+  both builds - full isolation buys the audit guarantee and a draft-free meta
+  split, not serving-die headroom. Prefill 88.74 t/s PASS. Decode/accept cells
+  for this arm lost twice to port-8080 collisions with the TP3 A/B lane (both
+  servers free_port-kill each other; hub #1343-#1345); v1 flag numbers (14.43
+  t/s, accept 0.66667) stand as the arm reference pending a clean decode-only
+  slot. LAW CANDIDATE from these two incidents: cross-desk free_port on a
+  shared port needs a hub GO handshake, not just a gap claim - a claimed gap
+  with a duration estimate still raced. LOCK CONVENTION adopted per
+  coordinator: /tmp/campaign_gpu_boot.lock (desk + ts + duration,
+  check-and-wait, release at teardown) implemented in run_tp2_feasibility.sh;
+  third run under the lock completed cleanly. FOURTH FINDING (defect route-back
+  to the draft-isolation desk): on the E-035 build the TP2/10k decode cell
+  FAILS - 7857-token request exhausts KV-space retries (28, down to n_batch=1)
+  and errors "Context size has been exceeded. off = 69" -> HTTP 500; v1 build
+  on the identical request/config: zero retries. KV geometry identical between
+  builds (n_ctx_seq 10240, unified, Meta KV 90 MiB, draft KV 40 MiB ROCm2) -
+  suspect dual-cache cell-accounting aliasing (draft cache seq state marking
+  target unified cells occupied). Iso decode/accept numbers NOT bankable at
+  10k until fixed; v1 flag numbers (14.43 t/s, 0.66667) remain the arm
+  reference. Prefill 88.91 t/s PASS under the lock (88.74 first run).
+- E-038 2026-09-22 TP2 desk: FOUR-ARM definitive table complete, zero VOIDs
+  (receipt Result 5/6; commits e5169d35d + successor). Arm C decode FILLED on
+  the isolation build: 7.42/7.41 t/s (reproduced, zero KV-retries, accept
+  0.66667/3.00) = -48.5% vs the v1-flag build's 14.43/14.43 on identical
+  flags/config. Savings ladder per serving die (post-probe): in-split MTP
+  costs ~961 MiB/die over MTP-OFF; v1-flag costs ~790; full isolation costs
+  ~786 - i.e. full isolation saves only ~4.5 MiB/die vs the v1 flag (169 vs
+  in-split) while DOUBLING the per-token draft cost: the audit's 0.00
+  meta-side residual is bought by running the draft's embedding+LM-head on
+  the 1x-bandwidth draft die. VERDICT: E-035 full isolation is not a
+  promotion candidate for latency-sensitive TP2 serving; the v1 flag (partial
+  relocation, head stays on meta) is the operating point, and full isolation
+  only matters if serving-die VRAM is the binding constraint. Acceptance
+  0.66667/3.00 in every arm. TP2@200k remains closed (E-028/E-031).
+  TP3 ladder paused mid-10k (off1/on1/flag1/off2 banked: pp 122.58/120.74 OFF,
+  117.39/84.64+81.67 in-split, 117.64 flag; decode 12.17-12.18 OFF, 15.38
+  in-split, 7.57 flag = the same isolation decode collapse on TP3) - on2
+  interrupted by priority correction, to resume after the TP2 bank.
+- E-056 2026-09-22 Integration: amd/tp2-mtp-feasibility final four-arm
+  table (8cddf5229). VERDICT OF RECORD for TP2@10k: v1-flag is the
+  operating point (decode 14.43, 231 MiB/die free, 0.66667). FULL
+  ISOLATION REJECTED for latency serving: decode 7.42 t/s (-48.5% vs v1)
+  reproduced clean with zero retries - the mechanism is the design itself:
+  the draft's embedding+LM-head run on the 1x-bandwidth draft die plus 2
+  host-staged hops/step; the 0.00 audit and the decode collapse are the
+  same choice. VRAM: D-vs-C = ~4.5 MiB/die (nothing); D-vs-OFF = ~786.
+  MTP value class confirmed: in-split +38-40% decode vs OFF at 10k-era;
+  TP3@10k flag arm shows the same isolation collapse (7.57 vs 15.38
+  in-split). Isolation remains viable ONLY if serving-die VRAM is the
+  binding constraint; buffer-placement follow-up would be needed to make
+  it latency-viable. Receipt Result 6; full four-arm table banked.

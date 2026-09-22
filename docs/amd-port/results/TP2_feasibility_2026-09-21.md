@@ -139,3 +139,159 @@ confirm the ub512 target compute buffer = 1057.78 MiB + draft-context compute
 #1326 window request -> #1328 ACK+GO (dies 0-2, 75 min) -> #1332 window start ->
 #1333 progress -> #1335 die-3 request -> #1336/#1337 de-conflict (TP3 A/B is
 Gemini's; this desk stays on TP2) -> #1338 stand-down + TP3 control VRAM handoff.
+
+## Result 4 - E-035 full-isolation build verified on TP2 at 10k (added 2026-09-22)
+
+Worktree synced to the campaign branch (merge amd/v340-port-v2 at 7d3ab351a,
+carrying the draft-isolation merge 8a4ebbcaa / ledger E-035); rebuilt served
+binary version 152 (7d3ab351a). Same arm as Result 2's flag row (TP2, -c 10000,
+b512/ub512, q4_0 KV, FA, --spec-mtp-device ROCm2), LLAMA_SPEC_MTP_STRICT=1.
+
+Gate and mechanics (tp2feas_t2flag10k3_20260921_212512_server.log):
+
+    load_tensors: MTP device ROCm2: duplicated token_embd.weight (335.3 MiB) and output.weight (517.8 MiB) for the draft context
+    sched_reserve: ROCm2 isolation audit:   132.02 MiB on ROCm2,     0.00 MiB on the model split
+    load_model: MTP draft context runs on ROCm2 (fully isolated: nextn weights + KV + duplicated embeddings/LM head)
+
+The required audit reads 0.00 MiB on the model split - PASS (logged in two
+independent boots; the draft context's own breakdown shows ROCm2 self = 1194 MiB
+= model 1022 (nextn 169.3 + duplication 853.12) + context 40 + compute 132).
+
+VRAM comparison, v1 flag build (Result 2) vs isolation build:
+
+| state | serving dies 0/1 used (free) | draft die 2 used (free) |
+|-------|------------------------------|-------------------------|
+| v1 boot-ready      | 7348.5/7347.9 (827.5/828.1) | 558.0 (7618.0) |
+| iso boot-ready     | 7344.3/7343.9 (831.7/832.1) | 1412.5 (6763.5) |
+| v1 post-probe      | 7945.3/7944.7 (230.7/231.3) | 1437.1 (6738.9) |
+| iso post-probe     | 7930.2/7929.8 (245.8/246.2) | 2290.8 (5885.2) |
+
+(boot-ready from runner snapshots; iso post-probe from the 2 s sampler's ~68 s
+stable decode-phase envelope after the prefill guard passed at 88.74 t/s.)
+
+Findings:
+
+- The duplication is exact: draft die boot delta = 1412.5 - 558.0 = +854.5 MiB
+  vs the 853.12 MiB token_embd+output duplication. Prediction confirmed.
+- The draft die carries 2290.8 MiB post-probe (matches the ~2.3 GiB prediction):
+  duplication + the draft context's request-time compute (+878.3 MiB) relocated.
+- The serving-die prediction (drop ~800 MiB further to ~7036 used) is REFUTED by
+  measurement: serving dies dropped only ~15 MiB (7945.3 -> 7930.2 post-probe).
+  Their request-time footprint is TARGET-context compute dominated - identical
+  in both builds; the v1 flag had already moved the draft's boot-time
+  allocations (v1-vs-iso boot-ready delta is only 4.2 MiB/die). Full isolation
+  buys a hard guarantee (audit-gated 0.00 residual, STRICT env) and removes the
+  draft's request-time presence from the serving dies' accounting, but the
+  serving-die envelope stays target-bound.
+- Prefill guard PASSED at 88.74 t/s (v1 87.61/87.68 - within noise); a second
+  clean run under the new boot lock passed prefill at 88.91 t/s. The decode/
+  acceptance cell FAILS on the isolation build at TP2/10k - a real E-035
+  defect, not a collision: the 7857-token decode request dies with 28
+  "failed to find free space in the KV cache" retries down to n_batch=1 and
+  "E srv decode: Context size has been exceeded. off = 69" -> HTTP 500 (v1
+  build: ZERO retries on the identical request; KV geometry identical between
+  builds: n_ctx/n_ctx_seq 10240, kv_unified, Meta KV 90 MiB, draft KV 40 MiB
+  on ROCm2). Hypothesis for the draft-isolation desk: the draft cache's cell
+  accounting aliases the target's unified-cache cells, marking ~10k cells
+  occupied while the target sequence has processed only ~3.6k. The decode/
+  acceptance comparison therefore stands on the v1 numbers (14.43 t/s, accept
+  0.66667) and the iso decode path is blocked at TP2/10k pending an E-035
+  follow-up fix.
+
+Coordination: first attempt (21:10) collided with the TP3 A/B control boot; the
+gap-claimed rerun (21:25) was killed at t+120 s by the next A/B boot's
+free_port; the third run (21:34) executed under the new
+/tmp/campaign_gpu_boot.lock convention (check-and-wait + hold + release on
+teardown) and completed cleanly into the defect above. Both collisions left
+the dies clean; no data loss beyond the decode cell.
+
+## Result 5 - DEFINITIVE three-way savings table on the isolation build (2026-09-22)
+
+Binary v152 (7d3ab351a, E-035/E-036 merged tree). TP2, -c 10000, b512/ub512,
+q4_0 KV, FA, 2 reps per arm, lock-honored boots. Serving dies = 0/1 (8176 MiB
+each); draft die = 2 in arm C.
+
+| arm | boot-ready used/free c0, c1 | post-probe used/free c0, c1 | pp 2k | decode ~7.9k | accept / mean |
+|-----|-----------------------------|-----------------------------|-------|--------------|---------------|
+| A MTP-OFF    r5,r6 | 6526.8/1649.2, 6526.4/1649.6 (both reps) | 7163.7/1012.3, 7165.3/1010.7; 7144.8/1031.2, 7144.4/1031.6 | 90.36 / 89.21 | 12.83 / 11.94 | - |
+| B in-split   r7,r8 | 7599.6/576.4, 7599.1/576.9 (both reps)   | 8112.4/63.6, 8112.1/63.9; 8108.9/67.1, 8108.6/67.4         | 84.64 / 81.67 | 12.80 / 13.59 | 0.66667 / 3.00 (both) |
+| C draft-die  r3,r4 | 7344.3/831.7, 7343.9/832.1 (both reps)   | 7930.2/245.8, 7929.8/246.2; 7936.5/239.5, 7936.1/239.9     | 88.74 / 88.91 | VOID (defect, Result 4) | VOID |
+
+Draft die residency (arm C): 1412.5 MiB at boot-ready -> 2290.8 / 2291.2 MiB
+post-probe (5885.2 free). Audit gate: 0.00 MiB on the model split, all C boots.
+
+SAVED per serving die (positive = freed; used-MiB deltas, rep-stable values):
+
+| comparison | boot-ready | post-probe |
+|------------|-----------|------------|
+| B-vs-A (true MTP cost, in-split) | -1072.8 (MTP COSTS 1072.8) | -955.9 (costs ~956) |
+| C-vs-A (MTP + isolation cost)    | -817.5 (costs 817.5)       | -778.6 (costs ~779) |
+| C-vs-B (isolation SAVING)        | +255.3                     | +177.3 |
+
+Reading (unchanged from Result 4, now 2-rep solid): boot-ready MTP cost is
+~1073 MiB/die in-split and ~818 with the flag - the flag/defect-free isolation
+saves 255 MiB/die statically, 177 MiB/die at request time; the serving-die
+envelope is target-compute dominated in every arm. Performance: decode B 12.80/
+13.59 vs A 12.83/11.94 - the MTP decode lift collapsed in this hot session
+(dies at 84-90 C edge through the run; v1 cool-session delta was +38%): cross-
+session decode comparisons are thermal-confounded, within-session ordering is
+A ~ B < C-unmeasured. pp: A 89.8 mean > C 88.8 mean > B 83.2 mean (in-split pp
+pays ~7% vs A; C recovers to ~A-1%). Acceptance 0.66667/3.00 everywhere it is
+measurable. Arm C decode/accept remains VOID pending the E-035 fix; the C
+decode/accept reference stays the v1 flag numbers (14.43/14.43, 0.66667).
+
+Artifacts: tp2feas_t2off10k{5,6}_20260922_*, tp2feas_t2noflag10k{7,8}_20260922_*,
+tp2feas_t2flag10k{3,4}_20260921_* (battery jsonl committed; raw logs local).
+Incidents: four boots voided by a die-capacity collision with the TP3-threeway
+lane (05:52-05:55); lock-broke + die-idle guard + refined stale-lock rule
+adopted (hub #1354/#1355).
+
+## Result 6 - FOUR-ARM definitive table, C decode filled (2026-09-22)
+
+Arm C decode re-run on the isolation build (t2flag10k r5/r6, clean conditions,
+lock held, STRICT=1): decode 7.42 / 7.41 t/s - REPRODUCED, and the C5 server log
+has ZERO "failed to find free space" retries, so the slowdown is the real
+isolation decode path, not an allocation stall (rep4's intermittent
+"Context size has been exceeded" HTTP 500 is a separate occasional failure mode;
+1 of 3 completed attempts). Acceptance unaffected: 0.66667 / 3.00 everywhere.
+
+| arm | build | boot-ready used (free) c0,c1 | post-probe used (free) c0,c1 | pp 2k | decode ~7.9k | accept / mean |
+|-----|-------|------------------------------|------------------------------|-------|--------------|---------------|
+| A MTP-OFF     | v152 | 6526.8 (1649.2), 6526.4 (1649.6) | 7144.4-7165.3 (1010.7-1031.6) | 90.36 / 89.21 | 12.83 / 11.94 | - |
+| B in-split    | v152 | 7599.6 (576.4), 7599.1 (576.9)   | 8108.6-8112.4 (63.6-67.4)     | 84.64 / 81.67 | 12.80 / 13.59 | 0.66667 / 3.00 |
+| C v1-flag     | v138 | 7348.5 (827.5), 7347.9 (828.1)   | 7944.7-7945.3 (230.7/231.3)   | 87.61 / 87.68 | 14.43 / 14.43 | 0.66667 / 3.00 |
+| D full-isolation | v152 | 7344.3 (831.7), 7343.9 (832.1) | 7940.7-7941.0 (235.0/235.4)   | 88.74 / 88.91 / 88.50 | 7.42 / 7.41 | 0.66667 / 3.00 |
+
+Draft-die residency: C = 558.0 boot -> 1437.1 post; D = 1412.5 boot (853.12
+duplication, exact) -> 2291.4/2291.5 post. Audit gate: 0.00 on the model split
+(D only).
+
+SAVED per serving die (post-probe used-MiB; positive = freed):
+
+| comparison | saving |
+|------------|--------|
+| B-vs-A  (MTP cost, in-split)        | -961 (MTP costs ~961 MiB/die) |
+| C-vs-A  (v1-flag MTP cost)          | -790 |
+| D-vs-A  (isolated MTP cost)         | -786 |
+| C-vs-B  (v1-flag saving vs in-split)| +164 |
+| D-vs-B  (isolation saving vs in-split) | +169 |
+| D-vs-C  (full isolation vs v1-flag) | +4.5 (nothing) |
+
+PERFORMANCE COST of full isolation: decode -48.5% vs v1-flag (7.42/7.41 vs
+14.43/14.43), also -42% vs in-split. Acceptance identical everywhere. pp: D
+88.7 mean recovers to ~A-1% (the duplication does not hurt prefill).
+
+MECHANISM (honest reading): the audit's 0.00 MiB meta-side residual is achieved
+exactly by running the draft's embedding-row + LM-head matmul on the die-2
+copies at 1x bandwidth (plus 2 host-staged hops per draft step) - the same
+relocation that frees the meta group doubles the per-draft-step cost. The 0.00
+gate and the decode collapse are two faces of the same design choice.
+
+VERDICT (definitive, TP2@10k): v1-flag behavior is the sweet spot - within
+~4.5 MiB/die of full isolation's serving-die footprint at 2.0x its decode.
+Full isolation (E-035) is not worth promoting for latency-sensitive TP2
+serving; it is only rational when serving-die VRAM, not throughput, is the
+binding constraint (its B-vs-D saving is real but small: ~169 MiB/die over
+in-split, and in-split itself only leaves 63-67 MiB/die free at 10k).
+
+Artifacts: tp2feas_t2flag10k{5,6}_20260922_* (battery jsonl committed).

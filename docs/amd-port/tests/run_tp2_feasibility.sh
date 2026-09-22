@@ -22,7 +22,8 @@ RESULTS="$REPO_ROOT/docs/amd-port/results"
 ARM_BASELINE="$HERE/baseline_tp2_200k.json"
 BIN="$REPO_ROOT/build-hip/bin/llama-server"
 MODEL="/media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf"
-PORT=8080
+PORT="${PORT:-8080}"
+VERBOSE="${VERBOSE:-}"  # non-empty adds --verbose back
 ARM=""
 REP=""
 IDLE_WAIT=60
@@ -43,6 +44,36 @@ fi
 if [ ! -x "$BIN" ]; then
   echo "ERROR: server binary not found at $BIN"; exit 1
 fi
+
+# campaign GPU boot lock (cross-desk convention): check-and-wait, then hold
+LOCK_FILE="/tmp/campaign_gpu_boot.lock"
+for _ in $(seq 1 60); do
+  [ -e "$LOCK_FILE" ] || break
+  echo "[lock] held by: $(cat "$LOCK_FILE" 2>/dev/null | head -1) - waiting 30s"
+  sleep 30
+done
+if [ -e "$LOCK_FILE" ]; then echo "ERROR: boot lock still held after 30 min"; exit 1; fi
+echo "desk=tp2-feasibility ts=$(date +%s) start=$(date '+%F %T') duration_min=12 arm=$ARM rep=$REP" > "$LOCK_FILE"
+
+# die-capacity guard: the lock serializes desks but dies are shared by boots on
+# different ports - only launch when every needed die is actually idle
+case "$ARM" in
+  off|noflag|t2off10k|t2noflag10k)          NEED_DIES="0 1";;
+  flag|t2flag10k|t2flag8k|t3off|t3on)       NEED_DIES="0 1 2";;
+  t3flag)                                    NEED_DIES="0 1 2 3";;
+  *)                                         NEED_DIES="0 1 2";;
+esac
+for _ in $(seq 1 20); do
+  NONIDLE=$(rocm-smi --showmeminfo vram --json 2>/dev/null | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+need=[int(d.get('card'+c,{}).get('VRAM Total Used Memory (B)',0))/1048576 for c in '$NEED_DIES'.split()]
+print(sum(1 for u in need if u > 200))
+" 2>/dev/null)
+  [ "$NONIDLE" = "0" ] && break
+  echo "[dies] busy (dies $NEED_DIES needed; a boot on another port may hold them) - waiting 30s"
+  sleep 30
+done
 
 STAMP="$(date +%Y%m%d_%H%M%S)"
 PREFIX="$RESULTS/tp2feas_${ARM}${REP}_${STAMP}"
@@ -73,6 +104,7 @@ free_port() {
 }
 
 teardown() {
+  rm -f "$LOCK_FILE"
   if [ -n "$SAMPLER_PID" ] && kill -0 "$SAMPLER_PID" 2>/dev/null; then
     kill "$SAMPLER_PID" 2>/dev/null || true
   fi
@@ -105,28 +137,28 @@ case "$ARM" in
       --device ROCm0,ROCm1 \
       -ngl 999 -sm tensor -c 200000 -b 512 -ub 512 \
       -ctk q4_0 -ctv q4_0 -fa on \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
     ;;
   noflag)
     HIP_VISIBLE_DEVICES=0,1 "$BIN" -m "$MODEL" \
       --device ROCm0,ROCm1 \
       -ngl 999 -sm tensor -c 200000 -b 512 -ub 512 \
       -ctk q4_0 -ctv q4_0 -fa on --spec-type draft-mtp \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
     ;;
   t2off10k)
     HIP_VISIBLE_DEVICES=0,1 "$BIN" -m "$MODEL" \
       --device ROCm0,ROCm1 \
       -ngl 999 -sm tensor -c 10000 -b 512 -ub 512 \
       -ctk q4_0 -ctv q4_0 -fa on \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
     ;;
   t2noflag10k)
     HIP_VISIBLE_DEVICES=0,1 "$BIN" -m "$MODEL" \
       --device ROCm0,ROCm1 \
       -ngl 999 -sm tensor -c 10000 -b 512 -ub 512 \
       -ctk q4_0 -ctv q4_0 -fa on --spec-type draft-mtp \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
     ;;
   t2flag10k)
     HIP_VISIBLE_DEVICES=0,1,2 "$BIN" -m "$MODEL" \
@@ -134,7 +166,7 @@ case "$ARM" in
       -ngl 999 -sm tensor -c 10000 -b 512 -ub 512 \
       -ctk q4_0 -ctv q4_0 -fa on --spec-type draft-mtp \
       --spec-mtp-device ROCm2 \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
     ;;
   t2flag8k)
     HIP_VISIBLE_DEVICES=0,1,2 "$BIN" -m "$MODEL" \
@@ -142,7 +174,22 @@ case "$ARM" in
       -ngl 999 -sm tensor -c 200000 -b 512 -ub 512 \
       -ctk q4_0 -ctv q4_0 -fa on --spec-type draft-mtp \
       --spec-mtp-device ROCm2 \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
+    ;;
+  t3off | t3on | t3flag)
+    ARM_BASELINE="$HERE/baseline_tp3_200k.json"
+    T3CTX="${T3CTX:-200000}"
+    VISIBLE="0,1,2"
+    EXTRA=""
+    case "$ARM" in
+      t3on)    EXTRA="--spec-type draft-mtp" ;;
+      t3flag)  VISIBLE="0,1,2,3"; EXTRA="--spec-type draft-mtp --spec-mtp-device ROCm3" ;;
+    esac
+    HIP_VISIBLE_DEVICES=$VISIBLE "$BIN" -m "$MODEL" \
+      --device ROCm0,ROCm1,ROCm2 \
+      -ngl 999 -sm tensor -c $T3CTX -b 512 -ub 512 \
+      -ctk q4_0 -ctv q4_0 -fa on $EXTRA \
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
     ;;
   *) echo "ERROR: unknown arm '$ARM'"; exit 1 ;;
 esac
@@ -219,30 +266,13 @@ case "$ARM" in
     mark probe_prefill
     run_battery --idle-wait "$IDLE_WAIT"
     ;;
-  t3on)
-    ARM_BASELINE="$HERE/baseline_tp3_200k.json"
-    HIP_VISIBLE_DEVICES=0,1,2 "$BIN" -m "$MODEL" \
-      --device ROCm0,ROCm1,ROCm2 \
-      -ngl 999 -sm tensor -c 200000 -b 512 -ub 512 \
-      -ctk q4_0 -ctv q4_0 -fa on --spec-type draft-mtp \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
-    ;;
-  t3flag)
-    ARM_BASELINE="$HERE/baseline_tp3_200k.json"
-    HIP_VISIBLE_DEVICES=0,1,2,3 "$BIN" -m "$MODEL" \
-      --device ROCm0,ROCm1,ROCm2 \
-      -ngl 999 -sm tensor -c 200000 -b 512 -ub 512 \
-      -ctk q4_0 -ctv q4_0 -fa on --spec-type draft-mtp \
-      --spec-mtp-device ROCm3 \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
-    ;;
   t2off10k)
     mark probe_prefill
     run_battery --idle-wait "$IDLE_WAIT" --prefill-only || true
     mark probe_decode
     run_battery --idle-wait 0 --decode-only || true
     ;;
-  t3on | t3flag)
+  t3off | t3on | t3flag)
     mark probe_prefill
     run_battery --idle-wait "$IDLE_WAIT" || true
     ;;
