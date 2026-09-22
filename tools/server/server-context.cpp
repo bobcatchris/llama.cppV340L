@@ -854,10 +854,11 @@ struct server_metrics {
 
 // unified KV cells that a task still needs to place, after reusing the
 // candidate slot's cached prefix (one token entry = one cell, media included)
+// the credit applies regardless of cache_prompt: launching on the slot keeps
+// or drops its cached prefix, either way those cells are not additional
+// pressure (exact with cache_prompt, conservative without it)
 static int32_t kv_unified_cells_needed(const server_slot & slot, const server_task & task) {
-    const size_t n_past = task.params.cache_prompt
-        ? slot.prompt.tokens.get_common_prefix(task.tokens)
-        : 0;
+    const size_t n_past = slot.prompt.tokens.get_common_prefix(task.tokens);
 
     return std::max<int32_t>(0, (int32_t) task.tokens.size() - (int32_t) n_past);
 }
@@ -2496,6 +2497,25 @@ private:
                             n_used = 0;
                             for (const server_slot & cur : slots) {
                                 n_used += cur.prompt.n_tokens();
+                            }
+                        }
+
+                        // last relief before deferring: the candidate slot itself may
+                        // hold a cached prompt that the purge above skips to preserve
+                        // prefix reuse - evict it (kept in the prompt cache) if that is
+                        // what admission needs
+                        if (!kv_unified_admission_fits(n_need, n_ctx, n_used, n_pending) && slot->prompt.n_tokens() > 0) {
+                            const int32_t n_cached = slot->prompt.n_tokens();
+
+                            if (kv_unified_admission_fits((int32_t) task.tokens.size(), n_ctx, n_used - n_cached, n_pending)) {
+                                SLT_WRN(*slot, "evicting %d cached cells to admit task %d\n", n_cached, task.id);
+
+                                if (prompt_cache) {
+                                    slot->prompt_save(*prompt_cache);
+                                }
+                                slot->prompt_clear(false);
+
+                                n_used -= n_cached;
                             }
                         }
 

@@ -15,6 +15,17 @@
 //   2. Slot fill order starves an older mid-prompt request for a newer one.
 //      The fill loop now iterates slots in FIFO order of task id (oldest
 //      first) instead of slot index order.
+//   3. E-090 admission starvation: after a request completes, its KV stays
+//      cached on the idle slot (slot selection by LCP similarity keeps it),
+//      and admission counted the deferred task's FULL need against those
+//      cells with no credit for the shared prefix - and the purge pass
+//      skipped the candidate slot - so the task deferred forever (probe
+//      geometry: B = A + 5-token suffix, incremental need 5 vs 2368 free).
+//      Fixes: the prefix credit now applies regardless of cache_prompt
+//      (launching on the slot keeps or drops its cached prefix - either way
+//      those cells are not additional pressure), and before denying, the
+//      candidate slot's own cached prompt is evicted to the prompt cache if
+//      that is what admission needs (purge before starve).
 //
 // The sims mirror the update_slots() loop arithmetic: the fill phase adds up
 // to n_batch tokens per round in fill order (server counts cells at fill
@@ -45,10 +56,9 @@ static int n_fail = 0;
 
 // mirror: kv_unified_cells_needed - cells a task still needs after reusing
 // the candidate slot's cached prefix (1 token entry = 1 cell, media included)
-static int32_t kv_cells_needed(bool cache_prompt, size_t n_prefix, size_t n_tokens) {
-    const size_t n_past = cache_prompt ? n_prefix : 0;
-
-    return std::max<int32_t>(0, (int32_t) n_tokens - (int32_t) n_past);
+// E-090: the credit applies regardless of cache_prompt
+static int32_t kv_cells_needed(size_t n_prefix, size_t n_tokens) {
+    return std::max<int32_t>(0, (int32_t) n_tokens - (int32_t) n_prefix);
 }
 
 // mirror: kv_unified_admission_fits
@@ -176,17 +186,24 @@ struct server_sim {
     }
 };
 
-// mirror of the new admission flow in process_single_task(); unlike the
+// mirror of the admission flow in process_single_task(); unlike the
 // legacy per-slot check it accounts for the global unified occupancy and
-// purges idle cached prompts (a real side effect) before deferring
+// runs both relief passes (a real side effect) before deferring:
+//   1. purge idle cached prompts on other slots (try_clear_idle_slots)
+//   2. E-090: evict the candidate slot's own cached prompt to the prompt
+//      cache if that is what admission needs (purge before starve)
+// cand_cached: reclaimable cells on the candidate slot, kept there by the
+// LCP-similarity slot selection (f_keep >= 0.5 skips the save/clear)
 enum admission_outcome { ADMIT, DEFER, REJECT_TOOBIG };
 
 static admission_outcome admit_task(server_sim & srv, int32_t cand_task_id,
-        int32_t n_need, int32_t n_tokens_raw, bool kv_unified, bool kv_admission) {
+        int32_t n_need, int32_t n_tokens_raw, int32_t cand_cached,
+        bool kv_unified, bool kv_admission, bool * evicted = nullptr) {
     if (!kv_unified || !kv_admission) {
         return ADMIT; // legacy path (or non-unified cache: per-slot regions)
     }
 
+    int32_t n_used = srv.used; // includes the candidate's cached cells
     int32_t n_pending = 0;
     for (const auto & cur : srv.slots) {
         if (cur.admitted && !cur.aborted && cur.task_id != cand_task_id) {
@@ -195,13 +212,28 @@ static admission_outcome admit_task(server_sim & srv, int32_t cand_task_id,
         }
     }
 
-    // mirror: purge idle cached prompts before giving up
-    while (!kv_admission_fits(n_need, N_CTX, srv.used, n_pending) && srv.idle_cache > 0) {
-        srv.used -= srv.idle_cache;
+    // relief 1: purge idle cached prompts on other slots
+    while (!kv_admission_fits(n_need, N_CTX, n_used, n_pending) && srv.idle_cache > 0) {
+        n_used -= srv.idle_cache;
         srv.idle_cache = 0;
     }
 
-    if (!kv_admission_fits(n_need, N_CTX, srv.used, n_pending)) {
+    // relief 2 (E-090): the candidate holds reclaimable cached cells the pass
+    // above skips - evict them (saved to the prompt cache) when the full task
+    // then fits; the prefix credit is gone with the evicted prefix
+    if (!kv_admission_fits(n_need, N_CTX, n_used, n_pending) && cand_cached > 0) {
+        if (kv_admission_fits(n_tokens_raw, N_CTX, n_used - cand_cached, n_pending)) {
+            n_used -= cand_cached;
+            n_need  = n_tokens_raw;
+            if (evicted) {
+                *evicted = true;
+            }
+        }
+    }
+
+    srv.used = n_used; // relief side effects persist even on a defer
+
+    if (!kv_admission_fits(n_need, N_CTX, n_used, n_pending)) {
         return n_tokens_raw > N_CTX ? REJECT_TOOBIG : DEFER;
     }
     return ADMIT;
@@ -229,14 +261,14 @@ static server_sim incident() {
 }
 
 int main() {
-    // ---- 1: unit mirrors of the new admission helpers ----
+    // ---- 1: unit mirrors of the admission helpers ----
 
     // prefix credit: 7857-token task on a slot with a 3584-token cached prefix
-    CHECK(kv_cells_needed(true, 3584, 7857) == 4273);
-    // cache_prompt = false: no credit, full prompt must fit
-    CHECK(kv_cells_needed(false, 3584, 7857) == 7857);
+    CHECK(kv_cells_needed(3584, 7857) == 4273);
+    // E-088 probe geometry: B = A + a 5-token suffix over A's cached 7857
+    CHECK(kv_cells_needed(7857, 7862) == 5);
     // slot cache diverges beyond the task prompt: clamp at 0
-    CHECK(kv_cells_needed(true, 9000, 7857) == 0);
+    CHECK(kv_cells_needed(9000, 7857) == 0);
 
     // exact fit admits, one cell over rejects
     CHECK(kv_admission_fits(1000, 10240, 9000, 240));
@@ -294,37 +326,37 @@ int main() {
     // ---- 4: admission decision units (the fix) ----
     {
         server_sim srv = incident();
-        const int32_t n_need = kv_cells_needed(true, 0, N_PROMPT);
+        const int32_t n_need = kv_cells_needed(0, N_PROMPT);
         CHECK(n_need == 7857);
 
         // incident admission: need 7857, pending 1270 (task 14 still needs
         // 7857 - 6587), free 3653 - the newcomer must NOT be admitted
         CHECK(!kv_admission_fits(n_need, N_CTX, 6587, 1270));
-        CHECK(admit_task(srv, 35, n_need, N_PROMPT, /*kv_unified*/ true, /*kv_admission*/ true) == DEFER);
+        CHECK(admit_task(srv, 35, n_need, N_PROMPT, 0, true, true) == DEFER);
         CHECK(srv.used == 6587); // nothing purged: no idle caches existed
 
         // the same request on an empty server admits
         server_sim empty;
         empty.slots = { make_task(35, 0) };
-        CHECK(admit_task(empty, 35, n_need, N_PROMPT, true, true) == ADMIT);
+        CHECK(admit_task(empty, 35, n_need, N_PROMPT, 0, true, true) == ADMIT);
 
         // prefix reuse shrinks the need; with the incident occupancy (free
         // 3653 minus pending 1270) only a large enough cache flips to ADMIT
         server_sim small_reuse = incident();
-        CHECK(admit_task(small_reuse, 35, kv_cells_needed(true, 3000, N_PROMPT), N_PROMPT, true, true) == DEFER);
-        CHECK(kv_admission_fits(kv_cells_needed(true, 5600, N_PROMPT), N_CTX, 6587, 1270));
+        CHECK(admit_task(small_reuse, 35, kv_cells_needed(3000, N_PROMPT), N_PROMPT, 0, true, true) == DEFER);
+        CHECK(kv_admission_fits(kv_cells_needed(5600, N_PROMPT), N_CTX, 6587, 1270));
         server_sim big_reuse = incident();
-        CHECK(admit_task(big_reuse, 35, kv_cells_needed(true, 5600, N_PROMPT), N_PROMPT, true, true) == ADMIT);
+        CHECK(admit_task(big_reuse, 35, kv_cells_needed(5600, N_PROMPT), N_PROMPT, 0, true, true) == ADMIT);
 
         // knobs off: legacy behavior (documented escape hatch)
         server_sim legacy = incident();
-        CHECK(admit_task(legacy, 35, n_need, N_PROMPT, false, true) == ADMIT);
-        CHECK(admit_task(legacy, 35, n_need, N_PROMPT, true, false) == ADMIT);
+        CHECK(admit_task(legacy, 35, n_need, N_PROMPT, 0, false, true) == ADMIT);
+        CHECK(admit_task(legacy, 35, n_need, N_PROMPT, 0, true, false) == ADMIT);
 
         // a request larger than the whole cache is rejected outright
         server_sim big;
         big.slots = { make_task(35, 0) };
-        CHECK(admit_task(big, 35, N_CTX + 1, N_CTX + 1, true, true) == REJECT_TOOBIG);
+        CHECK(admit_task(big, 35, N_CTX + 1, N_CTX + 1, 0, true, true) == REJECT_TOOBIG);
     }
 
     // ---- 5: purge-then-admit (idle cached prompts are reclaimable) ----
@@ -332,7 +364,7 @@ int main() {
         server_sim srv;
         srv.used = 7865;       // a finished request keeps its cache on the idle slot
         srv.idle_cache = 7865;
-        CHECK(admit_task(srv, 35, N_PROMPT, N_PROMPT, true, true) == ADMIT);
+        CHECK(admit_task(srv, 35, N_PROMPT, N_PROMPT, 0, true, true) == ADMIT);
         CHECK(srv.idle_cache == 0); // mirror of try_clear_idle_slots() relief
         CHECK(srv.used == 0);
     }
@@ -349,7 +381,7 @@ int main() {
         slot_sim & b = srv.slots[0];
 
         // admission of task 35 on arrival
-        CHECK(admit_task(srv, 35, N_PROMPT, N_PROMPT, true, true) == DEFER);
+        CHECK(admit_task(srv, 35, N_PROMPT, N_PROMPT, 0, true, true) == DEFER);
 
         int guard = 0;
         while (!a.prompt_done && !a.aborted && guard++ < 32) {
@@ -370,7 +402,7 @@ int main() {
         // release keeps the prompt cache on the idle slot; the deferred task
         // is re-admitted, purging the stale cache first
         srv.idle_cache = a.n_committed;
-        CHECK(admit_task(srv, 35, N_PROMPT, N_PROMPT, true, true) == ADMIT);
+        CHECK(admit_task(srv, 35, N_PROMPT, N_PROMPT, 0, true, true) == ADMIT);
         b.admitted = true;
 
         guard = 0;
@@ -413,7 +445,94 @@ int main() {
     {
         server_sim srv;
         srv.slots = { make_task(1, 0) };
-        CHECK(admit_task(srv, 1, N_CTX + 1, N_CTX + 1, /*kv_unified*/ false, true) == ADMIT);
+        CHECK(admit_task(srv, 1, N_CTX + 1, N_CTX + 1, 0, /*kv_unified*/ false, true) == ADMIT);
+    }
+
+    // ---- 9: E-090 starvation defect (served probe geometry, E-088) ----
+    //
+    // probe_kv_admission.py on a 10240-cell unified cache: A (7857 tokens)
+    // completes 200 and its 7872-cell KV stays on the idle slot (selected for
+    // B by LCP similarity 0.999, f_keep 0.998 - the save/clear is skipped);
+    // B = A + a 5-token suffix (7862 tokens). Served defer line of record:
+    //   "defer task 2 (n_need = 7862, n_used = 7872, n_pending = 0)"
+    // The full-need formula defers forever: 7862 > 2368 free, no eviction
+    // path (the purge pass skipped the candidate slot). B was cancelled at
+    // the probe's 600 s timeout.
+    {
+        // the defect arithmetic, verbatim from the served log
+        CHECK(kv_admission_fits(7862, N_CTX, 7872, 0) == false); // starves
+
+        // the fix: credit the cached prefix - incremental need is 5 cells
+        const int32_t n_need_b = kv_cells_needed(7857, 7862);
+        CHECK(n_need_b == 5);
+        CHECK(kv_admission_fits(n_need_b, N_CTX, 7872, 0));
+
+        // deferred B re-admits on the first retry after A releases, with the
+        // cached prefix left intact for reuse (no purge, no eviction)
+        server_sim srv;
+        srv.used = 7872;        // A's retained KV on the (idle) candidate slot
+        srv.slots = { make_task(2, 0) };
+        bool evicted = false;
+        CHECK(admit_task(srv, 2, n_need_b, 7862, 7872, true, true, &evicted) == ADMIT);
+        CHECK(!evicted);
+        CHECK(srv.used == 7872);
+        CHECK(srv.idle_cache == 0); // relief 1 never fired
+
+        // B lands on the prefix: drop the 15 generated cells beyond the LCP,
+        // place 5 incremental tokens, generate 15 - peak stays far under n_ctx
+        srv.used += (7862 - 7857) - (7872 - 7857) + 15; // = 7877
+        CHECK(srv.used == 7877);
+        CHECK(srv.used <= N_CTX);
+    }
+
+    // ---- 10: credit must not over-admit (E-054 guarantee intact) ----
+    {
+        // A mid-prefill (512 cells placed, the served first defer line):
+        // "defer task 2 (n_need = 7862, n_used = 512, n_pending = 7345)"
+        // B's first arrival (empty candidate slot, no prefix yet) defers ...
+        server_sim srv = incident();
+        slot_sim & a = srv.slots[1];
+        a.n_placed = a.n_committed = 512;
+        srv.used = 512;
+        CHECK(admit_task(srv, 2, 7862, 7862, 0, true, true) == DEFER);
+        CHECK(srv.used == 512);
+
+        // ... and so does a NON-overlapping C: an in-flight request never
+        // loses cells to a newcomer, prefix credit or not
+        CHECK(admit_task(srv, 2, kv_cells_needed(0, N_PROMPT), N_PROMPT, 0, true, true) == DEFER);
+        CHECK(kv_admission_fits(kv_cells_needed(0, N_PROMPT), N_CTX, 512, 7345) == false);
+    }
+
+    // ---- 11: purge before starve (candidate eviction is the last relief) --
+    //
+    // Mid-divergence geometry: the candidate slot holds 7872 cached cells,
+    // but the task only shares 1000 prefix tokens with it - the credit alone
+    // cannot admit (4000 > 2368 free). Before denying, the candidate's cache
+    // is evicted to the prompt cache; only when the full task then fits.
+    {
+        server_sim srv;
+        srv.used = 7872;
+        srv.slots = { make_task(2, 0) };
+        const int32_t n_need = kv_cells_needed(1000, 5000);
+        CHECK(n_need == 4000);
+        CHECK(kv_admission_fits(n_need, N_CTX, 7872, 0) == false); // credit alone: no
+
+        bool evicted = false;
+        CHECK(admit_task(srv, 2, n_need, 5000, 7872, true, true, &evicted) == ADMIT);
+        CHECK(evicted);                 // mirror of prompt_save + prompt_clear
+        CHECK(srv.used == 0);           // the stale cache is gone
+
+        // a task that does not fit even after the eviction (an in-flight
+        // request holds the rest) still defers, and the candidate cache is
+        // left untouched
+        server_sim srv2 = incident();
+        slot_sim & a2 = srv2.slots[1];
+        a2.n_placed = a2.n_committed = 2000;
+        srv2.used = 2000 + 7872;        // in-flight cells + candidate cache
+        bool evicted2 = false;
+        CHECK(admit_task(srv2, 2, kv_cells_needed(1000, 9000), 9000, 7872, true, true, &evicted2) == DEFER);
+        CHECK(!evicted2);
+        CHECK(srv2.used == 9872);
     }
 
     if (n_fail == 0) {
