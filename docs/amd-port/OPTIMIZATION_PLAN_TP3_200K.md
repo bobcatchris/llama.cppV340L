@@ -1758,3 +1758,71 @@ to Gemini's guard battery, die 3 is the dev cell.
   LIGHT_SYNC=1 (same outputs; exactly 1 wait/step), each with and without
   LLAMA_DRAFT_FAST_TOPK=1 for the full 2x2 - all four arms should read
   accept 0.66667/3.00; any accept move is a bug, not noise.
+- E-073 2026-09-22 TIMELINE ATTRIBUTION VERDICT (E-065 deferred protocol,
+  gate 1; T1 boot, lane 8083, 5x 7857-probe/n_predict-128 requests = 210
+  draft rounds, accept 0.66667 everywhere; receipt MTPgains_2026-09-22.md).
+  E-065 RULE FIRES: sample+batch 1.13 ms/step (<< 5 ms) => CPU chain minor,
+  device-side owns it. STRONGER: the 37 ms/draft-step model was
+  MISATTRIBUTED - the whole 3-step draft loop is 11.05 ms/round (draft
+  graph 2.3-2.7 ms/step device + 1.1 ms/step CPU; steps = 3 every round).
+  The round (~190-195 ms wall at 14.9 t/s) is owned by the TARGET VERIFY
+  decode: [decode-timeline] shows the 4-token verify ubatch issue = mean
+  85.3 / MED 138 ms BLOCKING (build 0.03, inputs 0.03; synchronize drain
+  0.04 ms => the wait sits inside graph_compute), plus ~40-55 ms host
+  sampling/batch per round. Cross-check vs E-072's drain budget: agrees -
+  host call-site changes cannot reach the 21.4-24.8 t/s class; the lever is
+  the verify-batch device serial chain + launch/replay latency. DRAIN-ATTACK
+  RETARGET (served evidence): verify-batch device critical path (3-die
+  pipeline + allreduce latency at 4 tokens) + the ~40-55 ms host slice; the
+  draft loop is already cheap (11 ms/round). 21.4-24.8 t/s needs round
+  121-140 ms. LOG LAW NOTE: library INFO maps to LOG_LEVEL_TRACE=4
+  (common/log.cpp common_get_verbosity) - [decode-timeline] lines need
+  -lv 4; default-verbosity boots only show [spec-timeline].
+- E-074 2026-09-22 FAST_TOPK INTERLEAVED 2x2 (E-065 gate 2; F1 unset / F2
+  set / F3 unset / F4 set, all + timelines + -lv 4; decode-only guard +
+  determinism per arm; cooldown-gated boots, stock clocks). ENGAGEMENT
+  PROVEN: sample+batch 1.131 -> 0.966 ms/step (-15%), round total 10.9 ->
+  10.27 ms in both set reps. ACCEPT 0.66667 / mean 3.0 / draft 126-84 in
+  every cell. DETERMINISM: 2-run greedy byte-identical per arm AND identical
+  sha256 across all four arms (4beb1ba25219ee9b) - byte-exact vs the
+  regular path at temp 0. t/s: unset 14.93/14.94 vs set 14.91/15.02 = +0.2%
+  mean, inside noise - the removed ~0.66 ms is 0.35% of an ~190 ms round,
+  so the modeled +1-3% overestimated the CPU share. VERDICT: fast-topk is
+  free and byte-exact but NOT a decode t/s lever at 200k today; its value
+  scales only if the round shrinks (or at smaller contexts).
+- E-075 2026-09-22 ARM G: BACKEND-SAMPLING ABORT CAPTURE (E-065 gate 3;
+  G1 boot, LLAMA_TP_BACKEND_SAMPLING=1 + timelines, one decode request;
+  NOT a perf arm). Boot WARNs captured (set_sampler experimental enabled +
+  "sampler ops on vocab-sharded logits are not modeled ...; aborts are
+  likely"). First draft-round process() aborts:
+  GGML_ASSERT(src_ss[i].axis != GGML_BACKEND_SPLIT_AXIS_UNKNOWN) at
+  ggml/src/ggml-backend-meta.cpp:814 via ggml_abort in
+  ggml_backend_meta_get_split_state <- draft_mtp::process <- server
+  update_slots. The first host GET of vocab-sharded sampler tensors walks
+  into the un-modeled split state - empirically closes the MTP_overhead
+  desk's "where does meta fail" question: on-device sampling needs head
+  re-shard or a per-shard top-k op (subsystem project). Controlled
+  GGML_ABORT: dmesg clean of libamdhip64 segfaults at the event, 4/4 dies
+  enumerated on the next boot.
+- E-076 2026-09-22 v1 VRAM TABLE AT 200k (E-065 gate 4; completes the
+  E-070 VRAM column; V1 boot: campaign line + --spec-mtp-device ROCm3 with
+  HIP_VISIBLE_DEVICES=0,1,2,3 - the draft die must be HIP-visible, else
+  -devm cannot resolve - STRICT unset, mode line "draft-device mode:
+  partial (v1)" verified at V1 log line 7). Probe: 14.935 t/s, accept
+  0.66667 = parity with in-split (matches E-069/E-070). VRAM (MiB, dies
+  total 8176; HIP0/1/2 = card1/card3/card0, HIP3 = card4; jsons
+  mtpgain_vram_{insplt_T1,v1_V1}_*): in-split boot 7809.7/7591.8/7643.9/18.0
+  vs v1 boot 7074.8/7052.9/7105.0/1440.8; post-probe in-split
+  8166.5/8069.9/8122.0/18.0 (FREE 9.5/106.1/54.0 - OOM-adjacent) vs v1
+  7675.4/7605.6/7665.5/2320.8 (FREE 500.6/570.4/510.5, draft die 5855.2
+  free). VERDICT: v1 saves ~456-491 MiB on EVERY serving die post-probe at
+  zero decode cost - the in-split-vs-v1 operating point CLOSES in favor of
+  v1 on VRAM grounds (E-069 item 3 resolved): v1 is the safer 200k serving
+  default. HANDOFF: E-072's served arms (PACKED_GET / LIGHT_SYNC x
+  FAST_TOPK 2x2) require a rebuild - the merged code (3964a90b1, 13:44)
+  postdates the current build-hip binary (libllama.so.0.0.187, 08:13) - so
+  they are queued for the next measurement window, not run in this one
+  (ladder was scope-locked; no rebuild in the measurement grant). Campaign
+  state: lane 8083 clean, lock released, stock clocks throughout, no
+  driver events.
+
