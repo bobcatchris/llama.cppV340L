@@ -2350,3 +2350,16 @@ to Gemini's guard battery, die 3 is the dev cell.
   amd/mmvq-kernel2 with a 60-minute first-deliverable milestone and
   an end-turn-on-blocker requirement; zombie check (>90 min silent,
   zero artifacts) added to the automation.
+- E-093 2026-09-22 MMVQ RELAUNCH: BASELINE REPRODUCED, FIRST DELIVERABLE
+  BANKED. wt-mmvq-kernel2 (amd/mmvq-kernel2 @ 075d1501b) reran the
+  oracle-gated 8-arm bench on die 3 (lock-compliant, 75 s settle):
+  base 421.1 us/call = 91.1 GB/s, -0.24% vs the banked 422.1/90.9
+  (P0 gate +-2% PASS), all 8 arms within +-1.3% of the 09-21 session,
+  oracle PASS 1.7e-06 everywhere. Control rep spread 1.6% noted
+  (median agreement 0.24%; 1% law enforced on future A/B verdict
+  sessions). Receipt: results/W2_mmvq2_baseline_2026-09-22.md.
+  Pre-kill recorded: arithmetic derivation of iq3s_grid is dead (the
+  512-entry grid is a trained codebook, not arithmetic). Live doors
+  named: T=2-4 tiled shapes (never benched; MTP verify band runs
+  T>1 in served decode graphs), gfx900 dot-product ISA compile probe,
+  q8_1 operand layout. Next: T>1 harness extension.
