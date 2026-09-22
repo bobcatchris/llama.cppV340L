@@ -322,7 +322,9 @@ llama_model_cohere2moe::graph_mtp::graph_mtp(const llama_model & model, const ll
     //       see llm_graph_context::build_inp_embd() for reference
     ggml_tensor * tok_embd;
     if (ubatch.token) {
-        ggml_tensor * tok_embd_w = layer.nextn.embed_tokens ? layer.nextn.embed_tokens : model.tok_embd;
+        // prefer the whole copy on the MTP device (full draft isolation)
+        ggml_tensor * tok_embd_w = layer.nextn.embed_tokens ? layer.nextn.embed_tokens
+                : model.tok_embd_mtp ? model.tok_embd_mtp : model.tok_embd;
         tok_embd = ggml_get_rows(ctx0, tok_embd_w, inp->tokens);
     } else {
         tok_embd = inp->embd;
@@ -428,7 +430,9 @@ llama_model_cohere2moe::graph_mtp::graph_mtp(const llama_model & model, const ll
     cur = ggml_get_rows(ctx0, cur, inp_out_ids);
     cb(cur, "mtp_shared_head_norm", -1);
 
-    ggml_tensor * head_w = layer.nextn.shared_head_head ? layer.nextn.shared_head_head : model.output;
+    // prefer the whole copy on the MTP device (full draft isolation)
+    ggml_tensor * head_w = layer.nextn.shared_head_head ? layer.nextn.shared_head_head
+            : model.output_mtp ? model.output_mtp : model.output;
     GGML_ASSERT(head_w && "COHERE2MOE MTP: missing LM head (nextn.shared_head_head or model.output)");
     cur = build_lora_mm(head_w, cur, layer.nextn.shared_head_head ? layer.nextn.shared_head_head_s : nullptr);
 

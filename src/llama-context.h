@@ -360,6 +360,10 @@ private:
     std::vector<ggml_backend_buffer_type_t> backend_buft;
     std::vector<size_t>                     backend_buf_exp_size; // expected buffer sizes
 
+    // extra per-context device leading the backend list (e.g. MTP draft
+    // isolation); NULL = none
+    ggml_backend_dev_t dev_extra = nullptr;
+
     llm_graph_result_ptr gf_res_prev;
     llm_graph_result_ptr gf_res_reserve;
 
