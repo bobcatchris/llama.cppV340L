@@ -2042,3 +2042,50 @@ to Gemini's guard battery, die 3 is the dev cell.
   sha, accept 0.66667/3.00 gate, engagement = one INFO line at first decode +
   [decode-timeline] inputs columns collapse to ~0.00-0.01 ms/ubatch; round
   -0.0..-0.15 ms (inside noise). Composable with all merged arms.
+- E-085 2026-09-22 CATCHUP-ROLLBACK DESK COMPLETE (wt-catchup on
+  amd/catchup-rollback, rebased on dd9b275f6; zero-GPU: code trace, offline
+  timeline logs, host parity test, gfx900 compile; receipt
+  CATCHUP_ROLLBACK_2026-09-22.md). (1) FLOW MAP: per round the draft_mtp
+  catch-up (process(), ctx_dft, 4 rows, n_outputs 0, med 11.66 ms = 6.1% of
+  the round) re-decodes the full verify batch [sampled @ L, d1..d3]; rows
+  0..k survive post_decode's seq_rm(pos_next = L+k+1) as prompt cells, rows
+  k+1..3 are thrown away unread - at accept 0.66667/mean_len 3.00
+  (E[k] = 2.0 measured 84/126) that is 1.0 wasted row/round (25%), worst in
+  the k=0 tail (P = 1/3 at iid, 3 of 4 rows wasted). Also redundant: the
+  ckpt block rm's the draft-phase cells (incl. the row-0 cell the draft
+  step 0 already decoded identically) before the catch-up rebuilds them.
+  (2) VERDICT - IMPLEMENTABLE-CLEAN: the E-078 "reorders KV rollback"
+  concern dissolves because the flush runs AFTER the accept loop and
+  decodes only rows 0..k - the rejected cells are never written, so
+  seq_rm finds nothing beyond pos_next; both caches end the round
+  accepted-only, identical to baseline. Audited: ctx_tgt untouched,
+  pending_h/verify_h unchanged (staged batch keeps pre-accept embd
+  copies), ckpt-restore path decodes full staged rows after the restore
+  (dead cells causally masked, rewritten by the re-verify round), mtmd
+  path self-heals unflushed stagings at the next process()/draft() entry,
+  mem_shared ignores the flag, chain_heads mirrors the per-head rm+offset
+  loop. Numerics caveat: the ubatch width changes (4 -> k+1), so last-ulp
+  KV differences can flip a near-tie draft - logic-identical, NOT
+  bit-identical on device; served gate is accept/mean-len within noise,
+  not identical sha. (3) IMPLEMENTED (env-gated, unset = byte-identical):
+  LLAMA_DRAFT_PREFIX_CATCHUP=1 - process() stages the byte-identical
+  catch-up batch, accept() records rows 0..k, new catchup_decode() (+
+  base-class hook catchup() + common_speculative_catchup, common/
+  speculative.{h,cpp}) decodes the prefix rows (full rows when no accept
+  decision), server flush call at the end of post_decode; engagement line
+  [spec-timeline] catchup: rows = N; catch-up decode n_tokens now varies
+  1..4. HOST TEST ALL PASS (new test_prefix_catchup_host, standalone):
+  identical drafted-token sequences + draft-phase attended views across
+  k = 0..3, catch-up rows = exact prefix of baseline rows, post-round
+  cells below pos_next identical, prefill/1-token rounds full rows,
+  mtmd self-heal parity, ckpt-restore + re-verify parity, row reduction
+  pinned (48 -> 28 rows on the 12-round script); ASAN/UBSAN clean.
+  gfx900 compile clean, ZERO warnings (llama, llama-common, llama-server).
+  (4) SIZING: rows 4 -> 3.0 avg, catch-up med 11.66 -> ~8-9 ms, wall
+  -1.5..-3 ms/round = +0.8..+1.6% t/s class; NEXT LEVER documented not
+  implemented: keep the draft-phase row-0 cell (ckpt rm bound L -> L+1 +
+  draft-ran guard) to drop the catch-up to E[k] = 2.0 rows (another ~25%).
+  (5) SERVED ARM R5 (fold into the combined window): campaign line +
+  LLAMA_DRAFT_PREFIX_CATCHUP=1 + timelines + -lv 4; accept 0.66667/3.00
+  within noise, catch-up issue med -> ~8-9 ms, wall -1.5..-3 ms,
+  +0.8..+1.6% class; greedy sha may differ at tie level (caveat above).
