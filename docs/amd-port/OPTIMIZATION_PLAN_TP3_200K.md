@@ -1856,3 +1856,64 @@ to Gemini's guard battery, die 3 is the dev cell.
   LIGHT_SYNC) validation on the rebuilt binary. Verify-round attack
   desk dispatched; timeline logs (T1/F1, -lv 4) on disk for offline
   profiling.
+
+- E-078 2026-09-22 VERIFY-ROUND DESK COMPLETE (wt-verify-round on
+  amd/verify-round, campaign HEAD f097c9f6e; zero-GPU: offline profiling of
+  the T1/F1 timeline logs, code, host tests, gfx900 compile; receipt
+  VERIFY_ROUND_2026-09-22.md + scripts/profile_verify_round.py).
+  (1) HOST-SLICE PROFILE - the E-077 "~40-55 ms/round host" partition is
+  WRONG: segmenting F1 by wall-clock timestamps (verify = n_tokens 4 with
+  n_outputs > 0; catch-up = the second n_tokens 4 decode, n_outputs 0) gives
+  round med 190.0 = verify issue 163.2 (85.9%) + catch-up issue 11.7 (6.1%)
+  + draft total 11.0 (7.55 device + 3.44 host) + D2H drain 1.9 + HOST only
+  ~5.5-8 ms (target sampling ~0.7, batch builds ~0.7, residual ~0.7). The
+  40-55 was an artifact of pooling verify+catch-up lines (E-073/E-077 pooled
+  n=170, med 138.1 understated verify) and of counting the catch-up DEVICE
+  decode as host. T1 (210 rounds) cross-checks. Round is 91-97% device
+  blocking. Candidate audit: no redundant logits copies exist (one tensor
+  get_async per extract; get_logits_ith is a pointer); target candidate
+  builds are ~0.66 ms/round and fast-topk does NOT transfer (request-shaped
+  chain); the E-072 redundant-sweep finding IS alive on the target accept
+  path (~24 syncs/round) - FIXED (2). (2) IMPLEMENTED (env-gated, unset =
+  byte-identical): LLAMA_VERIFY_ROW_SAMPLING=1 - one llama_wait_outputs +
+  new llama_peek_logits_rows (src/llama-ext.h) hand the 4 verify rows as
+  raw pointers to common_sampler_sample_row (E-072 API) with the same
+  break-on-mismatch loop (common_sampler_sample_and_accept_n_rows,
+  common/sampling.cpp; server gate + regular-path fallback in post_decode);
+  grammar/budget/backend-sampler guards fall back; LIGHT_SYNC-style perf
+  window caveat documented. GGML_PINNED_DEV_COPY=1 - the no-peer-copy
+  butterfly peer copies run 10 boundaries x 4 copies = 40x
+  [sync+sync+malloc+unpinned D2H+H2D+free] per round (5 decodes x 2
+  boundaries; ground truth in ggml_backend_tensor_copy_async); new
+  ggml_backend_dev_copy_staging (ggml-backend.cpp) replaces the per-call
+  malloc/free with a grow-only cached PINNED buffer (src device host buft),
+  get/set sequence unchanged = bytes identical by construction; falls back
+  to the historical path when unset / no host buft / alloc fail. HOST TESTS
+  ALL PASS: new test_verify_row_sampling_host (accepted sequences + break
+  positions bit-exact, greedy + seeded top-k/dist, 64..129272 vocab,
+  ~1900 trials, ties, guards; ASAN/UBSAN clean) and test_pinned_staging_host
+  (reuse, geometric growth, byte-exact staged vs malloc, fallbacks;
+  ASAN/UBSAN clean); test_mtp_sampling_host, test_packed_get_host,
+  test_w6_mtp_device_host, test_server_exposures_host re-run ALL PASS.
+  gfx900 compile clean, ZERO warnings (llama + llama-common + llama-cli).
+  (3) DESIGNED, no code: transport - die-to-die does not exist (PCIe through
+  host regardless); the structural lever is comm_allreduce (meta already
+  probes ggml_backend_comm_init / ggml_backend_comm_allreduce_tensor; HIP
+  registers none; RCCL integration = subsystem project, fp sum order is the
+  acceptance-critical question), the host-side lever is event-ordered async
+  pinned-ring staging (sync+sync+blocking copy -> get_async + event +
+  dst-wait + set_async, >= 4 slots/pair; est -2..-6 ms/round); copy
+  consolidation is unavailable (4 distinct (src,dst) pairs per boundary).
+  (4) REPLAY COUNT VERDICT - NOT CLEAN, do not implement: the meta splitter
+  cuts exactly at PARTIAL-axis nodes and each reduction feeds replicated
+  consumers (norm/activation between attn.out and mlp.down); boundary count
+  is architectural, the two reductions are sequentially dependent. Device
+  desk note: the catch-up decode re-decodes ALL verify tokens (incl. ~1.3
+  rejected/round, KV seq_rm'd later) at 11.7 ms med vs 2.5 ms per draft
+  step - an accepted-prefix-only catch-up would cut real device work but
+  reorders KV rollback, not mechanical. (5) SERVED ARMS (need rebuild;
+  timelines + -lv 4; accept 0.66667/3.00 gate in every arm, any move is a
+  bug): R1 baseline reproduces; R2 +LLAMA_VERIFY_ROW_SAMPLING (greedy sha
+  identical, ~22 fewer drain lines/round, G3 -0.3..-0.6 ms, +0.2..+0.5%);
+  R3 +GGML_PINNED_DEV_COPY (sha identical, verify med -2..-6 ms,
+  +1..+3% class); R4 = R2+R3 additive (-3..-7 ms/round).
