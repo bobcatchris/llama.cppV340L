@@ -61,9 +61,65 @@ ncclAllReduce / ncclGroupEnd on per-rank streams):
 RCCL version on box: 2.20.5 (`/opt/rocm-6.2.0`, librccl.so.1.0.60200,
 932 MiB - device code for gfx900 IS embedded, verified via strings).
 
-### Results (filled from the logs after the runs)
+### Results
 
-See the LOG section at the bottom of this file.
+Runs (logs: `results/rccl_probe_*.log`, dies 0/1/2 = the serving dies, idle
+SCLK, identical conditions for both arms, campaign lock held per protocol):
+
+- INIT: OK in 639-654 ms, ranks=3, canAccessPeer=0 all pairs (verified in
+  the probe itself). RCCL 2.20.5.
+- Transport (NCCL_DEBUG=INFO): every channel `via SHM/direct/direct` - RCCL
+  stages through HOST SHARED MEMORY (its own pinned staging), 2 channels,
+  ring + tree both connected, e.g.
+  `Channel 00 : 2[d000] -> 0[5000] via SHM/direct/direct nRanks 03`.
+  Socket NET is bootstrap-only. So RCCL's pipelined chunked host-SHM
+  transport is exactly the no-P2P path this box needs.
+- Latency (grouped ncclAllReduce from one thread, sync per boundary):
+  - 32 KB fp32: RCCL avg 94.0 us (min 86.6) vs butterfly emulation avg
+    212.0 us -> 2.26x, -118 us/boundary.
+  - 128 KB fp32: RCCL avg 152.4 us (min 135.7) vs butterfly 340.3 us ->
+    2.23x, -188 us/boundary.
+- Butterfly emulation = hipMemcpyPeerAsync (driver-staged through host,
+  same primitive ggml uses) + device ADDs + copyback in `allreduce_fallback`
+  order. The SERVED boundary costs ~1 ms (verified campaign decomposition);
+  the emulation's 212 us is the bare primitive, i.e. in situ RCCL also
+  eliminates 4 staging round trips + 3 graph dispatches per boundary on top
+  of the 2.3x primitive win.
+- ACCEPTANCE VERDICT: NOT bit-exact, exactly as fp non-associativity
+  predicts. 64 seeds x {8192, 32768} elems: 0/64 seeds byte-identical to
+  the butterfly grouping ((r0+r2)+r1); ~3.5% (32 KB) / ~4.4% (128 KB) of
+  elements differ, max ULP 64 / 256; bounded dust, no sign-flip wildness.
+  RCCL outputs are byte-identical ACROSS ranks in 64/64 seeds (the three
+  replicas never diverge from each other - the property the butterfly also
+  guarantees via copyback).
+  => sum-order reorder = numerics class change = NEEDS CHRIS'S EXPLICIT
+  SIGN-OFF per campaign law. Not mergeable on verification-bytes alone.
+  No RCCL algorithm can reproduce the butterfly's uniform association
+  (ring reduce-scatter reorders per chunk: ((rk+rk+1)+rk+2) rotates with k),
+  so bit-exactness is unreachable by env tuning - the one-shot fixed-order
+  AR design (allreduce.cu, CUDA-only in-tree) is the only bit-exact device
+  collective shape; that is a separate desk if the reorder is declined.
+
+## 3b. SERVED-ARM SPEC (for the sign-off window)
+
+If Chris signs off on the reorder class, the arm is:
+
+- Build: `-DGGML_HIP_RCCL=ON` (compile-clean, 0 warnings, librccl.so.1
+  links into libggml-hip - verified in this worktree).
+- Runtime: `GGML_CUDA_ALLREDUCE=nccl` (the only gate; unset = butterfly =
+  byte-identical to today). Pin `NCCL_ALGO`/`NCCL_PROTO` to the acceptance
+  values or leave unset and RECORD the RCCL_DEBUG=INFO connect lines as the
+  acceptance fingerprint; drift here silently changes the numerics class.
+- Canary (per existing law): greedy decode sha MUST be compared to the
+  butterfly baseline - it WILL differ (that is the signed-off change), so
+  the gates that must still pass are: acceptance rate 0.66667/3.00 +-band,
+  8-needle long-context, determinism (same arm twice => same sha), plus the
+  engagement signature: boundary tax lines drop, decode +15-25% class
+  (48 x ~1 ms -> 48 x ~0.1-0.15 ms modeled).
+- If the reorder is DECLINED: the legacy butterfly stays default; the
+  secondary lever (pinned-ring async staging, -2..-6 ms/round, extends the
+  merged GGML_PINNED_DEV_COPY pattern) becomes the fallback plan - designed
+  here, deliberately not implemented while the bigger lever is on the table.
 
 ## 3. ACCEPTANCE EXPERIMENT (protocol, required before any integration)
 
@@ -127,13 +183,14 @@ Zero new subsystems - wire the existing upstream path:
 2. Runtime gate: `GGML_CUDA_ALLREDUCE=nccl` (upstream env, already parsed).
    The meta backend then calls `comm_allreduce` at every boundary and only
    falls back to the butterfly per-call if it returns false.
-3. Byte-identical default (the one code change): with GGML_USE_NCCL defined
-   and env unset, the Linux default in `ggml_backend_cuda_comm_init` is
-   nccl - flipping RCCL into the default numerics class of every future
-   HIP build. Change the HIP default to `init_none` (butterfly) so that:
+3. Byte-identical default (IMPLEMENTED, staged in this worktree): with
+   GGML_USE_NCCL defined and env unset, the Linux default in
+   `ggml_backend_cuda_comm_init` is nccl - flipping RCCL into the default
+   numerics class of every future HIP build. The HIP default is now
+   `init_none` (butterfly) so that:
    - env unset => butterfly, byte-identical to today on every build, and
    - `GGML_CUDA_ALLREDUCE=nccl` => RCCL, on CUDA and HIP alike.
-   ~3 lines in ggml-cuda.cu. (A separate GGML_RCCL_BOUNDARY alias was
+   ~7 lines in ggml-cuda.cu. (A separate GGML_RCCL_BOUNDARY alias was
    considered and rejected - it would be a second knob for the same thing.)
 4. Non-compute ranks: `ggml_backend_cuda_comm_allreduce_nccl` already
    memsets non-compute tensors to 0 before the reduce (the n_outputs=0
@@ -159,3 +216,12 @@ applies to it only if still worth it.
 
 - 2026-09-22 desk opened; worktree created from amd/v340-port-v2 @ dd9b275f6;
   probe written + compiled clean with hipcc (gfx900, RCCL 2.20.5).
+- 2026-09-22 spike run 1 (full2, 2000 iters, 64 seeds): INIT OK 654 ms;
+  32 KB RCCL 94.0 us vs butterfly 212.0 us (2.26x); 128 KB 152.4 vs 340.3
+  (2.23x); bit-exactness 0/64 seeds, ~3.5/4.4% elems, max ULP 64/256,
+  cross-rank identical 64/64.
+- 2026-09-22 spike run 2 (transport2, NCCL_DEBUG=INFO): all channels via
+  SHM/direct/direct, 2 channels, ring + tree connected; init 644 ms.
+- 2026-09-22 integration staged: HIP default comm mode = butterfly (rccl
+  opt-in via GGML_CUDA_ALLREDUCE=nccl); compile clean with and without
+  GGML_HIP_RCCL=ON, 0 warnings; all five host suites PASS; commit follows.

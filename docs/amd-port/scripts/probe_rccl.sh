@@ -34,7 +34,8 @@ sleep 5
 
 OUT=$RES/rccl_probe_${TAG}_$(date +%Y%m%d_%H%M%S).log
 echo "[$TAG] probe -> $OUT"
-( timeout 140 "$PROBE" "$@" 2>&1; echo "probe-exit: $?" ) | tee "$OUT"
-RC=${PIPESTATUS[0]}
+( timeout 140 "$PROBE" "$@" 2>&1; echo "probe-exit: ${PIPESTATUS[0]}" ) | tee "$OUT"
+RC=$(grep -oE "probe-exit: [0-9]+" "$OUT" | tail -1 | cut -d' ' -f2)
 echo "[$TAG] probe rc=$RC"
-exit $RC
+[ "$RC" = "0" ] || exit 1
+exit 0

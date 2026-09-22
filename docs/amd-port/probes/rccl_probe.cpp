@@ -56,6 +56,7 @@
 struct rank_res {
     int          dev    = -1;
     hipStream_t  stream = nullptr;
+    hipEvent_t   ev     = nullptr; // device-scoped, like ggml's per-ctx copy_event
     float      * buf    = nullptr; // in-place allreduce / accumulator
     float      * tmp    = nullptr; // staging for butterfly emulation
     float      * hstage = nullptr; // pinned host stage (butterfly arm)
@@ -82,11 +83,8 @@ static void butterfly_boundary(std::vector<rank_res> & r, int n, int ne) {
     auto copy_peer = [&](int src, int dst, float * dst_ptr) {
         HIP_CHECK(hipMemcpyPeerAsync(dst_ptr, r[dst].dev, r[src].buf, r[src].dev,
                                      ne * sizeof(float), r[src].stream));
-        hipEvent_t ev; // one event per call, created disabled-timing
-        HIP_CHECK(hipEventCreateWithFlags(&ev, hipEventDisableTiming));
-        HIP_CHECK(hipEventRecord(ev, r[src].stream));
-        HIP_CHECK(hipStreamWaitEvent(r[dst].stream, ev, 0));
-        HIP_CHECK(hipEventDestroy(ev));
+        HIP_CHECK(hipEventRecord(r[src].ev, r[src].stream));
+        HIP_CHECK(hipStreamWaitEvent(r[dst].stream, r[src].ev, 0));
     };
     auto add = [&](int dst) {
         const int blocks = (ne + 255) / 256;
@@ -210,6 +208,7 @@ int main(int argc, char ** argv) {
         r[i].dev = devs[i];
         HIP_CHECK(hipSetDevice(r[i].dev));
         HIP_CHECK(hipStreamCreate(&r[i].stream));
+        HIP_CHECK(hipEventCreateWithFlags(&r[i].ev, hipEventDisableTiming));
         HIP_CHECK(hipMalloc(&r[i].buf, max_ne * sizeof(float)));
         HIP_CHECK(hipMalloc(&r[i].tmp, max_ne * sizeof(float)));
         HIP_CHECK(hipHostMalloc(&r[i].hstage, max_ne * sizeof(float)));
