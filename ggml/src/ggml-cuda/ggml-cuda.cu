@@ -1419,12 +1419,17 @@ static void * ggml_backend_cuda_comm_init(ggml_backend_t * backends, size_t n_ba
 
     const char * env = getenv("GGML_CUDA_ALLREDUCE");
     if (!env) {
-        // Platform default: Linux uses NCCL, otherwise (generally Windows) internal
-#if defined(__linux__)
+        // Platform default: Linux uses NCCL, otherwise (generally Windows) internal.
+        // HIP keeps the meta-backend butterfly: the internal pipeline is not
+        // compiled there, and RCCL reorders the fp32 sum, so switching to it
+        // must stay opt-in via GGML_CUDA_ALLREDUCE=nccl.
+#if defined(GGML_USE_HIP)
+        ggml_backend_cuda_comm_init_none(ret);
+#elif defined(__linux__)
         ggml_backend_cuda_comm_init_nccl(ret);
 #else
         ggml_backend_cuda_comm_init_internal(ret);
-#endif // defined(__linux__)
+#endif // defined(GGML_USE_HIP) / defined(__linux__)
     } else {
         std::string env_str(env);
         if (env_str == "nccl") {
