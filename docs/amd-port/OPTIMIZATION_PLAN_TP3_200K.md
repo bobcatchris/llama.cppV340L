@@ -1298,3 +1298,12 @@ to Gemini's guard battery, die 3 is the dev cell.
   in-split). Isolation remains viable ONLY if serving-die VRAM is the
   binding constraint; buffer-placement follow-up would be needed to make
   it latency-viable. Receipt Result 6; full four-arm table banked.
+- E-054 2026-09-22 MTP-overhead desk dispatched: wt-mtp-overhead on
+  amd/mtp-overhead (zero-GPU). TARGET: the per-draft-step fixed overhead
+  (~37 ms/step measured envelope vs a few ms of draft compute) that caps
+  the MTP decode multiplier at ~1.15x instead of ~3x. Named components:
+  the CPU sampling sync per draft step (backend sampling unsupported
+  under SPLIT_MODE_TENSOR - server warning of record), the full-vocab LM
+  head GEMV per step, and pipeline drains. Primary work item: make
+  sampling run on-device under tensor split (env-gated), plus timeline
+  instrumentation to attribute the rest.
