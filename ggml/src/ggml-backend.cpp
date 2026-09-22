@@ -15,6 +15,7 @@
 
 #include <assert.h>
 #include <limits.h>
+#include <mutex>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -474,6 +475,54 @@ ggml_backend_dev_t ggml_backend_get_device(ggml_backend_t backend) {
 
 // backend copy
 
+// Pinned staging for the slow device-to-device copy fallback
+// (GGML_PINNED_DEV_COPY). Without peer copy, the butterfly allreduce of
+// ggml-backend-meta lands in the malloc path below once per peer copy and
+// per allreduce boundary, so the per-call malloc/free and the
+// unpinned-transfer overhead are paid on the critical path of every decode.
+// The get/set sequence and the copied bytes are unchanged - only the host
+// buffer differs (pinned, grow-only, reused). Returns nullptr when the
+// source device has no host buffer type or the alloc fails; the caller then
+// keeps the historical malloc path.
+static void * ggml_backend_dev_copy_staging(ggml_backend_buffer_type_t buft, size_t nbytes) {
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
+
+    static ggml_backend_buffer_t buf = nullptr;
+    static size_t buf_size = 0;
+
+    if (buf && buf_size >= nbytes) {
+        return ggml_backend_buffer_get_base(buf);
+    }
+
+    ggml_backend_dev_t dev = ggml_backend_buft_get_device(buft);
+    ggml_backend_buffer_type_t host_buft = dev ? ggml_backend_dev_host_buffer_type(dev) : nullptr;
+    if (!host_buft) {
+        return nullptr;
+    }
+
+    size_t new_size = buf_size > 0 ? buf_size : (size_t) 1 << 20;
+    while (new_size < nbytes) {
+        new_size *= 2;
+    }
+
+    ggml_backend_buffer_t new_buf = ggml_backend_buft_alloc_buffer(host_buft, new_size);
+    if (new_buf == nullptr || ggml_backend_buffer_get_base(new_buf) == nullptr) {
+        if (new_buf != nullptr) {
+            ggml_backend_buffer_free(new_buf);
+        }
+        return nullptr;
+    }
+
+    if (buf) {
+        ggml_backend_buffer_free(buf);
+    }
+    buf = new_buf;
+    buf_size = new_size;
+
+    return ggml_backend_buffer_get_base(buf);
+}
+
 void ggml_backend_tensor_copy(const struct ggml_tensor * src, struct ggml_tensor * dst) {
     GGML_ASSERT(ggml_are_same_layout(src, dst) && "cannot copy tensors with different layouts");
 
@@ -490,10 +539,18 @@ void ggml_backend_tensor_copy(const struct ggml_tensor * src, struct ggml_tensor
         GGML_LOG_DEBUG("%s: warning: slow copy from %s to %s\n", __func__, ggml_backend_buffer_name(src->buffer), ggml_backend_buffer_name(dst->buffer));
 #endif // NDEBUG
         size_t nbytes = ggml_nbytes(src);
-        void * data = malloc(nbytes);
+
+        static const bool staged_copy = getenv("GGML_PINNED_DEV_COPY") != nullptr;
+        void * data = staged_copy ? ggml_backend_dev_copy_staging(src->buffer->buft, nbytes) : nullptr;
+        const bool staged = data != nullptr;
+        if (!staged) {
+            data = malloc(nbytes);
+        }
         ggml_backend_tensor_get(src, data, 0, nbytes);
         ggml_backend_tensor_set(dst, data, 0, nbytes);
-        free(data);
+        if (!staged) {
+            free(data);
+        }
     }
 }
 
