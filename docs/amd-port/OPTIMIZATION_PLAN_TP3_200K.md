@@ -2224,3 +2224,22 @@ to Gemini's guard battery, die 3 is the dev cell.
   legacy butterfly, -2..-6 ms/round): designed, deliberately NOT
   implemented while the ~35-45 ms RCCL lever awaits sign-off; it becomes
   the fallback lever only if the reorder is declined.
+- E-090 2026-09-22 RCCL SERVED VALIDATION - +25-27% DECODE CONFIRMED
+  WITH CONTROL. Two RCCL boots (GGML_CUDA_ALLREDUCE=nccl, RCCL-linked
+  binary): decode 19.01 / 18.72 t/s (+27.2% / +25.3% vs 14.94
+  baseline), accept 0.66667/3.00 in both - the numerics dust did NOT
+  move the accept loop. CONTROL (same binary, env unset, cooled to
+  43 C, cooldown-gated): 14.98 PASS = the butterfly reference exactly;
+  an interim un-cooled control at 9.38 was voided as inherited soak
+  (third consecutive boot). ARM IDENTITY: the only difference between
+  the arms is the env; the modeled 15-25% delivered as 25-27%.
+  SERVING ADOPTION REMAINS CHRIS'S SIGN-OFF (numerics class: RCCL sum
+  order differs from butterfly by bounded dust - ~3.5-4.4% of
+  elements, max ULP 64/256, ranks consistent 64/64; byte-exactness
+  unreachable by any RCCL algo). Until signed off: binary ships
+  RCCL-linked with env UNSET = byte-identical butterfly (init_none
+  default, init failure falls back). The ~48 ms/round boundary tax is
+  now ~21 ms - round ~165-170 ms, decode 18.7-19.0 at 200k on stock
+  clocks. At 10k, 20 t/s is at the doorstep. Remaining levers: MMVQ
+  kernel desk (running), catch-up rollback (+0.8-1.6%, merged),
+  T3 copy-back decode fix + admission starvation fix (desks running).
