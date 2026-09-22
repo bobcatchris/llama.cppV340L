@@ -1993,3 +1993,52 @@ to Gemini's guard battery, die 3 is the dev cell.
   kernel math (77% share), boundary transport, host syncs (merged),
   catch-up waste, input staging. Validation: one combined served
   window for all winners once the desks land (no per-desk batteries).
+
+- E-084 2026-09-22 ASYNC-INPUT DESK COMPLETE (wt-async-input on
+  amd/async-input, campaign HEAD c20b3f547; zero-GPU: set_inputs path audit,
+  implementation, host tests, gfx900 compile; receipt
+  ASYNC_INPUT_2026-09-22.md). (1) MAP - every per-round blocking H2D set
+  (blocking = ggml_backend_tensor_set on a device tensor; the HIP buffer set
+  is cudaMemcpyAsync + cudaStreamSynchronize + cudaSetDevice per tensor, and
+  behind the meta backend MIRRORED inputs fan out to one blocking round trip
+  PER DIE): per MTP round = draft steps 3 x (tokens 4 B + h row 16-32 KB +
+  pos) + verify (tokens 16 B + pos) + catch-up (tokens + h rows 64-128 KB +
+  pos) = 13 blocking tensor sets = 39 die-level round trips (E-072's 4-6/step
+  counted tensors, not die fan-out). out_ids/kq_mask/k-v idxs/k_shift/s_copy
+  are HOST-buffer writes, not DMA sets (sched moves them stream-ordered inside
+  graph_compute) - audited, untouched. Ground truth (F1 decode-timeline):
+  verify/catch-up inputs mean 0.027 ms/ubatch (max 0.051), draft-step inputs
+  mean 0.010 ms -> 0.08-0.15 ms/round total; E-072's ~50-300 us/step upper
+  range was pessimistic. (2) IMPLEMENTED (env-gated, unset = byte-identical):
+  LLAMA_ASYNC_INPUT=1 - llama_input_tensor_set (llama-graph.cpp) routes the
+  per-ubatch input setters through a pinned ring (8 grow-only slots, device
+  host-buft, GGML_PINNED_DEV_COPY house pattern): memcpy into slot +
+  ggml_backend_tensor_set_async on the sched-resolved owning backend (meta
+  MIRRORED fan-out posts per-die DMAs and returns). Slot reuse gated by a
+  per-slot backend event when the device supports events, else by a
+  synchronize of the issuing backend (meta drains all dies; quiescent at that
+  point in the decode loop, so the gate costs ~0). Device tensor addresses
+  unchanged -> graph reuse/capture-replay unaffected; bytes identical by
+  construction. Fallbacks: no sched (K-shift/opt call sites), host tensors,
+  no host buft, alloc fail, offset != 0. set_inputs grew a scheduler param.
+  HOST TESTS: new test_async_input_host (mirror control flow vs fake backend
+  layer): byte-exact landings + ring-overwrite safety over the real round
+  shape with two backends and varied drain timing, no-event device gate,
+  event re-creation on device change, growth, all fallbacks - ALL PASS,
+  ASAN/UBSAN clean; test_packed_get_host, test_verify_row_sampling_host,
+  test_pinned_staging_host, test_mtp_sampling_host re-run ALL PASS. gfx900
+  compile clean, ZERO warnings (llama, llama-common, llama-cli). (3) HONEST
+  SIZING: the lever deletes host round trips only - the posted DMA still must
+  land before the consuming graph reads the tensor. Decode ceiling = the
+  set_inputs wall => ~0.05-0.10 ms/round recoverable = < 0.1% of the ~190 ms
+  round, t/s +0.0-0.1%; floor = host enqueue ~2-5 us/copy + quiescent gate.
+  Secondary: draft-ctx prefill h-row sets (8-16 MB at 512, pageable blocking
+  today) may recover ~0.3-0.6 ms/chunk, rig-measurable only. VERDICT: S1 is
+  a hygiene win and a NEGATIVE for the speed offensive - it is two orders
+  below the 163 ms verify device chain and cannot move 15 -> 21+ t/s; the
+  round remains owned by the verify device serial chain + boundary transport.
+  (4) SERVED ARMS (fold into the combined validation window, no dedicated
+  battery): A1 unset reproduces; A2 +LLAMA_ASYNC_INPUT=1 - identical greedy
+  sha, accept 0.66667/3.00 gate, engagement = one INFO line at first decode +
+  [decode-timeline] inputs columns collapse to ~0.00-0.01 ms/ubatch; round
+  -0.0..-0.15 ms (inside noise). Composable with all merged arms.
