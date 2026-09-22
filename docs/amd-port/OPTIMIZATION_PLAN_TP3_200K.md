@@ -842,3 +842,34 @@ to Gemini's guard battery, die 3 is the dev cell.
   200k behavior on demand), RESIDENT alone inert, teardown clean. GEMM-only
   -3.0% confirms the E-024 L2-credit prediction. Remaining honest levers:
   src1 f32->f16 convert (16 ms/pass) + residual GEMM gap 4.33 -> 6.13.
+- E-037 2026-09-22 TP2 desk: E-035 full-isolation build VERIFIED on TP2 at
+  10k (worktree wt-tp2-mtp synced to 7d3ab351a, binary v152; receipt
+  results/TP2_feasibility_2026-09-21.md Result 4). AUDIT GATE PASSES:
+  "ROCm2 isolation audit: 132.02 MiB on ROCm2, 0.00 MiB on the model split"
+  (STRICT=1 armed), duplication lines confirm token_embd 335.3 + output 517.8
+  moved whole to the draft die. VRAM (boot-ready -> post-probe): serving dies
+  7344.3/7343.9 -> 7930.2/7929.8 used (v1 flag: 7348.5/7347.9 -> 7945.3/7944.7);
+  draft die 1412.5 -> 2290.8 (v1: 558.0 -> 1437.1). Duplication delta exact
+  (+854.5 vs 853.12); draft-die total matches the ~2.3 GiB prediction; the
+  serving-die ~800 MiB further-drop prediction is REFUTED (measured -15 MiB):
+  serving-die request-time footprint is TARGET-compute dominated, identical in
+  both builds - full isolation buys the audit guarantee and a draft-free meta
+  split, not serving-die headroom. Prefill 88.74 t/s PASS. Decode/accept cells
+  for this arm lost twice to port-8080 collisions with the TP3 A/B lane (both
+  servers free_port-kill each other; hub #1343-#1345); v1 flag numbers (14.43
+  t/s, accept 0.66667) stand as the arm reference pending a clean decode-only
+  slot. LAW CANDIDATE from these two incidents: cross-desk free_port on a
+  shared port needs a hub GO handshake, not just a gap claim - a claimed gap
+  with a duration estimate still raced. LOCK CONVENTION adopted per
+  coordinator: /tmp/campaign_gpu_boot.lock (desk + ts + duration,
+  check-and-wait, release at teardown) implemented in run_tp2_feasibility.sh;
+  third run under the lock completed cleanly. FOURTH FINDING (defect route-back
+  to the draft-isolation desk): on the E-035 build the TP2/10k decode cell
+  FAILS - 7857-token request exhausts KV-space retries (28, down to n_batch=1)
+  and errors "Context size has been exceeded. off = 69" -> HTTP 500; v1 build
+  on the identical request/config: zero retries. KV geometry identical between
+  builds (n_ctx_seq 10240, unified, Meta KV 90 MiB, draft KV 40 MiB ROCm2) -
+  suspect dual-cache cell-accounting aliasing (draft cache seq state marking
+  target unified cells occupied). Iso decode/accept numbers NOT bankable at
+  10k until fixed; v1 flag numbers (14.43 t/s, 0.66667) remain the arm
+  reference. Prefill 88.91 t/s PASS under the lock (88.74 first run).

@@ -44,6 +44,16 @@ if [ ! -x "$BIN" ]; then
   echo "ERROR: server binary not found at $BIN"; exit 1
 fi
 
+# campaign GPU boot lock (cross-desk convention): check-and-wait, then hold
+LOCK_FILE="/tmp/campaign_gpu_boot.lock"
+for _ in $(seq 1 60); do
+  [ -e "$LOCK_FILE" ] || break
+  echo "[lock] held by: $(cat "$LOCK_FILE" 2>/dev/null | head -1) - waiting 30s"
+  sleep 30
+done
+if [ -e "$LOCK_FILE" ]; then echo "ERROR: boot lock still held after 30 min"; exit 1; fi
+echo "desk=tp2-feasibility ts=$(date +%s) start=$(date '+%F %T') duration_min=12 arm=$ARM rep=$REP" > "$LOCK_FILE"
+
 STAMP="$(date +%Y%m%d_%H%M%S)"
 PREFIX="$RESULTS/tp2feas_${ARM}${REP}_${STAMP}"
 SERVER_LOG="$PREFIX""_server.log"
@@ -73,6 +83,7 @@ free_port() {
 }
 
 teardown() {
+  rm -f "$LOCK_FILE"
   if [ -n "$SAMPLER_PID" ] && kill -0 "$SAMPLER_PID" 2>/dev/null; then
     kill "$SAMPLER_PID" 2>/dev/null || true
   fi

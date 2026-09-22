@@ -139,3 +139,68 @@ confirm the ub512 target compute buffer = 1057.78 MiB + draft-context compute
 #1326 window request -> #1328 ACK+GO (dies 0-2, 75 min) -> #1332 window start ->
 #1333 progress -> #1335 die-3 request -> #1336/#1337 de-conflict (TP3 A/B is
 Gemini's; this desk stays on TP2) -> #1338 stand-down + TP3 control VRAM handoff.
+
+## Result 4 - E-035 full-isolation build verified on TP2 at 10k (added 2026-09-22)
+
+Worktree synced to the campaign branch (merge amd/v340-port-v2 at 7d3ab351a,
+carrying the draft-isolation merge 8a4ebbcaa / ledger E-035); rebuilt served
+binary version 152 (7d3ab351a). Same arm as Result 2's flag row (TP2, -c 10000,
+b512/ub512, q4_0 KV, FA, --spec-mtp-device ROCm2), LLAMA_SPEC_MTP_STRICT=1.
+
+Gate and mechanics (tp2feas_t2flag10k3_20260921_212512_server.log):
+
+    load_tensors: MTP device ROCm2: duplicated token_embd.weight (335.3 MiB) and output.weight (517.8 MiB) for the draft context
+    sched_reserve: ROCm2 isolation audit:   132.02 MiB on ROCm2,     0.00 MiB on the model split
+    load_model: MTP draft context runs on ROCm2 (fully isolated: nextn weights + KV + duplicated embeddings/LM head)
+
+The required audit reads 0.00 MiB on the model split - PASS (logged in two
+independent boots; the draft context's own breakdown shows ROCm2 self = 1194 MiB
+= model 1022 (nextn 169.3 + duplication 853.12) + context 40 + compute 132).
+
+VRAM comparison, v1 flag build (Result 2) vs isolation build:
+
+| state | serving dies 0/1 used (free) | draft die 2 used (free) |
+|-------|------------------------------|-------------------------|
+| v1 boot-ready      | 7348.5/7347.9 (827.5/828.1) | 558.0 (7618.0) |
+| iso boot-ready     | 7344.3/7343.9 (831.7/832.1) | 1412.5 (6763.5) |
+| v1 post-probe      | 7945.3/7944.7 (230.7/231.3) | 1437.1 (6738.9) |
+| iso post-probe     | 7930.2/7929.8 (245.8/246.2) | 2290.8 (5885.2) |
+
+(boot-ready from runner snapshots; iso post-probe from the 2 s sampler's ~68 s
+stable decode-phase envelope after the prefill guard passed at 88.74 t/s.)
+
+Findings:
+
+- The duplication is exact: draft die boot delta = 1412.5 - 558.0 = +854.5 MiB
+  vs the 853.12 MiB token_embd+output duplication. Prediction confirmed.
+- The draft die carries 2290.8 MiB post-probe (matches the ~2.3 GiB prediction):
+  duplication + the draft context's request-time compute (+878.3 MiB) relocated.
+- The serving-die prediction (drop ~800 MiB further to ~7036 used) is REFUTED by
+  measurement: serving dies dropped only ~15 MiB (7945.3 -> 7930.2 post-probe).
+  Their request-time footprint is TARGET-context compute dominated - identical
+  in both builds; the v1 flag had already moved the draft's boot-time
+  allocations (v1-vs-iso boot-ready delta is only 4.2 MiB/die). Full isolation
+  buys a hard guarantee (audit-gated 0.00 residual, STRICT env) and removes the
+  draft's request-time presence from the serving dies' accounting, but the
+  serving-die envelope stays target-bound.
+- Prefill guard PASSED at 88.74 t/s (v1 87.61/87.68 - within noise); a second
+  clean run under the new boot lock passed prefill at 88.91 t/s. The decode/
+  acceptance cell FAILS on the isolation build at TP2/10k - a real E-035
+  defect, not a collision: the 7857-token decode request dies with 28
+  "failed to find free space in the KV cache" retries down to n_batch=1 and
+  "E srv decode: Context size has been exceeded. off = 69" -> HTTP 500 (v1
+  build: ZERO retries on the identical request; KV geometry identical between
+  builds: n_ctx/n_ctx_seq 10240, kv_unified, Meta KV 90 MiB, draft KV 40 MiB
+  on ROCm2). Hypothesis for the draft-isolation desk: the draft cache's cell
+  accounting aliases the target's unified-cache cells, marking ~10k cells
+  occupied while the target sequence has processed only ~3.6k. The decode/
+  acceptance comparison therefore stands on the v1 numbers (14.43 t/s, accept
+  0.66667) and the iso decode path is blocked at TP2/10k pending an E-035
+  follow-up fix.
+
+Coordination: first attempt (21:10) collided with the TP3 A/B control boot; the
+gap-claimed rerun (21:25) was killed at t+120 s by the next A/B boot's
+free_port; the third run (21:34) executed under the new
+/tmp/campaign_gpu_boot.lock convention (check-and-wait + hold + release on
+teardown) and completed cleanly into the defect above. Both collisions left
+the dies clean; no data loss beyond the decode cell.
