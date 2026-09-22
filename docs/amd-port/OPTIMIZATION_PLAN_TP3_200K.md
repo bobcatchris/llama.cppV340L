@@ -676,3 +676,48 @@ to Gemini's guard battery, die 3 is the dev cell.
   different class from shipped h16/f32). Served validation queued on
   Gemini lane (rebuild, within-arm determinism, census trace, OFF/ON
   A/B); loader desk (delete retained per-call dequant) queued after.
+- E-030 2026-09-21 TP2 feasibility desk COMPLETE (worktree wt-tp2-mtp, branch
+  amd/tp2-mtp-feasibility, base 597fcaee5; dies 0-2 window, Gemini ACK #1328;
+  numbering note: shared tree already at E-029 when written, E-026..E-029 live
+  there). THREE-WAY MTP MATRIX at TP2/-c 10000 (b512/ub512, q4_0 KV, FA, 2 reps
+  per arm, receipt results/TP2_feasibility_2026-09-21.md): TRUE per-device MTP
+  cost in-split = 1072.8 MiB/die over MTP-OFF at boot-ready (7599.6 vs 6526.8,
+  byte-identical across reps), of which draft weights+KV are only ~90 MiB - the
+  cost is DRAFT-CONTEXT BUFFER dominated (~983 MiB/die on the TP meta group),
+  confirming the coordinator's buffer-dominance instinct and refuting the
+  202 MiB weights+KV analytic figure as a ~5x undercount (the >2 GB/device
+  hypothesis does NOT reproduce at TP2/10k either). --spec-mtp-device ROCm2
+  relocates only 251.1 MiB/die off the serving dies (draft-context backend list
+  [meta, die2, CPU] keeps most draft compute on meta; die 2 holds 558.0 MiB at
+  boot, 1437.1 after probes). Decode: OFF 10.54/11.39, in-split 14.79/14.81,
+  flag 14.43/14.43 (flag = -2.4% vs in-split, MTP = +38-40% vs OFF); pp
+  87.5-89.2 all arms; accept 0.66667 / 3.00 tok-per-step everywhere. Consequence:
+  in-split TP2+MTP post-probe headroom is 67 MiB/die at 10k (ctx ceiling
+  ~17-18k); the flag's 231 MiB/die + draft-KV moved off-die extends the ceiling
+  to ~36k at the -2.4% decode price. Flag stays opt-in; promotion only pays for
+  TP2 mid-context classes where MTP would otherwise not fit.
+- E-031 2026-09-21 TP2@200k failure NUMBERS (supersedes the "empty logs"
+  assumption in E-028; same desk as E-030): the MTP-OFF TP2/200k boot aborts at
+  target-context graph_reserve, not at first request - "allocating 1057.78 MiB
+  on device 0: cudaMalloc failed: out of memory" (ggml-backend-meta.cpp:1512
+  GGML_ASSERT), sampler peak 7956.6/7956.3 MiB on dies 0/1 = ~219 MiB free at
+  the 1057.78 MiB ask, i.e. >= 839 MiB/die short BEFORE any draft allocation.
+  KV at 200k = 3519.00 MiB total (16 full-attn layers, K/V q4_0 1759.50 each,
+  in-split); the 1057.78 MiB ub512 compute buffer is ctx-independent (same size
+  allocated by the TP3/200k control), so no ubatch reduction closes the gap.
+  TP2@200k remains closed as a topology. Desk stood down from the TP3 total A/B
+  per the hub de-conflict (#1336/#1337 - Gemini's lane); one TP3 control boot
+  VRAM record handed over (boot-ready 7809.8/7582.0/7634.2 used MiB, die 3
+  idle; results/tp2feas_t3on1_20260921_183902_vram.log).
+- E-032 2026-09-21 Integration: amd/tp2-mtp-feasibility merged. TP2 desk
+  FINAL: TP2@200k closed (fails MTP-OFF, >=839 MiB/die short on a
+  ctx-independent 1057.78 MiB buffer - no ubatch reduction closes it; the
+  historical 151 MiB was a 10k layer-split-era number, prediction refuted).
+  TRUE in-split MTP cost = 1072.8 MiB/die at TP2/10k (context-buffer
+  dominated: weights+KV only ~90 MiB; >2 GB does not reproduce at 10k).
+  Flag relocates only 251.1 MiB/die (draft ctx [meta, die, CPU] backend
+  list keeps compute on serving dies); value = extends TP2 MTP-capable
+  ceiling ~17-18k -> ~36k ctx for -2.4% decode; opt-in. MTP itself +38-40%
+  TP2 decode. Full three-way table + receipt:
+  results/TP2_feasibility_2026-09-21.md. W6 follow-up named: draft-context
+  buffer placement must prefer the extra device for full isolation.
