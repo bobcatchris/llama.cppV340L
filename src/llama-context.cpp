@@ -1063,6 +1063,22 @@ float * llama_context::get_logits_ith(int32_t i) {
     }
 }
 
+size_t llama_context::peek_logits_rows(int32_t n_rows, const int32_t * idxs, const float ** out_rows) {
+    if (n_rows <= 0 || idxs == nullptr || out_rows == nullptr) {
+        return 0;
+    }
+
+    for (int32_t r = 0; r < n_rows; ++r) {
+        float * row = get_logits_ith(idxs[r]);
+        if (row == nullptr) {
+            return (size_t) r;
+        }
+        out_rows[r] = row;
+    }
+
+    return (size_t) n_rows;
+}
+
 float * llama_context::get_embeddings() {
     output_reorder();
 
@@ -3921,6 +3937,10 @@ float * llama_get_logits_ith(llama_context * ctx, int32_t i) {
     }
 
     return res;
+}
+
+size_t llama_peek_logits_rows(struct llama_context * ctx, int32_t n_rows, const int32_t * idxs, const float ** out_rows) {
+    return ctx->peek_logits_rows(n_rows, idxs, out_rows);
 }
 
 float * llama_get_embeddings(llama_context * ctx) {

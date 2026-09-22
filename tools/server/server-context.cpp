@@ -3958,7 +3958,20 @@ private:
                 common_sampler_ptr smpl_save(common_sampler_clone(slot.smpl.get()));
 
                 GGML_ASSERT(slot.spec_i_batch.size() == n_draft + 1);
-                auto accepted = common_sampler_sample_and_accept_n(slot.smpl.get(), slot.ctx_tgt, slot.spec_i_batch, slot.spec_draft);
+
+                static const bool verify_row_sampling = getenv("LLAMA_VERIFY_ROW_SAMPLING") != nullptr;
+
+                // LLAMA_VERIFY_ROW_SAMPLING: one light drain + raw row
+                // pointers for the whole verify-accept loop instead of the
+                // per-row getter syncs; an empty result means not eligible,
+                // and the regular path runs unchanged
+                std::vector<llama_token> accepted;
+                if (verify_row_sampling) {
+                    accepted = common_sampler_sample_and_accept_n_rows(slot.smpl.get(), slot.ctx_tgt, slot.spec_i_batch, slot.spec_draft);
+                }
+                if (accepted.empty()) {
+                    accepted = common_sampler_sample_and_accept_n(slot.smpl.get(), slot.ctx_tgt, slot.spec_i_batch, slot.spec_draft);
+                }
                 slot.spec_i_batch.clear();
 
                 GGML_ASSERT(accepted.size() >= 1);

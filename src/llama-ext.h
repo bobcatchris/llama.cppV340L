@@ -114,6 +114,16 @@ LLAMA_API bool llama_fetch_nextn_outputs(struct llama_context * ctx, int32_t idx
 // the fetched output tensors. Requires the packed fetch above.
 LLAMA_API void llama_wait_outputs(struct llama_context * ctx);
 
+// No-sync multi-row logits peek (LLAMA_VERIFY_ROW_SAMPLING): resolve the raw
+// row pointers for the verify-accept loop. The copies and destinations are
+// identical to llama_get_logits_ith, so the bytes are the same by
+// construction; only the per-row synchronize sweeps are removed. The caller
+// must have drained the context (llama_wait_outputs or llama_synchronize)
+// before calling. Returns the number of rows resolved; a short count means
+// the caller must fall back to the regular getters.
+LLAMA_API size_t llama_peek_logits_rows(struct llama_context * ctx, int32_t n_rows,
+        const int32_t * idxs, const float ** out_rows);
+
 // mirrors:
 // LLAMA_API float * llama_get_embeddings(struct llama_context * ctx);
 LLAMA_API float * llama_get_embeddings_nextn(struct llama_context * ctx);

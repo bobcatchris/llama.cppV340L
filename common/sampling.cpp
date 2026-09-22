@@ -5,6 +5,8 @@
 #include "log.h"
 #include "reasoning-budget.h"
 
+#include "../src/llama-ext.h" // llama_wait_outputs / llama_peek_logits_rows (verify-row sampling)
+
 #include "ggml.h"
 
 #include <algorithm>
@@ -812,6 +814,66 @@ std::vector<llama_token> common_sampler_sample_and_accept_n(struct common_sample
     }
 
     return common_sampler_sample_and_accept_n(gsmpl, ctx, idxs, draft, grammar_first);
+}
+
+std::vector<llama_token> common_sampler_sample_and_accept_n_rows(struct common_sampler * gsmpl, struct llama_context * ctx, const std::vector<int> & idxs, const llama_tokens & draft) {
+    GGML_ASSERT(idxs.size() == draft.size() + 1 && "idxs.size() must be draft.size() + 1");
+
+    // the row path hands raw host rows to the chain, so it needs the same
+    // state-free conditions as the packed draft fetch (empty result = the
+    // caller falls back to the regular ctx-based loop)
+    if (gsmpl->grmr || gsmpl->rbudget) {
+        return {};
+    }
+
+    const llama_vocab * vocab = llama_model_get_vocab(llama_get_model(ctx));
+    const int n_vocab = llama_vocab_n_tokens(vocab);
+
+    // one light drain for all rows instead of one synchronize per getter
+    llama_wait_outputs(ctx);
+
+    // a backend sampler produces a sampled token for every row, so probing
+    // the first row detects the attached case
+    if (llama_get_sampled_token_ith(ctx, idxs[0]) != LLAMA_TOKEN_NULL) {
+        return {};
+    }
+
+    std::vector<const float *> rows(idxs.size());
+    if (llama_peek_logits_rows(ctx, (int32_t) idxs.size(), idxs.data(), rows.data()) != idxs.size()) {
+        return {};
+    }
+
+    std::vector<llama_token> result;
+    result.reserve(idxs.size());
+
+    size_t i = 0;
+    for (; i < draft.size(); i++) {
+        llama_token_data_array * cur_p = common_sampler_sample_row(gsmpl, rows[i], n_vocab);
+        GGML_ASSERT(cur_p != nullptr);
+
+        const llama_token id = cur_p->data[cur_p->selected].id;
+
+        common_sampler_accept(gsmpl, id, true);
+
+        result.push_back(id);
+
+        if (draft[i] != id) {
+            break;
+        }
+    }
+
+    if (i == draft.size()) {
+        llama_token_data_array * cur_p = common_sampler_sample_row(gsmpl, rows[i], n_vocab);
+        GGML_ASSERT(cur_p != nullptr);
+
+        const llama_token id = cur_p->data[cur_p->selected].id;
+
+        common_sampler_accept(gsmpl, id, true);
+
+        result.push_back(id);
+    }
+
+    return result;
 }
 
 uint32_t common_sampler_get_seed(const struct common_sampler * gsmpl) {

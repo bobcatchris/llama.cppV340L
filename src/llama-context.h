@@ -96,6 +96,13 @@ struct llama_context {
     float * get_logits();
     float * get_logits_ith(int32_t i);
 
+    // no-sync multi-row logits peek (LLAMA_VERIFY_ROW_SAMPLING): resolve the
+    // raw row pointers for the verify-accept loop. the caller must have
+    // drained the context (llama_wait_outputs / llama_synchronize) first;
+    // the rows are the same memory llama_get_logits_ith returns. returns the
+    // number of rows resolved (stops at the first invalid row)
+    size_t peek_logits_rows(int32_t n_rows, const int32_t * idxs, const float ** out_rows);
+
     float * get_embeddings();
     float * get_embeddings_ith(int32_t i);
     float * get_embeddings_seq(llama_seq_id seq_id);

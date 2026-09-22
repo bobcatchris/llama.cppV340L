@@ -108,6 +108,16 @@ std::vector<llama_token> common_sampler_sample_and_accept_n(struct common_sample
 // assume idxs == [ 0, 1, 2, ..., draft.size() ]
 std::vector<llama_token> common_sampler_sample_and_accept_n(struct common_sampler * gsmpl, struct llama_context * ctx, const llama_tokens & draft, bool grammar_first = false);
 
+// row-pointer variant of common_sampler_sample_and_accept_n
+// (LLAMA_VERIFY_ROW_SAMPLING): one light drain for all verify rows, then each
+// row is sampled from its raw host pointer (the same set_logits_row build the
+// regular path uses for raw logits), so the accepted tokens are identical.
+// requires the same state-free conditions as the packed draft fetch: no
+// grammar, no reasoning budget and no backend sampler on the context.
+// returns an empty vector when not eligible - the caller must then fall back
+// to common_sampler_sample_and_accept_n
+std::vector<llama_token> common_sampler_sample_and_accept_n_rows(struct common_sampler * gsmpl, struct llama_context * ctx, const std::vector<int> & idxs, const llama_tokens & draft);
+
 uint32_t common_sampler_get_seed(const struct common_sampler * gsmpl);
 
 // force the reasoning budget sampler (if any) to begin forcing its end sequence now.
