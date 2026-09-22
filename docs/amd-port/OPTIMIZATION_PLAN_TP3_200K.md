@@ -983,3 +983,48 @@ to Gemini's guard battery, die 3 is the dev cell.
   die 3) and the served-measurement lane for TP3 200k MTP-OFF/ON +
   isolation decode cell (dies 0-2 + coordinated die-3 window; answers the
   >2 GB-at-scale question and the W6/isolation A/B).
+- E-046 2026-09-21 served-measurement lane: TP3 200k MTP OFF vs ON per-die
+  VRAM MEASURED (port 8080, one boot + 5-guard battery per arm, campaign
+  lock held per boot, thermal settle <= 35C edge, same-binary E-043 build,
+  battery fingerprint aa336055d4d73b00): TRUE per-device MTP cost at 200k =
+  1061-1255 MiB/die at boot-ready (mean 1125.4; OFF 6554.6/6520.8/6574.5 vs
+  ON 7809.9/7582.1/7634.2), 968-976 MiB/die post-battery (mean 972.4);
+  >2 GB/device does NOT reproduce at 200k and cost is nearly ctx-independent
+  vs TP2/10k's 1072.8 (+4.9% for 20x ctx) - draft-context-buffer dominated
+  per E-030. Die 0 carries ~195 MiB more than dies 1/2 (rank-0 draft-side
+  buffers, KV symmetric). ON boot-ready matches the E-031 control record
+  within 0.1 MiB (cross-boot reproducibility). OPERATIONAL CEILING
+  quantified: MTP-ON serving peak 8150.9-8165.7 of 8176.0 MiB/die = 10.3-25.1
+  MiB free at peak - the E-041/E-044 tile-OOM threshold is now a number
+  (any per-call pool alloc > ~10 MiB aborts die 0 at the 200k served point).
+  Served decode 8k-10k: OFF 12.23 vs ON 15.12 t/s = +23.6% (matches baseline
+  untraced_no_spec_reference 12.24); accept 0.0 vs 0.66667; greedy sha
+  4beb1ba25219ee9b byte-identical in BOTH arms; needle 3/3 both. Arm A FAIL
+  verdict = expected control signature. Single-rep prefill -6.2% (123.14 vs
+  115.50) noted, not this lane's cell. Receipt:
+  results/TP3_mtp_vram_2026-09-21.md (full table + receipts list).
+- E-047 2026-09-21 served-measurement lane: iso decode cell (E-038 request)
+  CLOSED on the draft-isolation build: dies 0-2 + --spec-mtp-device on die 3
+  at -c 10000, battery on PORT=8081 (lane-only client): 5/5 PASS, prefill
+  116.95, decode 15.21 t/s, accept 0.66667 exact (84/126, mean 3.00),
+  determinism sha 4beb1ba25219ee9b, needle 3/3; server log 0
+  "Context size has been exceeded", 0 retry lines - the E-037 defect
+  signature does not reproduce under a serial battery. NAMING CORRECTION of
+  record: the W6/dispatch line's --device CUDA0,CUDA1,CUDA2 --spec-mtp-device
+  CUDA3 does not resolve on this HIP build (invalid device: CUDA0); actual
+  names are ROCm0..ROCm3 per --list-devices; --device must still precede
+  --spec-mtp-device. CONTAMINATION AUDIT (E-043 convention): the
+  wt-tile-chunked bench was resident AND computing on die 3 during the
+  window (card3 allocs during my cooldown, 100% util samples in the decode
+  cell, alive at teardown with 363.7 MiB; benches are not lock-gated).
+  Client exclusivity HELD (8081, zero foreign HTTP), so the retry/accept/
+  determinism/needle cells are contention-immune and CLOSED; decode 15.21 is
+  a lower-bound-flavored number under die-3 compute sharing - it already
+  matches the canonical 200k MTP-ON decode (15.12) and exceeds the expected
+  14.4-14.9 class. Die-3 VRAM residency not cleanly attributable (my draft
+  residency bounded 347.6-551.1 MiB over idle; foreign transient dominated
+  serving). Attempt 2 (23:55) aborted pre-battery: a new foreign bench was
+  already on die 3 before boot. WINDOW REQUEST to the coordinator: one clean
+  exclusive die-3 window (~10 min) to optionally re-bank the iso decode t/s
+  uncontended; all other cells closed. Receipt:
+  results/TP3_iso_decode_2026-09-21.md.
