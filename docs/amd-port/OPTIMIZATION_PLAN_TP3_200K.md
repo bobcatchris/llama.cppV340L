@@ -1977,3 +1977,19 @@ to Gemini's guard battery, die 3 is the dev cell.
   direct-request boots MUST go through the same gate as desks -
   check-and-hold the lock, targeted kill by PID only (never a global
   llama-server sweep), and if a lock is held, the request WAITS.
+- E-083 2026-09-22 SPEED OFFENSIVE WIDENED (Chris: "make progress on
+  speed, heat shouldnt be an issue anymore"). Two more zero-GPU desks
+  dispatched so every known lever has an owner: (1) CATCHUP-ROLLBACK
+  DESK (wt-catchup on amd/catchup-rollback): the 11.66 ms/round
+  catch-up re-decodes rejected drafts - map the accept/reject flow,
+  feasibility verdict on accepted-prefix catch-up (the KV-rollback
+  ordering concern from E-078), implement behind
+  LLAMA_DRAFT_PREFIX_CATCHUP=1 if clean, blocker doc if not.
+  (2) ASYNC-INPUT DESK (wt-async-input on amd/async-input): the 4-6
+  blocking H2D input sets per step - map the critical path, pinned
+  ring + event-gated consumption behind LLAMA_ASYNC_INPUT=1, honest
+  latency-floor sizing. With the running MMVQ-kernel and
+  verify-transport desks, all five identified levers are owned:
+  kernel math (77% share), boundary transport, host syncs (merged),
+  catch-up waste, input staging. Validation: one combined served
+  window for all winners once the desks land (no per-desk batteries).
