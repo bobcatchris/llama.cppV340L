@@ -2089,3 +2089,65 @@ to Gemini's guard battery, die 3 is the dev cell.
   LLAMA_DRAFT_PREFIX_CATCHUP=1 + timelines + -lv 4; accept 0.66667/3.00
   within noise, catch-up issue med -> ~8-9 ms, wall -1.5..-3 ms,
   +0.8..+1.6% class; greedy sha may differ at tie level (caveat above).
+- E-086 2026-09-22 COMBO WINDOW COMPLETE (combined validation desk, lane
+  8083, cooled dies, ref-interleaved ladder ref0,A,B,ref1,C,D,ref2,ALL,ref3;
+  receipt ComboVal_20260922_175500.md). Incident: first ref0 boot killed at
+  launch by the coordinator's TP2 boot (killed ALL llama-server processes
+  and replaced the campaign boot lock - E-082); voided, dmesg clean, ladder
+  re-run. GATES: accept 0.66667 / mean_len 3.00 / draft 84-126 in every
+  cell of every arm (zero moves - no bugs); greedy sha 4beb1ba25219ee9b
+  identical across all nine boots (byte-exact vs the regular path, same as
+  E-074). t/s (2-ref drift control, ref band 14.79-14.93, spread 0.94%):
+  ref0 14.93, A 15.00 (+0.47%), B 14.88 (-0.34%), ref1 14.83, C 14.89
+  (+0.40% vs ref1), D 14.74 (-0.61% vs ref1), ref2 14.92, ALL 14.85
+  (-0.47% vs ref2), ref3 14.79 - every arm inside the ref band; even with
+  cooled dies sub-1% boot noise is the floor at these effect sizes.
+  ENGAGEMENT PROVEN per arm: A sample+batch timer 1.146 -> 0.055 ms/step
+  (mostly re-attribution into the packed fetch; honest host deletion =
+  draft total med 10.93 -> 10.26 ms/round, -0.67) + drains/round 232 ->
+  214; B wait_outputs/draft-step = exactly 1.000 (126/126, 3.00/round,
+  0.90 ms = the real drain); C drains/round 232.0 -> 215.0 (-17.0; brief
+  estimated ~22) + one 0.003 ms light wait/round, wall med -3.08 ms vs
+  ref1 (largest wall move of the window); D SIGNATURE NOT REPRODUCED -
+  verify issue med -0.6 ms only (modeled -2..-6), wall -1.09 ms, t/s -0.61%
+  (low side of band); engaged by construction (unconditional on the
+  no-peer-copy fallback path), the two blocking syncs per boundary copy
+  dominate and stay; ALL stacks all signatures (waits 4/round, drains/round
+  194.0 = window minimum). VERDICT: all five arms free and byte-exact
+  (defaults-safe), none is the t/s lever at 200k in-split - wall med stays
+  192-194 ms in every arm; E-078's device-owned round confirmed on cooled
+  silicon.
+- E-087 2026-09-22 T3 GROUPED-MMVQ DEVICE VALIDATION (combined validation
+  desk; one boot GGML_CUDA_MMVQ_GROUP=1 + DEBUG, receipt section 2).
+  FORMATION PROOF CAPTURED: 18 "group formed" lines (2-member groups:
+  node_14 q5_K rows 256, node_43 q5_K+q3_K, node_115 iq3_xxs+q5_K, node_187
+  q4_K+q3_K, rows 12-256, prefill graphs included), 12 "admitted as
+  copy-back" lines, verbatim max_rows declines ("mtp_Qcur_full-64 has 6144
+  rows ... > max_rows 256; attn k/v shards are 512-granular under TP3").
+  DEFECT: the server ABORTED on the first decode graph - controlled
+  ggml_cuda_error (dmesg clean of libamdhip64): "ROCm error: invalid
+  argument" at hipMemcpyAsync(node->data, it->second.temp, ... D2D) in the
+  pending copy-back path, ggml-cuda.cu:5108, right after "group formed at
+  Vcur-3: 2 members ... member Kcur-3 (copy-back)". Prefill grouped
+  launches with copy-back members ran fine; the decode graph's copy-back
+  placement fails (the off-device dst guard appears not to cover this
+  case). t/s + accept UNDECIDABLE, determinism cell not runnable - handed
+  back to the T3 desk with verbatim evidence; formation is NOT the
+  bottleneck, copy-back execution is.
+- E-088 2026-09-22 ADMISSION VALIDATION (E-054 fix, combined validation
+  desk; one boot -c 10240, kv unified verified, probe_kv_admission.py).
+  MECHANISM ENGAGED AND CLEAN: two defer lines ("unified KV occupancy is
+  too high, defer task 2 (n_need = 7862, n_used = 512, n_pending = 7345,
+  n_ctx = 10240)" and the retry at n_used = 7872), zero "Context size has
+  been exceeded", zero HTTP 500, request A 200 in 80.1 s (prefill 99.8 t/s,
+  mean acc len 3.00). DEFECT FOUND - DEFERRED REQUEST STARVES: A released
+  with its 7872-token KV retained by the prompt cache (slot picked by LCP
+  similarity 0.999 - B is A's prompt + a 5-token suffix), and the admission
+  formula counts B's FULL n_need = 7862 against n_used = 7872 with no
+  credit for the 7857 already-cached prefix tokens (incremental need ~5
+  against 2368 free); no eviction path exists, B is never scheduled and is
+  cancelled at 12.3 min when the probe's 600 s client timeout closes.
+  Probe verdict line: FIX FAIL (non-200) - captured as the deliverable.
+  Fix direction: credit prompt-cache prefix reuse in n_need (admit when
+  incremental need fits) or evict cached KV after N defers. --control mode
+  left for a later window per brief (would hit the same starvation).
