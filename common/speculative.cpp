@@ -1347,11 +1347,14 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
             return true;
         }
 
+        static const bool tl_on = getenv("LLAMA_SPEC_TIMELINE") != nullptr;
+
+        const int64_t t_process_start = tl_on ? ggml_time_us() : 0;
+
         // TODO: how to make it work with vision tokens?
         if (batch_in.token == nullptr || batch_in.embd != nullptr) {
             return true;
         }
-
         const int32_t n_tokens = batch_in.n_tokens;
 
         // remember the frist and last batch index for each sequence
@@ -1457,6 +1460,11 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
                     verify_h[seq_id].data() + (size_t) (n_rows - 1) * n_embd, row_bytes);
         }
 
+        if (tl_on) {
+            LOG_INF("[spec-timeline] process: n_tokens = %d, heads = %d, decode_issue = %.3f ms\n",
+                    n_tokens, n_mtp_layers, (ggml_time_us() - t_process_start)/1e3);
+        }
+
         return true;
     }
 
@@ -1494,6 +1502,18 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
 
         int i = 0;
 
+        // draft-step timeline (LLAMA_SPEC_TIMELINE=1) and fast draft sampling
+        // (LLAMA_DRAFT_FAST_TOPK=1, heap-select of the top-k candidates instead
+        // of the full-vocab array; identical selection for distinct logits)
+        static const bool tl_on     = getenv("LLAMA_SPEC_TIMELINE") != nullptr;
+        static const bool fast_topk = getenv("LLAMA_DRAFT_FAST_TOPK") != nullptr;
+
+        int64_t t_decode_us = 0;
+        int64_t t_sample_us = 0;
+        int     n_tl_steps  = 0;
+
+        const int64_t t_draft_start = tl_on ? ggml_time_us() : 0;
+
         while (n_drafting > 0) {
             // each step decodes under a different head, i.e. a different decoder layer, and
             // KV is per layer. process() filled this layer's KV only for positions < n_past
@@ -1511,11 +1531,20 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
                 llama_set_nextn_layer_offset(ctx_dft, i);
             }
 
+            const int64_t t_decode_start = tl_on ? ggml_time_us() : 0;
+
             int ret = llama_decode(ctx_dft, batch);
             if (ret != 0) {
                 SPC_ERR("llama_decode[%d] returned %d\n", i, ret);
                 break;
             }
+
+            if (tl_on) {
+                t_decode_us += ggml_time_us() - t_decode_start;
+                n_tl_steps++;
+            }
+
+            const int64_t t_sample_start = tl_on ? ggml_time_us() : 0;
 
             // rebuild the batch for the next step: the growing-KV paths re-add only the
             // new token (the KV already holds the prefix), while chained heads re-add the
@@ -1529,10 +1558,20 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
 
                 auto * smpl = smpls[seq_id].get();
 
-                common_sampler_sample(smpl, ctx_dft, i_last[seq_id], true);
-                const float * h_row = llama_get_embeddings_nextn_ith(ctx_dft, i_last[seq_id]);
+                llama_token_data_array * cur_p = nullptr;
 
-                const auto * cur_p = common_sampler_get_candidates(smpl, true);
+                if (fast_topk) {
+                    // k matches the draft chain's top-k(10) set in the ctor
+                    cur_p = common_sampler_sample_topk(smpl, ctx_dft, i_last[seq_id], 10);
+                }
+
+                if (!cur_p) {
+                    common_sampler_sample(smpl, ctx_dft, i_last[seq_id], true);
+
+                    cur_p = common_sampler_get_candidates(smpl, true);
+                }
+
+                const float * h_row = llama_get_embeddings_nextn_ith(ctx_dft, i_last[seq_id]);
 
                 for (int k = 0; k < std::min(3, (int) cur_p->size); ++k) {
                     SPC_DBG(" - seq_id %d, draft candidate %3d, pos %3d: %6d (%8.3f) '%s'\n",
@@ -1588,11 +1627,21 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
                 i_last[seq_id] = batch.n_tokens - 1;
             }
 
+            if (tl_on) {
+                t_sample_us += ggml_time_us() - t_sample_start;
+            }
+
             if (batch.n_tokens == 0) {
                 break;
             }
 
             ++i;
+        }
+
+        if (tl_on && n_tl_steps > 0) {
+            LOG_INF("[spec-timeline] draft: steps = %d, decode_issue = %.3f ms/step, sample+batch = %.3f ms/step, total = %.3f ms\n",
+                    n_tl_steps, t_decode_us/1e3/n_tl_steps, t_sample_us/1e3/n_tl_steps,
+                    (ggml_time_us() - t_draft_start)/1e3);
         }
 
         if (chain_heads) {

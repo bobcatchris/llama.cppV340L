@@ -1466,3 +1466,62 @@ to Gemini's guard battery, die 3 is the dev cell.
   launch; expected signature if v1 is real: decode ~14-15 t/s class
   (vs 7.58 full isolation) with draft die NOT carrying duplicated
   output weights.
+- E-057 2026-09-22 MTP-overhead desk COMPLETE (worktree wt-mtp-overhead, branch
+  amd/mtp-overhead; the zero-GPU draft-step 37 ms attack; NO die time).
+  ROOT CAUSE BANKED: the "backend sampling not supported with
+  SPLIT_MODE_TENSOR; using CPU" line fires from llama_context::set_sampler
+  (src/llama-context.cpp), triggered by the draft-mtp ctor's
+  llama_set_sampler(ctx_dft, top_k(10) chain) offload attempt
+  (common/speculative.cpp; --spec-draft-backend-sampling defaults ON).
+  Provenance: introduced by the same upstream PR that built backend sampling
+  (#23287, ad2775726) as a defensive "-sm tensor" fallback - UNIMPLEMENTED,
+  not proven fundamental. KEY QUESTION ANSWERED: NO die holds the full summed
+  logits row after the draft LM head in this build - output.weight is
+  vocab-axis sharded (llama-model.cpp split config AXIS_1 -> meta head result
+  AXIS_0-disjoint), the head triggers NO allreduce (meta boundaries only
+  after PARTIAL nodes, i.e. the ffn_down class inside the block), and the
+  full ~517 KB row materializes only on the host via the spliced 3-way
+  get_tensor_async. Also banked: the drafted token is cur_p->data[0].id =
+  top-1 logit (greedy; the chain's trailing dist only fills p for p_min), and
+  id(N) is a true compute input of draft step N+1 (graph_mtp consumes the
+  token embedding via enorm + the h row via hnorm through eh_proj) - the
+  draft loop is inherently lockstep, so "overlap CPU sampling with the next
+  draft block" is dead on the dependency, not on effort. Naive unrefusal
+  aborts in ggml_backend_meta_get_split_state (TOP_K/ARGSORT handle_per_row
+  asserts src != AXIS_0; handle_pad split-axis assert; no (AXIS_0 weight,
+  MIRRORED x) MUL_MAT case; the segment model cannot express a top-k whose
+  output size differs from the input partition) - a full on-device sampling
+  project needs either head K-axis re-shard (FP-sum-order change =
+  acceptance-risk + model-wide layout) or a new top-k-per-shard op + meta
+  state. IMPLEMENTED (all env-gated, unset = byte-identical):
+  LLAMA_TP_BACKEND_SAMPLING=1 experimental unrefusal with abort WARNs (the
+  served instrument that closes "where does meta actually fail");
+  LLAMA_DRAFT_FAST_TOPK=1 minimal-sync arm - common_sampler_sample_topk
+  heap-selects the top-k straight off the logits row (same
+  make_heap/scan/sort_heap algorithm + comparator as the regular
+  std::partial_sort path) and runs the same chain on the k survivors,
+  deleting the 129272 x 16 B full-vocab candidate build + full-size
+  partial_sort per draft step, with eligibility guards (no grammar/rbudget,
+  no backend token, chain exactly [top-k(+dist)]) falling back to the regular
+  path; LLAMA_SPEC_TIMELINE=1 + LLAMA_DECODE_TIMELINE=1 draft-step profiler
+  (per step: decode_issue, build/reused/inputs/issue, outputs issue, drain,
+  sample+batch, total) - the 37 ms attribution instrument for the served
+  cell. HOST TESTS ALL PASS (docs/amd-port/tests/test_mtp_sampling_host.cpp,
+  ~23 s): distinct-value trials (4 vocab sizes to 129272, ~222k trials)
+  bit-exact arrays + identical drafted token + identical dist draw;
+  k-boundary +-12 ULP bands bit-exact; exact-tie rows keep the logit
+  multiset and the unique-max drafted token identical (tie ORDER among
+  exactly-tied ids may differ - the one documented divergence, able to move
+  only the seeded draw among tied candidates); full-scale top-1 and edge
+  cases pass. Predecessor W6 MTP host suite re-run ALL PASS. Compile-clean
+  on all three changed TUs (plain g++ and -DGGML_USE_HIP -DGGML_HIP mirror).
+  DEFERRED SERVED PROTOCOL (priority order): (1) attribution cell -
+  campaign config + LLAMA_SPEC_TIMELINE=1, ~50 rounds, split decode_issue vs
+  drain vs CPU chain (rule: chain ~= 1-3 ms => the 37 ms is device/launch/AR,
+  next desk is device-side); (2) LLAMA_DRAFT_FAST_TOPK=1 A/B, expect greedy
+  byte-identical, accept 0.66667, +1-3% t/s; (3) LLAMA_TP_BACKEND_SAMPLING=1
+  single-round abort capture; (4) optional cb_eval flag for LM-head vs block
+  ms. REVISED ESTIMATE at 12-15 ms/step: round 121-140 ms for 3.0 tokens =
+  21.4-24.8 t/s = +40-61% vs today's 14.43-15.38 and a 1.76-2.04x MTP
+  multiplier vs OFF (12.17-12.18) - up from 1.15-1.26x. Receipt:
+  results/MTP_overhead_2026-09-22.md.

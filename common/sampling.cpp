@@ -161,6 +161,50 @@ struct common_sampler {
         cur_p = { cur.data(), cur.size(), -1, false };
     }
 
+    // candidate selection without the full-vocab array: heap-select the top-k
+    // logits and hand just those to the sampler chain. mirrors std::partial_sort
+    // (make_heap + scan + sort_heap) over the id-ordered full-vocab array, so
+    // the selected set and order match set_logits + partial_sort for distinct
+    // logits. returns false when the state requires the regular set_logits.
+    bool set_logits_topk(struct llama_context * ctx, int idx, int k) {
+        if (llama_get_sampled_probs_ith(ctx, idx) || llama_get_sampled_logits_ith(ctx, idx)) {
+            return false;
+        }
+
+        const llama_model * model = llama_get_model(ctx);
+        const llama_vocab * vocab = llama_model_get_vocab(model);
+
+        const int n_vocab = llama_vocab_n_tokens(vocab);
+
+        const auto * logits = llama_get_logits_ith(ctx, idx);
+        GGML_ASSERT(logits != nullptr);
+
+        if (k <= 0 || k > n_vocab) {
+            k = n_vocab;
+        }
+
+        static const auto comp = [](const llama_token_data & a, const llama_token_data & b) {
+            return a.logit > b.logit;
+        };
+
+        cur.resize(k);
+        for (int i = 0; i < k; ++i) {
+            cur[i] = llama_token_data{(llama_token) i, logits[i], 0.0f};
+        }
+        std::make_heap(cur.begin(), cur.end(), comp);
+        for (int i = k; i < n_vocab; ++i) {
+            if (logits[i] > cur.front().logit) {
+                std::pop_heap(cur.begin(), cur.end(), comp);
+                cur.back() = llama_token_data{(llama_token) i, logits[i], 0.0f};
+                std::push_heap(cur.begin(), cur.end(), comp);
+            }
+        }
+        std::sort_heap(cur.begin(), cur.end(), comp);
+
+        cur_p = { cur.data(), cur.size(), -1, true };
+        return true;
+    }
+
     common_time_meas tm() {
         return common_time_meas(t_total_us, params.no_perf);
     }
@@ -619,6 +663,44 @@ llama_token common_sampler_sample(struct common_sampler * gsmpl, struct llama_co
     id = cur_p.data[cur_p.selected].id;
 
     return id;
+}
+
+llama_token_data_array * common_sampler_sample_topk(struct common_sampler * gsmpl, struct llama_context * ctx, int idx, int k) {
+    llama_synchronize(ctx);
+
+    // start measuring sampling time after the llama_context synchronization in order to not measure any ongoing async operations
+    const auto tm = gsmpl->tm();
+
+    // the fast path only covers plain top-k chains (the draft sampler); grammar,
+    // reasoning budget and backend sampling need the regular path
+    if (gsmpl->grmr || gsmpl->rbudget) {
+        return nullptr;
+    }
+
+    if (llama_get_sampled_token_ith(ctx, idx) != LLAMA_TOKEN_NULL) {
+        return nullptr;
+    }
+
+    const int n_chain = llama_sampler_chain_n(gsmpl->chain);
+    if (n_chain < 1 || n_chain > 2) {
+        return nullptr;
+    }
+    if (strcmp(llama_sampler_name(llama_sampler_chain_get(gsmpl->chain, 0)), "top-k") != 0) {
+        return nullptr;
+    }
+    if (n_chain == 2 && strcmp(llama_sampler_name(llama_sampler_chain_get(gsmpl->chain, 1)), "dist") != 0) {
+        return nullptr;
+    }
+
+    if (!gsmpl->set_logits_topk(ctx, idx, k)) {
+        return nullptr;
+    }
+
+    llama_sampler_apply(gsmpl->chain, &gsmpl->cur_p);
+
+    GGML_ASSERT(gsmpl->cur_p.selected != -1 && "no selected token during sampling - check your sampling configuration");
+
+    return &gsmpl->cur_p;
 }
 
 std::vector<llama_token> common_sampler_sample_and_accept_n(struct common_sampler * gsmpl, struct llama_context * ctx, const std::vector<int> & idxs, const llama_tokens & draft, bool grammar_first) {
