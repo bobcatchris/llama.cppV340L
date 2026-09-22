@@ -1366,3 +1366,21 @@ to Gemini's guard battery, die 3 is the dev cell.
   ordered. Ladder t3flag2 was the last 200k boot (started 07:29:44);
   watcher fires the sweep on its next 150 s tick after teardown + die
   drain.
+- E-060 2026-09-22 TP3 200k DEFINITIVE TABLE (coordinator read of the
+  tp2-feasibility desk receipts, wt-tp2-mtp/docs/amd-port/results/
+  tp2feas_t3*_{on,flag}{1,2}_20260922_07*_battery.jsonl; desk may add
+  its own entry on resume - keep both). In-split MTP (t3on) @ 200k x2:
+  decode 14.73 / 14.67 t/s PASS (-1.4% vs 14.94 baseline), prefill
+  113.69 / 113.43, accept 0.66667, mean_len 3.0. v1-flag draft-device
+  (t3flag) @ 200k: decode 7.58 / 7.58 / 7.57 t/s = -49.3% (decode gate
+  FAIL is the ONLY failing cell), prefill 117.6 / 117.9 / 117.5 (+2%),
+  accept 0.66667, determinism byte-identical, needle PASS except one
+  rep with 'Remote end closed connection without response' (server
+  died mid-needle on that boot - needs the server-log crash check).
+  VERDICT OF RECORD: at TP3@200k the draft-device relocation costs
+  ~2x decode exactly as at TP2@10k (7.4 vs 14.4); in-split MTP is the
+  operating point at every measured geometry; serving-die VRAM under
+  the flag arm at 200k ~1127/1075 MiB free + draft die 2.29 GiB. The
+  decode collapse mechanism (draft embedding+LM-head on the 1x-
+  bandwidth die + host hops) is now confirmed at 200k, doubling the
+  weight behind the MTP-overhead desk's on-device sampling work.
