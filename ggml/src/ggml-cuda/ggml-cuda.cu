@@ -611,6 +611,10 @@ ggml_backend_cuda_context::~ggml_backend_cuda_context() {
     // alive; the pools account outstanding allocations in their destructor
     q81_act_cache.clear();
 
+    // free the resident f16 weights while the devices are still usable; raw
+    // cudaMalloc'd buffers, freed with each entry's device current
+    tile_fp16_residency.clear();
+
     if (copy_event != nullptr) {
         CUDA_CHECK(cudaEventDestroy(copy_event));
     }

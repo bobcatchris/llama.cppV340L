@@ -29,6 +29,7 @@
 #include <cstdio>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -1502,6 +1503,65 @@ struct ggml_cuda_q81_act_cache {
     }
 };
 
+// Steady-state f16 copies of the tile route's quantized weight slices
+// (GGML_CUDA_TILE_FP16_RESIDENT=1, glue in tile-gemm.cu). Produced once at first
+// use by the same dequant kernel the per-call route runs, so tile output on the
+// resident copy is bit-identical to the per-call-dequant route. Weights are
+// immutable after load, so entries are keyed by device pointer + shape and live
+// until context teardown. Raw cudaMalloc, NOT graph-pool memory: pool buffers are
+// recycled within a graph build and would alias across computes.
+struct ggml_cuda_tile_fp16_residency {
+    struct key {
+        int device;
+        const void * data;    // weight slice device pointer
+        int64_t ne00;         // K
+        int64_t row_diff;     // rows of this device's slice
+        int64_t type;         // ggml_type of the quantized weight
+
+        bool operator==(const key & other) const {
+            return device == other.device && data == other.data && ne00 == other.ne00
+                && row_diff == other.row_diff && type == other.type;
+        }
+    };
+
+    struct hash {
+        size_t operator()(const key & k) const {
+            size_t h = (size_t) (uintptr_t) k.data;
+            h = h*31 + (size_t) k.ne00;
+            h = h*31 + (size_t) k.row_diff;
+            h = h*31 + (size_t) (k.type + k.device*7);
+            return h;
+        }
+    };
+
+    struct entry {
+        void * buf = nullptr;   // f16 weight copy, row_diff x ne00 halves
+        size_t bytes = 0;
+    };
+
+    bool    active = false;
+    size_t  cap_bytes = 0;
+    size_t  total_bytes = 0;
+    int64_t n_hits = 0;
+    int64_t n_misses = 0;
+    int64_t n_refused = 0;
+
+    std::unordered_map<key, entry, hash> entries;
+    std::unordered_set<key, hash> refused;   // per-tensor refusal is final, no retry churn
+
+    // frees every resident buffer; runs in the context dtor with each entry's
+    // device current, before the members that own the CUDA resources are gone
+    void clear() {
+        for (auto & it : entries) {
+            ggml_cuda_set_device(it.first.device);
+            CUDA_CHECK(cudaFree(it.second.buf));
+        }
+        entries.clear();
+        refused.clear();
+        total_bytes = 0;
+    }
+};
+
 struct ggml_backend_cuda_context {
     int device;
     std::string name;
@@ -1572,6 +1632,8 @@ struct ggml_backend_cuda_context {
     ggml_cuda_stream_context concurrent_stream_context;
 
     ggml_cuda_q81_act_cache q81_act_cache;
+
+    ggml_cuda_tile_fp16_residency tile_fp16_residency;
 
     ~ggml_backend_cuda_context();
 
