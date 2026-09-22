@@ -2288,3 +2288,13 @@ to Gemini's guard battery, die 3 is the dev cell.
   evidence verbatim in the receipt). Control rerun without draft-mtp
   (textbook-signature hunt) left unrun: the t3-copyback desk holds
   the lane (lock law).
+- E-091 2026-09-22 CATCH-UP VERDICT: t/s-NEUTRAL under RCCL at 10k
+  (interleaved 2x2, cooled, engagement captured). ref 18.63 / 18.66 vs
+  PREFIX_CATCHUP 18.59 / 18.45 - the modeled +0.8-1.6% did not
+  materialize; the 11.66 ms catch-up is dominated by fixed decode-issue
+  cost that the row reduction does not remove (consistent with the
+  async-input desk's fixed-cost finding). The earlier 15.95 stacked
+  cell was thermal (uncooled late-chain boot). Flag stays merged,
+  OFF by default, not counted in the stack-up. RCCL reference
+  reconfirmed at 10k: 18.59-18.66. Desktop review document updated to
+  match.
