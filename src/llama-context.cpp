@@ -787,6 +787,123 @@ void llama_context::synchronize() {
     t_compute_start_us = 0;
 }
 
+void llama_context::wait_outputs() {
+    // light drain for the packed draft-step fetch: synchronize only the
+    // backends that own the fetched output tensors. for a tensor-parallel
+    // model this is the meta backend (which drains all of its devices); the
+    // full synchronize() additionally sweeps every scheduler backend and
+    // closes the perf evaluation window - both skipped here
+    if (!sched || !gf_res_prev) {
+        return;
+    }
+
+    static const bool tl_on = getenv("LLAMA_DECODE_TIMELINE") != nullptr;
+
+    const int64_t t_sync_start = tl_on ? ggml_time_us() : 0;
+
+    auto * res = gf_res_prev.get();
+
+    ggml_backend_t synced = nullptr;
+    for (ggml_tensor * t : { res->get_logits(), cparams.embeddings_nextn ? res->get_h_nextn() : nullptr }) {
+        if (!t) {
+            continue;
+        }
+
+        ggml_backend_t backend = ggml_backend_sched_get_tensor_backend(sched.get(), t);
+        if (backend && backend != synced) {
+            ggml_backend_synchronize(backend);
+            synced = backend;
+        }
+    }
+
+    if (tl_on) {
+        LLAMA_LOG_INFO("[decode-timeline] wait_outputs = %.3f ms\n", (ggml_time_us() - t_sync_start)/1e3);
+    }
+}
+
+bool llama_context::fetch_nextn_outputs(int32_t idx, const float ** out_logits, const float ** out_h) {
+    // mirrors the raw-logits and h_nextn extract branches of decode(): the
+    // same tensors, byte counts and pinned destinations, so the bytes that
+    // land in the output buffers are identical by construction; the draft
+    // loop reads the rows after its drain (synchronize or wait_outputs)
+    if (!gf_res_prev || n_outputs <= 0) {
+        return false;
+    }
+
+    if (!output_swaps.empty()) {
+        // the lazy reorder applies to the ctx output getters only
+        LLAMA_LOG_WARN("%s: unsorted outputs are not supported by the packed fetch\n", __func__);
+        return false;
+    }
+
+    int64_t j = -1;
+    try {
+        j = output_resolve_row(idx);
+    } catch (const std::exception & err) {
+        LLAMA_LOG_ERROR("%s: invalid output row: %s\n", __func__, err.what());
+        return false;
+    }
+
+    auto * res = gf_res_prev.get();
+
+    auto * t_logits  = res->get_logits();
+    auto * t_h_nextn = cparams.embeddings_nextn ? res->get_h_nextn() : nullptr;
+
+    const int64_t n_vocab = model.vocab.n_tokens();
+
+    if (!logits.data || !t_logits || !embd_nextn.data || !t_h_nextn) {
+        return false;
+    }
+
+    ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(sched.get(), t_logits);
+    GGML_ASSERT(backend_res != nullptr);
+
+    // single-ubatch decodes only (the draft batch never splits)
+    GGML_ASSERT(n_outputs*n_vocab <= (int64_t) logits.size);
+    ggml_backend_tensor_get_async(backend_res, t_logits, logits.data, 0, n_outputs*n_vocab*sizeof(float));
+
+    if (!cparams.embeddings_nextn_masked) {
+        // the unmasked layout is indexed by raw token position and the token
+        // count of the last ubatch is not tracked here
+        return false;
+    }
+
+    const uint32_t n_embd = model.hparams.n_embd_out();
+
+    ggml_backend_t backend_h = ggml_backend_sched_get_tensor_backend(sched.get(), t_h_nextn);
+    GGML_ASSERT(backend_h != nullptr);
+
+    GGML_ASSERT(n_outputs*n_embd <= (int64_t) embd_nextn.size);
+    ggml_backend_tensor_get_async(backend_h, t_h_nextn, embd_nextn.data, 0, n_outputs*n_embd*sizeof(float));
+
+    if (out_logits) {
+        *out_logits = logits.data + j*n_vocab;
+    }
+
+    if (out_h) {
+        *out_h = embd_nextn.data + j*n_embd;
+    }
+
+    return true;
+}
+
+void llama_context::set_packed_fetch(bool value) {
+    LLAMA_LOG_DEBUG("%s: value = %d\n", __func__, (int) value);
+
+    if (!value) {
+        packed_fetch = false;
+        return;
+    }
+
+    if (!sampling.samplers.empty()) {
+        // backend-sampled outputs never touch the raw logits buffer
+        LLAMA_LOG_WARN("%s: backend sampling is active; packed fetch not enabled\n", __func__);
+        return;
+    }
+
+    packed_fetch = true;
+}
+
 const llama_model & llama_context::get_model() const {
     return model;
 }
@@ -2005,7 +2122,7 @@ int llama_context::decode(const llama_batch & batch_inp) {
         const int64_t t_outputs_start = tl_on ? ggml_time_us() : 0;
 
         // extract logits
-        if (logits.data && t_logits && n_outputs > 0 && needs_raw_logits(ubatch, sampling.samplers)) {
+        if (logits.data && t_logits && n_outputs > 0 && needs_raw_logits(ubatch, sampling.samplers) && !packed_fetch) {
             ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(sched.get(), t_logits);
             GGML_ASSERT(backend_res != nullptr);
             GGML_ASSERT(logits.data != nullptr);
@@ -2088,7 +2205,7 @@ int llama_context::decode(const llama_batch & batch_inp) {
             const int64_t n_rows = masked ? n_outputs       : (int64_t) ubatch.n_tokens;
             const int64_t offset = masked ? n_outputs_prev  : n_tokens_prev;
 
-            if (embd_nextn.data && t_h_nextn && n_rows > 0 && cparams.pooling_type == LLAMA_POOLING_TYPE_NONE) {
+            if (embd_nextn.data && t_h_nextn && n_rows > 0 && cparams.pooling_type == LLAMA_POOLING_TYPE_NONE && !packed_fetch) {
                 ggml_backend_t backend_h = ggml_backend_sched_get_tensor_backend(sched.get(), t_h_nextn);
                 GGML_ASSERT(backend_h != nullptr);
 
@@ -3834,6 +3951,18 @@ void llama_set_embeddings_layer_inp(llama_context * ctx, uint32_t lid, bool valu
 
 void llama_set_nextn_layer_offset(llama_context * ctx, int32_t offset) {
     ctx->set_nextn_layer_offset(offset);
+}
+
+void llama_set_packed_fetch(llama_context * ctx, bool value) {
+    ctx->set_packed_fetch(value);
+}
+
+bool llama_fetch_nextn_outputs(llama_context * ctx, int32_t idx, const float ** out_logits, const float ** out_h) {
+    return ctx->fetch_nextn_outputs(idx, out_logits, out_h);
+}
+
+void llama_wait_outputs(llama_context * ctx) {
+    ctx->wait_outputs();
 }
 
 llama_memory_t llama_get_memory(const struct llama_context * ctx) {

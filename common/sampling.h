@@ -74,6 +74,19 @@ llama_token common_sampler_sample(struct common_sampler * gsmpl, struct llama_co
 // the caller must still call common_sampler_accept with the chosen token.
 llama_token_data_array * common_sampler_sample_topk(struct common_sampler * gsmpl, struct llama_context * ctx, int idx, int k);
 
+// packed draft-step variants of the two entries above (LLAMA_DRAFT_PACKED_GET):
+// identical selection and chain application, but the logits come from an
+// explicit host row (handed out by llama_fetch_nextn_outputs) instead of the
+// context's logits buffer. no synchronization - the caller fetched the row and
+// owns the drain. the caller must exclude backend sampling (no sampled token
+// can exist when the row was fetched raw); nullptr means the caller should
+// use the regular context-based path. common_sampler_sample_row keeps the
+// full-vocab candidate build (candidate arrays identical to the regular path);
+// common_sampler_sample_topk_row heap-selects the top-k like
+// common_sampler_sample_topk.
+llama_token_data_array * common_sampler_sample_row(struct common_sampler * gsmpl, const float * logits_row, int n_vocab);
+llama_token_data_array * common_sampler_sample_topk_row(struct common_sampler * gsmpl, const float * logits_row, int n_vocab, int k);
+
 // generalized version of common_sampler_sample
 //
 // will cross-reference the sampled tokens with a batch of draft tokens and accept those that match

@@ -100,6 +100,20 @@ LLAMA_API void llama_set_embeddings_nextn(struct llama_context * ctx, bool value
 // chain multiple trained NextN heads. Default 0 (first head).
 LLAMA_API void llama_set_nextn_layer_offset(struct llama_context * ctx, int32_t offset);
 
+// Packed draft-step output fetch (LLAMA_DRAFT_PACKED_GET): decode() skips the
+// raw-logits and h_nextn extraction and the draft loop fetches both rows with
+// one call instead. The copies and destinations are identical to the skipped
+// extraction, so the bytes are the same by construction. The fetch does not
+// synchronize; the caller drains (llama_wait_outputs or llama_synchronize)
+// before reading the rows.
+LLAMA_API void llama_set_packed_fetch(struct llama_context * ctx, bool value);
+LLAMA_API bool llama_fetch_nextn_outputs(struct llama_context * ctx, int32_t idx,
+        const float ** out_logits, const float ** out_h);
+
+// Light drain (LLAMA_DRAFT_LIGHT_SYNC): synchronize only the backends that own
+// the fetched output tensors. Requires the packed fetch above.
+LLAMA_API void llama_wait_outputs(struct llama_context * ctx);
+
 // mirrors:
 // LLAMA_API float * llama_get_embeddings(struct llama_context * ctx);
 LLAMA_API float * llama_get_embeddings_nextn(struct llama_context * ctx);

@@ -1705,3 +1705,56 @@ to Gemini's guard battery, die 3 is the dev cell.
   (Priority Zero refund test; clean reference now 15.10/15.23).
   Environment: post-reboot clean state; stock clocks; OD/cap
   experiments closed.
+- E-072 2026-09-22 DRAIN-ATTACK DESK COMPLETE (wt-mtp-drain on
+  amd/mtp-drain, zero-GPU: audit, implementation, host tests, compile).
+  SYNCHRONIZE AUDIT: one draft step executes 5-6 full scheduler sweeps
+  (the sample drain + backend-token guard + the 3 set_logits sampled-getter
+  probes + the h-row getter - every C-API output getter synchronizes), and
+  only the sample drain is a real dependency: the logits row is spliced from
+  3 dies, so waiting all 3 die streams is irreducible. EXTRACT AUDIT: the
+  "517 KB spliced get" is already 3 linear async DMAs into pinned host
+  memory at final offsets - the full row is never on one die, so "one
+  contiguous transfer" is physically 3 and the splice was already single-
+  copy; the real per-step fat is the redundant syncs, not the DMA. Offset
+  note: the meta AXIS splice's get_2d degrades to a linear copy per shard at
+  n_copies = 1 (the per-draft-step case). IMPLEMENTED (env-gated, unset =
+  byte-identical): (1) LLAMA_DRAFT_PACKED_GET=1 - decode() skips its logits +
+  h_nextn extraction for the draft ctx; one llama_fetch_nextn_outputs call
+  per step (staged API, src/llama-ext.h) issues the same two meta gets and
+  hands the raw row pointers to new no-sync sampler entries
+  (common_sampler_sample_row / common_sampler_sample_topk_row, common/
+  sampling.{h,cpp}); PACKED alone keeps the full-vocab candidate build
+  (arrays byte-identical to baseline), with FAST_TOPK it keeps the
+  heap-select; (2) LLAMA_DRAFT_LIGHT_SYNC=1 - llama_wait_outputs drains only
+  the output-owning backends; per-step blocking syncs drop 5-6 -> 1 (draft
+  ctx perf counters stop closing in this mode, documented). Guards: packed
+  path auto-off with backend sampling attached or shared draft ctx (WARN);
+  fetch failure stops the draft round rather than read stale rows. HOST
+  TESTS ALL PASS (docs/amd-port/tests/test_packed_get_host.cpp: meta splice
+  mirror byte-exact on uneven 3-way shards at the real 129272 vocab x 1-4
+  output rows plus 2/4/5-way stress, row-pointer resolution, mirrored h-row
+  get, sample_row parity BIT-EXACT vs the regular path across 64/1k/32k/
+  129272 vocabs, tie-order caveat re-measured 2/200 at 129272; ASAN/UBSAN
+  clean); test_mtp_sampling_host and test_w6_mtp_device_host re-run ALL
+  PASS. Compile-clean gfx900 (cmake -DGGML_HIP=ON -DAMDGPU_TARGETS=gfx900:
+  libllama, common, llama-cli all built, zero warnings). DRAIN BUDGET
+  (results/DRAIN_BUDGET_2026-09-22.md): per draft step = 9 main subgraph
+  replays (nextn block cut at its 2 PARTIAL nodes into 3 meta subgraphs x 3
+  dies) + 2 allreduce boundaries x (4 inter-die host-staged peer copies + 3
+  ADD replays; n=3 butterfly fallback) + 4 output DMAs + 1 true drain + 4-5
+  idle sweeps + 4-6 blocking H2D input sets; real device work ~0.2-0.5
+  ms/die at 200k. VERDICT: (a)+(b) delete ~0.1-0.5 ms/step of host slice -
+  the 21.4-24.8 t/s class is NOT reachable by host call-site changes; it
+  requires the device-side serial chain attacked (on-device sampling
+  subsystem, launch/replay latency on the 15 device issues, AR transport).
+  STEP-BATCHED DESIGN: two draft steps per replay is blocked by the
+  id(N)->eh_proj dependency unless the top-2 candidates are branched
+  speculatively with branched draft KV (2x slots + commit-on-choice) -
+  verdict NOT clean, do not implement; doc lists the follow-up options
+  (async input sets, splice-plan cache, HIP-graph replay health check).
+  SERVED ARMS for the measurement desk: LLAMA_DRAFT_PACKED_GET=1 alone
+  (greedy outputs byte-identical, accept 0.66667 gate; expect sample+batch
+  -0.1..-0.5 ms/step in SPEC_TIMELINE, t/s ~0-+2%), then +LLAMA_DRAFT_
+  LIGHT_SYNC=1 (same outputs; exactly 1 wait/step), each with and without
+  LLAMA_DRAFT_FAST_TOPK=1 for the full 2x2 - all four arms should read
+  accept 0.66667/3.00; any accept move is a bug, not noise.
