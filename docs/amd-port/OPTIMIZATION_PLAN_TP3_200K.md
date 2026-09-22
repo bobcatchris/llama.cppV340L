@@ -721,3 +721,12 @@ to Gemini's guard battery, die 3 is the dev cell.
   TP2 decode. Full three-way table + receipt:
   results/TP2_feasibility_2026-09-21.md. W6 follow-up named: draft-context
   buffer placement must prefer the extra device for full isolation.
+- E-033 2026-09-21 Two more desks dispatched (keep-3-agents directive):
+  wt-draft-isolation on amd/draft-isolation (FULL draft isolation: draft
+  ctx backends must lead with the dedicated device, shared output/embd
+  duplicated there ~0.9 GiB budget, zero draft allocations on meta group;
+  zero-GPU impl + host tests, die-3 windows negotiated) and
+  wt-loader-dequant on amd/loader-dequant (load-time f16 weight residency
+  to delete the retained per-call dequant; die-3 bench vs 6.10/4.79
+  references). Die-3 primary user: served-validation desk (boots are on
+  0-2; die 3 free between its censuses).
