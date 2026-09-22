@@ -758,3 +758,39 @@ to Gemini's guard battery, die 3 is the dev cell.
   warnings. NOT RUN: served A/B queued for a negotiated die-3 window
   (protocol in the receipt; smoke = boot-log dup/audit lines with 0.00 MiB
   residue, rocm-smi banked against the analytic numbers).
+- E-038 2026-09-22 W6-isolation desk: E-037 route-back ROOT-CAUSED - the
+  TP2@10k decode-cell failure ("Context size has been exceeded. off = 69",
+  28 KV retries, HTTP 500) is NOT a defect of the E-035 isolation build and
+  the dual-cache cell-accounting-aliasing hypothesis is REFUTED. Forensics
+  on tp2feas_t2flag10k4_20260921_213414_server.log: the failing run served
+  FIVE completion requests; the battery posts exactly two (serial,
+  guard_battery sha identical to the v1 run) - tasks 20 (3122 tok), 35
+  (7857 tok) and 46 (32 tok) were FOREIGN clients (TP3 A/B lane harness
+  landing on whichever server held the contested port 8080, per E-037's own
+  collision story). Two concurrent 7857-token prompts on one 10240-cell
+  unified cache (n_parallel auto=4, kv_unified=true) demand 15714 cells;
+  the log closes to the exact cell: task 14 placed 6075 + 512 in-flight =
+  6587, task 35 placed 3584 + 64 + 4 + 1 trickle = 3653, total 10240 = zero
+  free (even nb=1 then fails); the retry storms sit at batch offsets 0/64/
+  68/69 (batch offsets, not cell offsets) and the "28 retries" is the
+  counted retry-line total. No aliasing exists in code: create_memory for
+  mtp_on_hybrid_qwen35 builds a plain llama_kv_cache with mem_other =
+  nullptr (the only mem_other consumer is the GEMMA4_ASSISTANT iswa path);
+  the duplicated token_embd/output are weight buffers and never enter cell
+  arithmetic. Same build, serial load (10k3, killed externally at t+120s):
+  ZERO retries through cached 5120 of the identical request. v1's "zero
+  retries" comparison was clean-serial vs contested-port - not the same
+  geometry. The decode cell was never cleanly measured on the iso build;
+  v1's 14.43 t/s / 0.66667 stands until a clean window. RESIDUAL
+  build-independent exposures surfaced (flagged, out of desk scope): per-
+  slot n_ctx admission ignores global unified occupancy; slot fill order
+  starves an older mid-prompt request for a newer one. HARDENING shipped:
+  server now logs "MTP draft cache: independent cells (not shared with the
+  target)" at boot on --spec-mtp-device; host suite extended with the
+  cache-independence rule table + incident capacity arithmetic as
+  regression documentation (ALL PASS, predecessor suites ALL PASS,
+  llama-server gfx900 rebuild zero warnings). Receipt:
+  results/W6_isolation_defect_2026-09-22.md. REQUEST to the coordinator:
+  re-verify the TP2@10k decode cell on the iso build under CLIENT
+  exclusivity (distinct port, e.g. 8081, or hub-GO quiescence of the TP3
+  lane harness) - serial battery; expected zero retries, accept ~0.66667.

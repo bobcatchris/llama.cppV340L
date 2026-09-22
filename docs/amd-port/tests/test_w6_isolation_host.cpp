@@ -27,6 +27,7 @@
 //   g++ -std=c++17 -Wall -Wextra -o /tmp/test_w6_isolation_host
 //       docs/amd-port/tests/test_w6_isolation_host.cpp && /tmp/test_w6_isolation_host
 
+#include <cstdint>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -132,6 +133,35 @@ static audit_result isolation_audit(const void * dev_extra, const std::vector<co
     }
     return r;
 }
+
+// ---- mirror 6: draft-cache independence (defect E-038 route-back) ------->
+
+// mirror: llama-model.cpp create_memory - which context/memory combinations
+// pass mem_other into the cache (the ONLY cell-aliasing path). qwen35 MTP is
+// NOT one of them: the draft cache is a separate cells object.
+enum cache_case { T_QWEN35_MTP, T_QWEN35_TARGET, T_GEMMA4_ASSISTANT };
+
+static bool shares_cells_with_target(cache_case c) {
+    switch (c) {
+        case T_GEMMA4_ASSISTANT: return true;  // llama_kv_cache_iswa(mem_other)
+        case T_QWEN35_MTP:       return false; // plain llama_kv_cache, no mem_other
+        case T_QWEN35_TARGET:    return false; // llama_memory_hybrid, no mem_other
+    }
+    return false;
+}
+
+// ---- mirror 7: unified-cache capacity (defect E-038 incident) ----------->
+
+// mirror of the TP2@10k incident arithmetic: kv_unified=true gives ALL slots
+// one shared 10240-cell array; two concurrent 7857-token prompts overcommit it
+// regardless of build. The server's n_ctx admission check is per-slot.
+struct unified_cache {
+    uint32_t size;
+    uint32_t used = 0;
+
+    bool can_place(uint32_t n) const { return size - used >= n; }
+    void place(uint32_t n) { used += n; }
+};
 
 int main() {
     // ---- 1: dup rule ----
@@ -241,6 +271,39 @@ int main() {
         const auto warn_only = isolation_audit(d3, devs, spill_bufs, false);
         CHECK(warn_only.size_rest == 5 * mib);
         CHECK(!warn_only.strict_trip); // default: WARN only
+    }
+
+    // ---- 6: draft-cache independence (E-038 route-back) ----
+    // the TP2@10k "Context size has been exceeded. off = 69" incident suspected
+    // draft-cache cell aliasing into the target's unified cache; the draft
+    // cache is independent by construction and the incident was unified-cache
+    // capacity overcommit from concurrent foreign requests
+    CHECK(!shares_cells_with_target(T_QWEN35_MTP));
+    CHECK(!shares_cells_with_target(T_QWEN35_TARGET));
+    CHECK(shares_cells_with_target(T_GEMMA4_ASSISTANT)); // the ONLY sharing path
+
+    // incident arithmetic of record: 10240-cell unified cache, two concurrent
+    // 7857-token prompts (battery request + foreign client on the shared port)
+    {
+        unified_cache kv{10240};
+        kv.place(6075);                 // request A, starved mid-prompt
+        CHECK(kv.can_place(3584));      // request B chunks 1..7 placed
+        kv.place(3584);
+        CHECK(kv.used == 9659);
+        // request B's next 512-token chunk fails because request A's in-flight
+        // [6075, 6587) chunk holds the last 512 cells: 69 free remain
+        kv.place(512);                  // request A in-flight chunk
+        CHECK(kv.used == 10171);
+        CHECK(!kv.can_place(512));
+        // request B trickles 64 + 4 + 1 tokens (batch offsets 0 -> 64 -> 68
+        // -> 69, then "Context size has been exceeded. off = 69" at nb=1)
+        kv.place(64);
+        kv.place(4);
+        kv.place(1);
+        CHECK(!kv.can_place(1));
+        CHECK(kv.used == 6587u + 3653u); // exactly 10240 - zero free
+        // demand vs supply: two 7857-token prompts need 15714 cells
+        CHECK(2u * 7857u > 10240u);
     }
 
     if (n_fail == 0) {
