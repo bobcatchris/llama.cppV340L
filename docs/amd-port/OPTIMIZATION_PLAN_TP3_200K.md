@@ -1961,3 +1961,19 @@ to Gemini's guard battery, die 3 is the dev cell.
   validation (probe_kv_admission.py at 10k class). With the cooling
   headroom, +0.5-3% class deltas are finally resolvable in a single
   window instead of being eaten by soak.
+- E-082 2026-09-22 COORDINATOR LOCK VIOLATION (own-goal, full
+  transparency per campaign law). While running Chris's direct TP2
+  10k flag request (TP2/10k/v1-flag decode guard = 14.41 t/s, PASS,
+  receipts /home/chris/tp2flag_dummy.jsonl - reproduces the
+  historical 14.43 on the merged tree) the coordinator's launch
+  command (a) killed ALL llama-server processes and (b) removed and
+  replaced /tmp/campaign_gpu_boot.lock - killing the combined
+  validation desk's freshly-booted ref0 server one second after
+  start and destroying its held lock. This is the exact incident
+  class E-039/#1355 banned, committed by the coordinator. REMEDIATION
+  executed immediately: TP2 server torn down, lock removed, dies
+  drained and returned to the desk, desk notified (void ref0,
+  re-run first, rest of ladder clean). LAW AMENDMENT: coordinator
+  direct-request boots MUST go through the same gate as desks -
+  check-and-hold the lock, targeted kill by PID only (never a global
+  llama-server sweep), and if a lock is held, the request WAITS.
