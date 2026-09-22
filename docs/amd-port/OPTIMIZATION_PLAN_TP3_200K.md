@@ -1348,3 +1348,21 @@ to Gemini's guard battery, die 3 is the dev cell.
   sudo; watcher log /home/chris/tp3_temp_sweep_watcher.log (exact-name
   LOG LAW applies). Receipt lands at docs/amd-port/results/
   voltage_sweep_<ts>.log.
+- E-059 2026-09-22 TEMP PROGRAM REVISION (Chris: "the priority after
+  their tp3 run is get temps under control through a bunch of short
+  experiments, 10k runs and mtp overhead in parallel"). Sweep script
+  rewritten to be ALL-SHORT/10K: single server boot for the whole
+  sweep (lane 8081, 10k, in-split MTP, wt-tp2-mtp binary); phase 0
+  stock reference cell (perf auto, no pin) for the thermal + t/s
+  reference; phase 1 pin 1200 MHz @ 1125 mV reference cell; phase 2
+  steps 1100..850 with the gate kit (mclk 945 untouched, decode
+  t/s >= 97% of pinned baseline, accept >= 0.63 when canary reports,
+  junction < 95 C, instant stock revert); phase 3 winner on all four
+  dies + FULL guard battery at 10k; EXIT trap restores stock. The
+  200k confirmation phase is dropped - 200k re-stamps happen only
+  after temps are controlled. Junction sampled every 2 s during each
+  cell (voltage_sweep_<ts>_temps.log) so every step reports its own
+  max temp. MTP-overhead desk continues in parallel (zero-GPU), as
+  ordered. Ladder t3flag2 was the last 200k boot (started 07:29:44);
+  watcher fires the sweep on its next 150 s tick after teardown + die
+  drain.
