@@ -64,6 +64,16 @@ struct llama_sampler * common_sampler_get(const struct common_sampler * gsmpl);
 //
 llama_token common_sampler_sample(struct common_sampler * gsmpl, struct llama_context * ctx, int idx, bool grammar_first = false);
 
+// fast candidate selection for the draft sampling path: heap-select the top-k
+// logits directly from the row (no full-vocab candidate array) and apply the
+// sampler chain on just those k candidates. the result matches
+// common_sampler_sample + common_sampler_get_candidates for chains that only
+// reduce with a top-k head (e.g. the draft top-k(10) + dist chain); requires
+// no grammar, reasoning budget or backend sampling. returns nullptr when the
+// chain is not eligible, in which case the caller should use the regular path.
+// the caller must still call common_sampler_accept with the chosen token.
+llama_token_data_array * common_sampler_sample_topk(struct common_sampler * gsmpl, struct llama_context * ctx, int idx, int k);
+
 // generalized version of common_sampler_sample
 //
 // will cross-reference the sampled tokens with a batch of draft tokens and accept those that match

@@ -740,7 +740,15 @@ void llama_context::synchronize() {
         return;
     }
 
+    static const bool tl_on = getenv("LLAMA_DECODE_TIMELINE") != nullptr;
+
+    const int64_t t_sync_start = tl_on ? ggml_time_us() : 0;
+
     ggml_backend_sched_synchronize(sched.get());
+
+    if (tl_on) {
+        LLAMA_LOG_INFO("[decode-timeline] drain = %.3f ms\n", (ggml_time_us() - t_sync_start)/1e3);
+    }
 
     // FIXME: if multiple single tokens are evaluated without a synchronization,
     // the stats will be added to the prompt evaluation stats
@@ -1247,16 +1255,29 @@ bool llama_context::set_sampler(llama_seq_id seq_id, llama_sampler * sampler) {
     LLAMA_LOG_DEBUG("%s: seq_id = %d, sampler = %p\n", __func__, (int) seq_id, (void *) sampler);
 
     if (sampler && model.split_mode() == LLAMA_SPLIT_MODE_TENSOR) {
-        static bool warned = false;
-        if (!warned) {
-            LLAMA_LOG_WARN("%s: backend sampling not supported with SPLIT_MODE_TENSOR; using CPU\n", __func__);
-            warned = true;
+        // experimental escape hatch: under SPLIT_MODE_TENSOR the output head is
+        // vocab-sharded across devices and the meta split machinery does not
+        // model sampler ops on that layout, so graph scheduling aborts. kept
+        // behind an env gate so the served rig can measure the real behavior.
+        static const bool tp_backend_sampling = getenv("LLAMA_TP_BACKEND_SAMPLING") != nullptr;
+        if (!tp_backend_sampling) {
+            static bool warned = false;
+            if (!warned) {
+                LLAMA_LOG_WARN("%s: backend sampling not supported with SPLIT_MODE_TENSOR; using CPU\n", __func__);
+                warned = true;
+            }
+            if (sampling.samplers.count(seq_id) > 0) {
+                sched_need_reserve = true;
+            }
+            sampling.samplers.erase(seq_id);
+            return false;
         }
-        if (sampling.samplers.count(seq_id) > 0) {
-            sched_need_reserve = true;
+        static bool warned_exp = false;
+        if (!warned_exp) {
+            LLAMA_LOG_WARN("%s: experimental backend sampling under SPLIT_MODE_TENSOR enabled via LLAMA_TP_BACKEND_SAMPLING\n", __func__);
+            LLAMA_LOG_WARN("%s: sampler ops on vocab-sharded logits are not modeled by the meta split machinery; aborts are likely\n", __func__);
+            warned_exp = true;
         }
-        sampling.samplers.erase(seq_id);
-        return false;
     }
 
     const bool can_offload =
@@ -1356,6 +1377,13 @@ bool llama_context::set_adapter_cvec(
 }
 
 llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, llm_graph_type gtype, llama_memory_context_i * mctx, ggml_status & ret) {
+    static const bool tl_on = getenv("LLAMA_DECODE_TIMELINE") != nullptr;
+
+    int64_t t_set_inputs_us = 0;
+    int64_t t_issue_us      = 0;
+    int64_t t_build_us      = 0;
+    bool    graph_reused    = false;
+
     if (mctx && !mctx->apply()) {
         LLAMA_LOG_ERROR("%s: failed to apply memory context\n", __func__);
         ret = GGML_STATUS_FAILED;
@@ -1371,6 +1399,8 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
 
     if (!graph_reuse_disable && res->can_reuse(gparams)) {
         //LLAMA_LOG_DEBUG("%s: reusing previous graph\n", __func__);
+
+        graph_reused = true;
 
         // with pipeline parallelism, the previous graph_compute_async may still be running
         // on the GPU. we must synchronize before set_inputs to avoid overwriting input tensors
@@ -1388,7 +1418,13 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
 
         //const auto t_start_us = ggml_time_us();
 
+        const int64_t t_build_start = tl_on ? ggml_time_us() : 0;
+
         gf = model.build_graph(gparams);
+
+        if (tl_on) {
+            t_build_us = ggml_time_us() - t_build_start;
+        }
 
         //LLAMA_LOG_INFO("graph build time: %.3f ms\n", (ggml_time_us() - t_start_us)/1000.0);
 
@@ -1410,16 +1446,31 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
         //const auto t_start_us = ggml_time_us();
 
         // FIXME this call causes a crash if any model inputs were not used in the graph and were therefore not allocated
+        const int64_t t_inputs_start = tl_on ? ggml_time_us() : 0;
+
         res->set_inputs(&ubatch);
+
+        if (tl_on) {
+            t_set_inputs_us = ggml_time_us() - t_inputs_start;
+        }
 
         //LLAMA_LOG_INFO("graph set inputs time: %.3f ms\n", (ggml_time_us() - t_start_us)/1000.0);
     }
+
+    const int64_t t_issue_start = tl_on ? ggml_time_us() : 0;
 
     const auto status = graph_compute(res->get_gf(), ubatch.n_tokens > 1);
     if (status != GGML_STATUS_SUCCESS) {
         LLAMA_LOG_ERROR("%s: failed to compute graph, compute status: %d\n", __func__, status);
         ret = status;
         return nullptr;
+    }
+
+    if (tl_on) {
+        t_issue_us = ggml_time_us() - t_issue_start;
+
+        LLAMA_LOG_INFO("[decode-timeline] n_tokens = %d, reused = %d, build = %.3f ms, inputs = %.3f ms, issue = %.3f ms\n",
+                ubatch.n_tokens, (int) graph_reused, t_build_us/1e3, t_set_inputs_us/1e3, t_issue_us/1e3);
     }
 
     ret = GGML_STATUS_SUCCESS;
@@ -1940,6 +1991,9 @@ int llama_context::decode(const llama_batch & batch_inp) {
             t_embd = res->get_embd_pooled();
         }
 
+        static const bool tl_on = getenv("LLAMA_DECODE_TIMELINE") != nullptr;
+        const int64_t t_outputs_start = tl_on ? ggml_time_us() : 0;
+
         // extract logits
         if (logits.data && t_logits && n_outputs > 0 && needs_raw_logits(ubatch, sampling.samplers)) {
             ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(sched.get(), t_logits);
@@ -2047,6 +2101,12 @@ int llama_context::decode(const llama_batch & batch_inp) {
             copy_tensor_async_floats    (res->t_sampled_logits, sampling.logits,     stride, sampling.logits_count,     seq_to_output_row, sched.get());
             copy_tensor_async_floats    (res->t_sampled_probs,  sampling.probs,      stride, sampling.probs_count,      seq_to_output_row, sched.get());
             copy_tensor_async_candidates(res->t_candidates,     sampling.candidates, stride, sampling.candidates_count, seq_to_output_row, sched.get());
+        }
+
+        if (tl_on) {
+            LLAMA_LOG_INFO("[decode-timeline] outputs = %.3f ms (n_outputs = %d, backend sampled = %d)\n",
+                    (ggml_time_us() - t_outputs_start)/1e3, n_outputs,
+                    (int) (!res->t_sampled.empty() || !res->t_sampled_probs.empty() || !res->t_sampled_logits.empty()));
         }
 
         n_outputs_prev += n_outputs;
