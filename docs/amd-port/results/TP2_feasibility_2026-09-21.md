@@ -327,3 +327,28 @@ die at 1x bandwidth and two host-staged hops per draft step replace the
 117.4-118.5 in-split).
 
 ## TP3 200k arms (B in-split / C draft-die, 2 reps) - appended below when complete
+
+## Result 8 - TP3 200k: B in-split vs C draft-die, 2 reps (2026-09-22)
+
+A@200k stands closed (Result 1 / E-028/E-031: MTP-OFF alone is >=839 MiB/die
+short at boot). C audit gate captured at 200k with a VERBOSE boot:
+"sched_reserve: ROCm3 isolation audit: 263.52 MiB on ROCm3, 0.00 MiB on the
+model split" + the 335.3/517.8 duplication lines.
+
+| arm | boot-ready used (free) c0,c1,c2 | post-probe used | die 3 | pp 2k | decode ~7.9k | accept / mean |
+|-----|---------------------------------|-----------------|-------|-------|--------------|---------------|
+| B in-split r1,r2 | 7809.8 (366.2), 7582.0 (594.0), 7634.2 (541.8) | end-of-session not banked; decode-cell envelope sampled | - | 113.69 / 113.43 | 14.73 / 14.67 | 0.66667 / 3.00 |
+| C draft-die r1,r2 | 7070.8 (1105.2), 7048.9 (1127.2), 7101.0 (1075.0) | 7673.9/7606.1/7662.1 (decode-cell envelope) | 2288.8/2288.9 boot (5887 free); 3168.9 post-probe (5887->5087... see artifacts) | 117.61 / 117.88 | 7.58 / 7.58 | 0.66667 / 3.00 |
+
+SAVED per serving die at 200k boot-ready (C-vs-B): +739/+533/+533 MiB
+(mean ~602/die freed from the serving dies by the draft-die move). Decode
+penalty at 200k: -48.5% (7.58 vs 14.73/14.67) - the same collapse as 10k,
+full battery 5-cell quality guards PASS in every arm (canary 0.66667,
+determinism byte-identical, needle 3/3).
+
+TP3 200k VERDICT: the flag arm boots healthy at 200k with ~533-739 MiB/die
+more serving-die headroom than the config of record and identical acceptance
+- but at half the decode throughput. As a promotion candidate for the TP3
+200k serving lane: NO on decode-sensitive workloads; the config of record
+(14.7 t/s) stands. The headroom reading matters only if a future lane needs
+the serving-die margin (e.g. longer contexts or larger ubatch experiments).
