@@ -1917,3 +1917,22 @@ to Gemini's guard battery, die 3 is the dev cell.
   identical, ~22 fewer drain lines/round, G3 -0.3..-0.6 ms, +0.2..+0.5%);
   R3 +GGML_PINNED_DEV_COPY (sha identical, verify med -2..-6 ms,
   +1..+3% class); R4 = R2+R3 additive (-3..-7 ms/round).
+- E-079 2026-09-22 SERVING DEFAULT = IN-SPLIT (Chris: "we will mainly
+  serve split for now but should be able to turn it on via a flag").
+  launch_tp3_200k.sh reverted to in-split; v1 documented as the flag
+  path (--spec-mtp-device ROCm3 + HIP 0,1,2,3). v1's warm full-battery
+  cell (disc3) lands for the record but no longer gates anything.
+  MEASUREMENT PAUSE: no more repeated A/B batteries - the remaining
+  die windows are for NEW optimization validation only. OPTIMIZATION
+  OFFENSIVE DISPATCHED (Chris: "work on some optimizations instead of
+  running the same crap over and over"): (1) MMVQ KERNEL DESK
+  (wt-mmvq-kernel on amd/mmvq-kernel): the 77%-of-decode-time kernel,
+  gfx900 iq3_s vecdot - LUT residency, dot2-instruction probe, tiling,
+  q8_1 layout; ninfer-kernel-opt protocol, oracle bit-exact gate,
+  bench harness exists; single-die short benches on card4 only.
+  (2) VERIFY-TRANSPORT DESK (wt-verify-transport on
+  amd/verify-transport): event-ordered async pinned-ring staging for
+  the 40 boundary copies/round (est -2..-6 ms/round), copy-engine
+  overlap with a dependency diagram, RCCL feasibility spike (gfx900
+  x4 no-P2P; fp-sum-order acceptance experiment designed, not run).
+  (3) disc3 (v1 warm battery) result = record only.
