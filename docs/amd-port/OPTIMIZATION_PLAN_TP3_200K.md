@@ -2151,3 +2151,26 @@ to Gemini's guard battery, die 3 is the dev cell.
   Fix direction: credit prompt-cache prefix reuse in n_need (admit when
   incremental need fits) or evict cached KV after N defers. --control mode
   left for a later window per brief (would hit the same starvation).
+- E-089 2026-09-22 COMBO VERDICT + TWO FIX DESKS DISPATCHED. Combined
+  window verdict (E-086..E-088): every merged fix byte-exact
+  (sha 4beb1ba25219ee9b across 9 boots), engagement proven, but ALL
+  arms inside the ref band (14.79-14.93) - the hygiene stack is
+  defaults-safe and kept, none is the t/s lever; the round stays
+  192-194 ms device-owned. TWO defects found by the window, both
+  dispatched: (1) T3 COPY-BACK DECODE FIX DESK (wt-t3-graph,
+  amd/t3-graph, synced to HEAD): groups FORM (18 formation lines,
+  12 copy-back admissions, prefill grouped launches fine) but the
+  first DECODE graph aborts with hipMemcpyAsync invalid argument at
+  ggml-cuda.cu:5108 right after "group formed at Vcur-3 ... member
+  Kcur-3 (copy-back)" - graph-capture legality of the copy-back D2D
+  is the diagnosed class (unstable temp address / capture-stream
+  mismatch); fix must keep solo timing + bit-exact + capture safety;
+  served validation boot at the end under the lock. (2) ADMISSION
+  STARVATION FIX DESK (wt-server-fixes, amd/server-fixes): the probe
+  caught OUR E-054 fix starving the deferred request - after A
+  completes, its 7872-cell cache is retained and B's FULL need (7862)
+  is counted with no credit for the ~7857 already-cached prefix
+  cells; fix = credit incremental cells (need minus cached prefix) on
+  both admission paths + purge idle slots before denying a deferred
+  task; probe re-run in both modes as validation. (3) RCCL transport
+  and MMVQ kernel desks continue (the +15-25% and unknown-big levers).
