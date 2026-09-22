@@ -873,3 +873,21 @@ to Gemini's guard battery, die 3 is the dev cell.
   target unified cells occupied). Iso decode/accept numbers NOT bankable at
   10k until fixed; v1 flag numbers (14.43 t/s, 0.66667) remain the arm
   reference. Prefill 88.91 t/s PASS under the lock (88.74 first run).
+- E-038 2026-09-22 TP2 desk: FOUR-ARM definitive table complete, zero VOIDs
+  (receipt Result 5/6; commits e5169d35d + successor). Arm C decode FILLED on
+  the isolation build: 7.42/7.41 t/s (reproduced, zero KV-retries, accept
+  0.66667/3.00) = -48.5% vs the v1-flag build's 14.43/14.43 on identical
+  flags/config. Savings ladder per serving die (post-probe): in-split MTP
+  costs ~961 MiB/die over MTP-OFF; v1-flag costs ~790; full isolation costs
+  ~786 - i.e. full isolation saves only ~4.5 MiB/die vs the v1 flag (169 vs
+  in-split) while DOUBLING the per-token draft cost: the audit's 0.00
+  meta-side residual is bought by running the draft's embedding+LM-head on
+  the 1x-bandwidth draft die. VERDICT: E-035 full isolation is not a
+  promotion candidate for latency-sensitive TP2 serving; the v1 flag (partial
+  relocation, head stays on meta) is the operating point, and full isolation
+  only matters if serving-die VRAM is the binding constraint. Acceptance
+  0.66667/3.00 in every arm. TP2@200k remains closed (E-028/E-031).
+  TP3 ladder paused mid-10k (off1/on1/flag1/off2 banked: pp 122.58/120.74 OFF,
+  117.39/84.64+81.67 in-split, 117.64 flag; decode 12.17-12.18 OFF, 15.38
+  in-split, 7.57 flag = the same isolation decode collapse on TP3) - on2
+  interrupted by priority correction, to resume after the TP2 bank.

@@ -245,3 +245,53 @@ tp2feas_t2flag10k{3,4}_20260921_* (battery jsonl committed; raw logs local).
 Incidents: four boots voided by a die-capacity collision with the TP3-threeway
 lane (05:52-05:55); lock-broke + die-idle guard + refined stale-lock rule
 adopted (hub #1354/#1355).
+
+## Result 6 - FOUR-ARM definitive table, C decode filled (2026-09-22)
+
+Arm C decode re-run on the isolation build (t2flag10k r5/r6, clean conditions,
+lock held, STRICT=1): decode 7.42 / 7.41 t/s - REPRODUCED, and the C5 server log
+has ZERO "failed to find free space" retries, so the slowdown is the real
+isolation decode path, not an allocation stall (rep4's intermittent
+"Context size has been exceeded" HTTP 500 is a separate occasional failure mode;
+1 of 3 completed attempts). Acceptance unaffected: 0.66667 / 3.00 everywhere.
+
+| arm | build | boot-ready used (free) c0,c1 | post-probe used (free) c0,c1 | pp 2k | decode ~7.9k | accept / mean |
+|-----|-------|------------------------------|------------------------------|-------|--------------|---------------|
+| A MTP-OFF     | v152 | 6526.8 (1649.2), 6526.4 (1649.6) | 7144.4-7165.3 (1010.7-1031.6) | 90.36 / 89.21 | 12.83 / 11.94 | - |
+| B in-split    | v152 | 7599.6 (576.4), 7599.1 (576.9)   | 8108.6-8112.4 (63.6-67.4)     | 84.64 / 81.67 | 12.80 / 13.59 | 0.66667 / 3.00 |
+| C v1-flag     | v138 | 7348.5 (827.5), 7347.9 (828.1)   | 7944.7-7945.3 (230.7/231.3)   | 87.61 / 87.68 | 14.43 / 14.43 | 0.66667 / 3.00 |
+| D full-isolation | v152 | 7344.3 (831.7), 7343.9 (832.1) | 7940.7-7941.0 (235.0/235.4)   | 88.74 / 88.91 / 88.50 | 7.42 / 7.41 | 0.66667 / 3.00 |
+
+Draft-die residency: C = 558.0 boot -> 1437.1 post; D = 1412.5 boot (853.12
+duplication, exact) -> 2291.4/2291.5 post. Audit gate: 0.00 on the model split
+(D only).
+
+SAVED per serving die (post-probe used-MiB; positive = freed):
+
+| comparison | saving |
+|------------|--------|
+| B-vs-A  (MTP cost, in-split)        | -961 (MTP costs ~961 MiB/die) |
+| C-vs-A  (v1-flag MTP cost)          | -790 |
+| D-vs-A  (isolated MTP cost)         | -786 |
+| C-vs-B  (v1-flag saving vs in-split)| +164 |
+| D-vs-B  (isolation saving vs in-split) | +169 |
+| D-vs-C  (full isolation vs v1-flag) | +4.5 (nothing) |
+
+PERFORMANCE COST of full isolation: decode -48.5% vs v1-flag (7.42/7.41 vs
+14.43/14.43), also -42% vs in-split. Acceptance identical everywhere. pp: D
+88.7 mean recovers to ~A-1% (the duplication does not hurt prefill).
+
+MECHANISM (honest reading): the audit's 0.00 MiB meta-side residual is achieved
+exactly by running the draft's embedding-row + LM-head matmul on the die-2
+copies at 1x bandwidth (plus 2 host-staged hops per draft step) - the same
+relocation that frees the meta group doubles the per-draft-step cost. The 0.00
+gate and the decode collapse are two faces of the same design choice.
+
+VERDICT (definitive, TP2@10k): v1-flag behavior is the sweet spot - within
+~4.5 MiB/die of full isolation's serving-die footprint at 2.0x its decode.
+Full isolation (E-035) is not worth promoting for latency-sensitive TP2
+serving; it is only rational when serving-die VRAM, not throughput, is the
+binding constraint (its B-vs-D saving is real but small: ~169 MiB/die over
+in-split, and in-split itself only leaves 63-67 MiB/die free at 10k).
+
+Artifacts: tp2feas_t2flag10k{5,6}_20260922_* (battery jsonl committed).

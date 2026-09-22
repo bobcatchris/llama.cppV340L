@@ -23,6 +23,7 @@ ARM_BASELINE="$HERE/baseline_tp2_200k.json"
 BIN="$REPO_ROOT/build-hip/bin/llama-server"
 MODEL="/media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf"
 PORT="${PORT:-8080}"
+VERBOSE="${VERBOSE:-}"  # non-empty adds --verbose back
 ARM=""
 REP=""
 IDLE_WAIT=60
@@ -136,28 +137,28 @@ case "$ARM" in
       --device ROCm0,ROCm1 \
       -ngl 999 -sm tensor -c 200000 -b 512 -ub 512 \
       -ctk q4_0 -ctv q4_0 -fa on \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
     ;;
   noflag)
     HIP_VISIBLE_DEVICES=0,1 "$BIN" -m "$MODEL" \
       --device ROCm0,ROCm1 \
       -ngl 999 -sm tensor -c 200000 -b 512 -ub 512 \
       -ctk q4_0 -ctv q4_0 -fa on --spec-type draft-mtp \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
     ;;
   t2off10k)
     HIP_VISIBLE_DEVICES=0,1 "$BIN" -m "$MODEL" \
       --device ROCm0,ROCm1 \
       -ngl 999 -sm tensor -c 10000 -b 512 -ub 512 \
       -ctk q4_0 -ctv q4_0 -fa on \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
     ;;
   t2noflag10k)
     HIP_VISIBLE_DEVICES=0,1 "$BIN" -m "$MODEL" \
       --device ROCm0,ROCm1 \
       -ngl 999 -sm tensor -c 10000 -b 512 -ub 512 \
       -ctk q4_0 -ctv q4_0 -fa on --spec-type draft-mtp \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
     ;;
   t2flag10k)
     HIP_VISIBLE_DEVICES=0,1,2 "$BIN" -m "$MODEL" \
@@ -165,7 +166,7 @@ case "$ARM" in
       -ngl 999 -sm tensor -c 10000 -b 512 -ub 512 \
       -ctk q4_0 -ctv q4_0 -fa on --spec-type draft-mtp \
       --spec-mtp-device ROCm2 \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
     ;;
   t2flag8k)
     HIP_VISIBLE_DEVICES=0,1,2 "$BIN" -m "$MODEL" \
@@ -173,7 +174,22 @@ case "$ARM" in
       -ngl 999 -sm tensor -c 200000 -b 512 -ub 512 \
       -ctk q4_0 -ctv q4_0 -fa on --spec-type draft-mtp \
       --spec-mtp-device ROCm2 \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
+    ;;
+  t3off | t3on | t3flag)
+    ARM_BASELINE="$HERE/baseline_tp3_200k.json"
+    T3CTX="${T3CTX:-200000}"
+    VISIBLE="0,1,2"
+    EXTRA=""
+    case "$ARM" in
+      t3on)    EXTRA="--spec-type draft-mtp" ;;
+      t3flag)  VISIBLE="0,1,2,3"; EXTRA="--spec-type draft-mtp --spec-mtp-device ROCm3" ;;
+    esac
+    HIP_VISIBLE_DEVICES=$VISIBLE "$BIN" -m "$MODEL" \
+      --device ROCm0,ROCm1,ROCm2 \
+      -ngl 999 -sm tensor -c $T3CTX -b 512 -ub 512 \
+      -ctk q4_0 -ctv q4_0 -fa on $EXTRA \
+      --port $PORT -t 8 ${VERBOSE:+--verbose} > "$SERVER_LOG" 2>&1 < /dev/null &
     ;;
   *) echo "ERROR: unknown arm '$ARM'"; exit 1 ;;
 esac
@@ -250,37 +266,13 @@ case "$ARM" in
     mark probe_prefill
     run_battery --idle-wait "$IDLE_WAIT"
     ;;
-  t3off | t3on | t3flag)
-    ARM_BASELINE="$HERE/baseline_tp3_200k.json"
-    T3CTX="${T3CTX:-200000}"
-    VISIBLE="0,1,2"
-    EXTRA=""
-    case "$ARM" in
-      t3on)    EXTRA="--spec-type draft-mtp" ;;
-      t3flag)  VISIBLE="0,1,2,3"; EXTRA="--spec-type draft-mtp --spec-mtp-device ROCm3" ;;
-    esac
-    HIP_VISIBLE_DEVICES=$VISIBLE "$BIN" -m "$MODEL" \
-      --device ROCm0,ROCm1,ROCm2 \
-      -ngl 999 -sm tensor -c $T3CTX -b 512 -ub 512 \
-      -ctk q4_0 -ctv q4_0 -fa on $EXTRA \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
-    ;;
-  t3flag)
-    ARM_BASELINE="$HERE/baseline_tp3_200k.json"
-    HIP_VISIBLE_DEVICES=0,1,2,3 "$BIN" -m "$MODEL" \
-      --device ROCm0,ROCm1,ROCm2 \
-      -ngl 999 -sm tensor -c 200000 -b 512 -ub 512 \
-      -ctk q4_0 -ctv q4_0 -fa on --spec-type draft-mtp \
-      --spec-mtp-device ROCm3 \
-      --port $PORT -t 8 --verbose > "$SERVER_LOG" 2>&1 < /dev/null &
-    ;;
   t2off10k)
     mark probe_prefill
     run_battery --idle-wait "$IDLE_WAIT" --prefill-only || true
     mark probe_decode
     run_battery --idle-wait 0 --decode-only || true
     ;;
-  t3on | t3flag)
+  t3off | t3on | t3flag)
     mark probe_prefill
     run_battery --idle-wait "$IDLE_WAIT" || true
     ;;
