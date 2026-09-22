@@ -2243,3 +2243,48 @@ to Gemini's guard battery, die 3 is the dev cell.
   clocks. At 10k, 20 t/s is at the doorstep. Remaining levers: MMVQ
   kernel desk (running), catch-up rollback (+0.8-1.6%, merged),
   T3 copy-back decode fix + admission starvation fix (desks running).
+- E-090 2026-09-22 ADMISSION STARVATION FIXED + SERVED-VALIDATED
+  (admission starvation fix desk, wt-server-fixes, amd/server-fixes
+  synced to HEAD 4ab107998, receipt AdmStarvFix_20260922_181538.md).
+  FIX (two parts, E-088's "credit the cached prefix" direction):
+  (1) kv_unified_cells_needed now credits the candidate slot's cached
+  common prefix regardless of cache_prompt - launching on the slot
+  keeps or drops that prefix, either way those cells are not
+  additional pressure (exact with cache_prompt, conservative without:
+  the slot drops the retained prefix before placing new cells, and
+  LCP <= cached cells keeps the fit inequality sound); applied on the
+  single admission path that serves BOTH initial admission and the
+  deferred re-admission, and mirrored in the in-flight n_pending
+  accounting. (2) PURGE BEFORE STARVE: after the existing idle-slot
+  purge pass, a last relief evicts the CANDIDATE slot's own cached
+  prompt (saved to the prompt cache first) before denying - only when
+  evicting actually flips the verdict (the full task then fits) - so
+  no purge pass can starve on a skip-param blind spot. E-054 guarantee
+  intact: in-flight n_pending reservation untouched, purges/evictions
+  only ever touch idle (non-generating) slots. HOST: sections 9-11
+  added to test_server_exposures_host.cpp at the exact served cells
+  (defect arithmetic verbatim, non-overlapping C must still defer
+  against an in-flight incumbent, eviction-only-when-it-flips); all
+  existing host suites green on the branch. SERVED (lane 8083, -c
+  10240 in-split, kv unified verified, probe both arms): FIX PASS -
+  1 defer line ("defer task 2 (n_need = 7857, n_used = 512,
+  n_pending = 7350)") while the incumbent prefills, then re-admitted
+  30 ms after release on LCP similarity 1.000 with the incremental
+  credit against the retained 7877-cell cache, both requests 200
+  (80.1 s / 160.8 s), zero exceeded, zero 500 - the E-088 starvation
+  (600 s timeout cancellation) is gone. With cache_prompt = false the
+  server re-prefills the full prompt after dropping the retained
+  prefix (conservative case, correct); with cache_prompt = true the
+  prefix reuse collapses the re-prefill to the incremental cells
+  (host-test level). CONTROL ARM (--no-kv-admission) CAPTURED, NEW
+  SIGNATURE: no textbook 500/exceeded class - the overcommit halves
+  n_batch to 2 on KV-full then ABORTS the server (GGML_ASSERT(task)
+  at server-context.cpp:365 + "speculative batch index 2 is not
+  inside the current sub-batch [0, 2)" via ggml_abort in decode);
+  A got 500, B got a dropped connection. On today's HEAD the
+  admission gate is the only thing between this geometry and a
+  server-killing abort - the legacy knob is not a safe escape hatch
+  for concurrent ~8k prompts (abort root-cause out of desk scope,
+  evidence verbatim in the receipt). Control rerun without draft-mtp
+  (textbook-signature hunt) left unrun: the t3-copyback desk holds
+  the lane (lock law).
