@@ -204,3 +204,44 @@ free_port; the third run (21:34) executed under the new
 /tmp/campaign_gpu_boot.lock convention (check-and-wait + hold + release on
 teardown) and completed cleanly into the defect above. Both collisions left
 the dies clean; no data loss beyond the decode cell.
+
+## Result 5 - DEFINITIVE three-way savings table on the isolation build (2026-09-22)
+
+Binary v152 (7d3ab351a, E-035/E-036 merged tree). TP2, -c 10000, b512/ub512,
+q4_0 KV, FA, 2 reps per arm, lock-honored boots. Serving dies = 0/1 (8176 MiB
+each); draft die = 2 in arm C.
+
+| arm | boot-ready used/free c0, c1 | post-probe used/free c0, c1 | pp 2k | decode ~7.9k | accept / mean |
+|-----|-----------------------------|-----------------------------|-------|--------------|---------------|
+| A MTP-OFF    r5,r6 | 6526.8/1649.2, 6526.4/1649.6 (both reps) | 7163.7/1012.3, 7165.3/1010.7; 7144.8/1031.2, 7144.4/1031.6 | 90.36 / 89.21 | 12.83 / 11.94 | - |
+| B in-split   r7,r8 | 7599.6/576.4, 7599.1/576.9 (both reps)   | 8112.4/63.6, 8112.1/63.9; 8108.9/67.1, 8108.6/67.4         | 84.64 / 81.67 | 12.80 / 13.59 | 0.66667 / 3.00 (both) |
+| C draft-die  r3,r4 | 7344.3/831.7, 7343.9/832.1 (both reps)   | 7930.2/245.8, 7929.8/246.2; 7936.5/239.5, 7936.1/239.9     | 88.74 / 88.91 | VOID (defect, Result 4) | VOID |
+
+Draft die residency (arm C): 1412.5 MiB at boot-ready -> 2290.8 / 2291.2 MiB
+post-probe (5885.2 free). Audit gate: 0.00 MiB on the model split, all C boots.
+
+SAVED per serving die (positive = freed; used-MiB deltas, rep-stable values):
+
+| comparison | boot-ready | post-probe |
+|------------|-----------|------------|
+| B-vs-A (true MTP cost, in-split) | -1072.8 (MTP COSTS 1072.8) | -955.9 (costs ~956) |
+| C-vs-A (MTP + isolation cost)    | -817.5 (costs 817.5)       | -778.6 (costs ~779) |
+| C-vs-B (isolation SAVING)        | +255.3                     | +177.3 |
+
+Reading (unchanged from Result 4, now 2-rep solid): boot-ready MTP cost is
+~1073 MiB/die in-split and ~818 with the flag - the flag/defect-free isolation
+saves 255 MiB/die statically, 177 MiB/die at request time; the serving-die
+envelope is target-compute dominated in every arm. Performance: decode B 12.80/
+13.59 vs A 12.83/11.94 - the MTP decode lift collapsed in this hot session
+(dies at 84-90 C edge through the run; v1 cool-session delta was +38%): cross-
+session decode comparisons are thermal-confounded, within-session ordering is
+A ~ B < C-unmeasured. pp: A 89.8 mean > C 88.8 mean > B 83.2 mean (in-split pp
+pays ~7% vs A; C recovers to ~A-1%). Acceptance 0.66667/3.00 everywhere it is
+measurable. Arm C decode/accept remains VOID pending the E-035 fix; the C
+decode/accept reference stays the v1 flag numbers (14.43/14.43, 0.66667).
+
+Artifacts: tp2feas_t2off10k{5,6}_20260922_*, tp2feas_t2noflag10k{7,8}_20260922_*,
+tp2feas_t2flag10k{3,4}_20260921_* (battery jsonl committed; raw logs local).
+Incidents: four boots voided by a die-capacity collision with the TP3-threeway
+lane (05:52-05:55); lock-broke + die-idle guard + refined stale-lock rule
+adopted (hub #1354/#1355).
