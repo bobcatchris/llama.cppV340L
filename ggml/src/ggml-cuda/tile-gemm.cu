@@ -162,6 +162,102 @@ static bool tile_fp16_env_enabled() {
     return enabled;
 }
 
+// loader step: steady-state f16 weights. GGML_CUDA_TILE_FP16_RESIDENT=1 keeps one
+// f16 copy per (weight slice, device), produced at first use by the same dequant
+// kernel the per-call route runs; the tile then reads the stable resident buffer
+// and the per-call dequant disappears. Budget: cumulative per-device cap
+// GGML_CUDA_TILE_FP16_RESIDENT_MIB (default 4096) AND live free VRAM at decision
+// time minus a 256 MiB margin; refusal is final for the tensor and falls back to
+// the per-call dequant. Only reached through tile_fp16_should_use, so the
+// residency whitelist is exactly the tile census whitelist (trunk K set).
+
+static bool tile_fp16_resident_env_enabled() {
+    static const bool enabled = [] {
+        const char * env = getenv("GGML_CUDA_TILE_FP16_RESIDENT");
+        const bool on = env != nullptr && env[0] == '1';
+        if (on) {
+            GGML_LOG_INFO("ggml-cuda: GGML_CUDA_TILE_FP16_RESIDENT=1, load-time f16 weight residency enabled\n");
+        }
+        return on;
+    }();
+    return enabled;
+}
+
+static size_t tile_fp16_resident_cap_bytes() {
+    static const size_t cap = [] {
+        const char * env = getenv("GGML_CUDA_TILE_FP16_RESIDENT_MIB");
+        const size_t mib = env != nullptr ? (size_t) atoll(env) : 4096;
+        return mib * 1024 * 1024;
+    }();
+    return cap;
+}
+
+// returns the resident f16 weights, or nullptr to dequantize per call
+static const half * tile_fp16_resident_weight(
+        ggml_backend_cuda_context & ctx, int id,
+        const ggml_tensor * src0, const char * src0_dd_i, int64_t row_diff, int64_t ne00,
+        const to_fp16_cuda_t to_fp16_cuda, cudaStream_t stream) {
+    if (!tile_fp16_resident_env_enabled()) {
+        return nullptr;
+    }
+
+    auto & cache = ctx.tile_fp16_residency;
+    if (!cache.active) {
+        cache.active   = true;
+        cache.cap_bytes = tile_fp16_resident_cap_bytes();
+    }
+
+    const ggml_cuda_tile_fp16_residency::key key { id, src0_dd_i, ne00, row_diff, (int64_t) src0->type };
+
+    const auto hit = cache.entries.find(key);
+    if (hit != cache.entries.end()) {
+        cache.n_hits++;
+        return (const half *) hit->second.buf;
+    }
+    cache.n_misses++;
+
+    if (cache.refused.count(key) > 0) {
+        return nullptr;
+    }
+
+    // first use for this slice: the budget decision is made once, here, when free
+    // VRAM is observable; a later retry would churn per call and the answer does
+    // not change (weights grow, free VRAM only shrinks from here)
+    const size_t bytes = row_diff*ne00*sizeof(half);
+    if (cache.total_bytes + bytes > cache.cap_bytes) {
+        cache.refused.insert(key);
+        cache.n_refused++;
+        GGML_LOG_WARN("%s: residency cap %.0f MiB full (%.1f MiB used), per-call dequant stays for K=%lld rows=%lld\n",
+                      __func__, (double) cache.cap_bytes / (1024.0*1024.0), (double) cache.total_bytes / (1024.0*1024.0),
+                      (long long) ne00, (long long) row_diff);
+        return nullptr;
+    }
+
+    size_t free_b = 0, total_b = 0;
+    CUDA_CHECK(cudaMemGetInfo(&free_b, &total_b));   // device id is current in the op
+    constexpr size_t margin = 256ull*1024*1024;      // graph/compute headroom beyond the cap
+    if (bytes + margin > free_b) {
+        cache.refused.insert(key);
+        cache.n_refused++;
+        GGML_LOG_WARN("%s: %.1f MiB free < %.1f MiB needed (+%zu MiB margin), per-call dequant stays for K=%lld rows=%lld\n",
+                      __func__, (double) free_b / (1024.0*1024.0), (double) bytes / (1024.0*1024.0), (size_t) (margin / (1024*1024)),
+                      (long long) ne00, (long long) row_diff);
+        return nullptr;
+    }
+
+    void * buf = nullptr;
+    CUDA_CHECK(cudaMalloc(&buf, bytes));
+    to_fp16_cuda(src0_dd_i, (half *) buf, row_diff*ne00, stream);
+
+    cache.entries.emplace(key, ggml_cuda_tile_fp16_residency::entry { buf, bytes });
+    cache.total_bytes += bytes;
+    GGML_LOG_INFO("%s: resident f16 K=%lld rows=%lld (%.1f MiB, %.1f MiB resident total, %.1f MiB free)\n",
+                  __func__, (long long) ne00, (long long) row_diff,
+                  (double) bytes / (1024.0*1024.0), (double) cache.total_bytes / (1024.0*1024.0),
+                  (double) (free_b - bytes) / (1024.0*1024.0));
+    return (const half *) buf;
+}
+
 // census trunk whitelist; device guards keep the kernel's 32-bit index math and
 // b128/float4 accesses valid. Any miss = shipped route (logged once).
 static bool tile_fp16_should_use(int cc, const ggml_tensor * src0, const ggml_tensor * src1,
@@ -214,12 +310,17 @@ bool ggml_cuda_tile_fp16_mul_mat(
         return false;
     }
 
-    // same f16 weight buffer the shipped cublas route produces by per-call dequant;
-    // load-time f16 steady state (deleting this tax) is a later step
+    // f16 weights: the resident steady-state copy when the budget admits the
+    // slice, else the per-call dequant the shipped cublas route produces
     const to_fp16_cuda_t to_fp16_cuda = ggml_get_to_fp16_cuda(src0->type);
     GGML_ASSERT(to_fp16_cuda != nullptr);
-    ggml_cuda_pool_alloc<half> src0_as_f16(ctx.pool(id), row_diff*ne00);
-    to_fp16_cuda(src0_dd_i, src0_as_f16.get(), row_diff*ne00, stream);
+    const half * w_f16 = tile_fp16_resident_weight(ctx, id, src0, src0_dd_i, row_diff, ne00, to_fp16_cuda, stream);
+    ggml_cuda_pool_alloc<half> src0_as_f16(ctx.pool(id));
+    if (w_f16 == nullptr) {
+        src0_as_f16.alloc(row_diff*ne00);
+        to_fp16_cuda(src0_dd_i, src0_as_f16.get(), row_diff*ne00, stream);
+        w_f16 = src0_as_f16.get();
+    }
 
     const to_fp16_cuda_t to_fp16_cuda_src1 = ggml_get_to_fp16_cuda(src1->type);
     GGML_ASSERT(to_fp16_cuda_src1 != nullptr);
@@ -238,7 +339,7 @@ bool ggml_cuda_tile_fp16_mul_mat(
     const dim3 grid((unsigned) (row_diff / nt), (unsigned) (src1_ncols / mt), (unsigned) ks);
 
     tile_fp16_gemm<mt, nt, ty, tx, TILE_FP16_KC><<<grid, block, 0, stream>>>(
-        src0_as_f16.get(), src1_as_f16.get(), dst_dd_i, p, (int) row_diff, (int) ne00, ldc);
+        w_f16, src1_as_f16.get(), dst_dd_i, p, (int) row_diff, (int) ne00, ldc);
 
     if (ks > 1) {
         const int64_t mn = src1_ncols*row_diff;

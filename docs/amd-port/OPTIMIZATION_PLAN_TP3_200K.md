@@ -777,3 +777,68 @@ to Gemini's guard battery, die 3 is the dev cell.
   die-3 residency ~2.82 GiB. Awaiting die-3 served window (coordinated
   with Gemini) + A/B per the receipt protocol. Desk served its window
   request to Gemini on the hub.
+
+- E-033 2026-09-21 Loader dequant-elimination desk COMPLETE (worktree
+  wt-loader-dequant, branch amd/loader-dequant; die 3 only, ~19 min of windows;
+  dies 0-2 untouched). LOAD-TIME F16 WEIGHT RESIDENCY IS IN behind
+  GGML_CUDA_TILE_FP16_RESIDENT=1 (composes with GGML_CUDA_TILE_FP16): the tile
+  route's per-call dequant of the quantized weight slice is replaced by a
+  persistent per-(tensor, device) f16 cache, produced ONCE at first use by the
+  same dequant kernel the per-call route runs. Design: entries keyed by {device,
+  weight-slice device pointer, K, row_diff, type} (weights immutable post-load;
+  the census whitelist admits only model-weight slices), raw cudaMalloc NOT
+  graph-pool memory (pools recycle within a graph build), freed in the context
+  dtor via clear() per-entry device-current (T4 teardown lesson applied); budget
+  = cumulative per-device cap GGML_CUDA_TILE_FP16_RESIDENT_MIB (default 4096)
+  AND live cudaMemGetInfo free minus 256 MiB margin at first use; refusal is
+  final per tensor, one WARN, per-call dequant fallback. Residency whitelist =
+  tile census whitelist by construction (fetch sits behind tile_fp16_should_use).
+  VALIDATION (die 3, M=128 census shapes, IQ3_S, zero-warning gfx900 build):
+  (1) ORACLE 10/10 shapes BIT-IDENTICAL f32 dst (cmp of dumps, resident vs
+  per-call, same protocol as E-024); (2) cap-refused arm (CAP_MIB=16 -> 8
+  refusals + 2 sub-cap residents) 10/10 byte-identical vs per-call - fallback IS
+  the per-call path; (3) free-VRAM gate exercised with a 7900 MiB hog (234 MiB
+  free): 10/10 refusals, 0 residents, clean exit - the served-200k behavior
+  reproduced on demand; (4) RESIDENT without TILE_FP16 inert (zero route logs);
+  (5) teardown clean: VRAM before/after resident run identical (12,550,144 B).
+  PERF: wall op-level call-weighted die agg per-call 4.28-4.34 (median 4.32,
+  reproduces E-024's 4.33) -> resident 5.41-5.52 (median 5.46) = +26.4%; biggest
+  per-shape walls ssm_out 1.38x, attn_q+gate 1.36x, gdn_gate/attn_out 1.30-1.32x,
+  attn k/v 1.10-1.13x. GEMM-only kernel trace: 6.32 -> 6.13 TF/s/die aggregate
+  (-3.0%) - the E-024 L2-credit prediction CONFIRMED and small; post-loader
+  integrated reference is 6.13, above the 5.53 standalone anchor. Deleted tax
+  measured: dequantize_block_iq3_s 141.3 ms per 63x10-compute pass vs 3.4 ms
+  one-time residency production (10 launches). VRAM delta at bench scale: 304.2
+  MiB raw residency for the 10-shape set (analytic 304.25), end-state free-VRAM
+  delta 254 MiB vs per-call (pool slice difference included). Receipt:
+  results/Loader_dequant_2026-09-21.md; raw runs + traces:
+  results/loader_dequant_{percall,resident}_{run.txt,trace csv}_2026-09-21;
+  harness tests/bench_tile_resident.cpp + tests/parse_tile_resident_trace.py.
+- E-034 2026-09-21 TP3 RESIDENCY BUDGET VERDICT: NEGATIVE for served use - full
+  f16 residency of the whitelist shapes does NOT fit at TP3, any context. Exact
+  arithmetic (die shares = equal thirds, 48 GDN + 16 full-attn layers, f16 = 2
+  B/elem): FFN 64L = 10,736 MiB/die (gate 3600 + up 3600 + down 3536); GDN 48L =
+  3,456 (gdn_qkv 1560 + gdn_gate 960 + ssm_out 936); attn 16L = 1,032 (q+gate
+  640, out 312, k 40, v 40); FULL WHITELIST = 15,224 MiB/die = 14.87 GiB/die =
+  1.78x the entire 8573 MiB die (44.6 GiB across TP3); FFN-only = 1.25x the die,
+  does not fit even EMPTY. f16 = 2.61x the 5837 MiB/die quantized whitelist
+  bytes. At the 200k boot of record (154 MiB free/die) the free-VRAM gate
+  refuses every slice (smallest FFN ask 55.25 + 256 margin = 311 > 154); at
+  10k-class boots (763-991 MiB free) only attn k+v (80 MiB/die, +10-13% wall on
+  those cells, ~0.7% call-weighted) fits and is not worth a served A/B.
+  PRODUCTION: switch stays OFF at TP3 - behavior and numerics unchanged (tile v1
+  with per-call dequant, 4.33 wall class); the +26% wall is banked for
+  headroom-ful environments (single-GPU short-ctx, >=16 GiB dies). The residency
+  question at TP3 is CLOSED unless a weights/KV format change opens >= 15.3
+  GiB/die (none on the roadmap). Remaining tile-wall levers named: src1 f32->f16
+  convert (16 ms/pass at bench scale) and the residual GEMM gap to 6.13.
+- E-036 2026-09-21 Integration: amd/loader-dequant merged (015bf0dbc).
+  RESIDENCY VERDICT: full-weight f16 residency does NOT fit at TP3 200k
+  (needs 15,224 MiB/die = 1.78x the die; FFN-only 1.25x; at the 154 MiB
+  free 200k boot the gate refuses every slice) - NEGATIVE banked with full
+  arithmetic; switch OFF in production, +26.4% wall win banked for
+  headroom-ful environments (>=16 GiB dies). Oracle byte-identical 10/10,
+  budget gates exercised (CAP refusals + 234 MiB-free hog reproduce the
+  200k behavior on demand), RESIDENT alone inert, teardown clean. GEMM-only
+  -3.0% confirms the E-024 L2-credit prediction. Remaining honest levers:
+  src1 f32->f16 convert (16 ms/pass) + residual GEMM gap 4.33 -> 6.13.
