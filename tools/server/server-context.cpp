@@ -1272,6 +1272,12 @@ private:
             if (params_base.dev_mtp) {
                 SRV_INF("MTP draft context runs on %s (fully isolated: nextn weights + KV + duplicated embeddings/LM head)\n",
                         ggml_backend_dev_name(params_base.dev_mtp));
+                // the MTP cache is a separate cells object (create_memory passes
+                // no mem_other for MTP) - state the invariant explicitly so a
+                // shared-cache misconfiguration shows up in the boot log
+                SRV_INF("MTP draft cache: %s\n",
+                        llama_get_memory(ctx_dft.get()) != llama_get_memory(ctx_tgt)
+                            ? "independent cells (not shared with the target)" : "SHARED with the target");
             }
 
             params_base.speculative.draft.ctx_tgt = ctx_tgt;

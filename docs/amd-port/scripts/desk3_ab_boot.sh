@@ -11,10 +11,30 @@ RES=$REPO/docs/amd-port/results
 CAND=$1; ARM=$2; REP=$3; shift 3
 LABEL=c${CAND}_${ARM}_rep${REP}
 MANIFEST=$RES/desk3_ab_manifest.jsonl
+LOCK=/tmp/campaign_gpu_boot.lock
 
-# pre-boot thermal window: wait for edge temps to settle (<= 35C, max 300s)
+# campaign GPU boot lock (convention declared 2026-09-21 21:33 by tp2 desk):
+# create holder+timestamp+duration before any served boot, honor existing
+# locks check-and-wait, remove at teardown
+cleanup_lock() { rm -f "$LOCK" 2>/dev/null; }
+trap cleanup_lock EXIT INT TERM
+while [ -f "$LOCK" ]; do
+  AGE=$(( $(date +%s) - $(stat -c %Y "$LOCK" 2>/dev/null || date +%s) ))
+  if [ "$AGE" -gt 1800 ]; then
+    echo "[$LABEL] lock stale (${AGE}s), stealing"
+    cleanup_lock; break
+  fi
+  [ ${LOCKWAIT:-0} -eq 0 ] && echo "[$LABEL] campaign GPU lock held, waiting: $(cat "$LOCK" 2>/dev/null)"
+  LOCKWAIT=1
+  sleep 15
+done
+echo "holder=served-validation desk3 label=$LABEL start=$(date +%s) eta_min=20" > "$LOCK"
+
+# pre-boot settle window: rest >= 120s AND edge temps <= 35C (cap 15 min);
+# boots launched too soon after a 24GB teardown were SIGKilled mid-load
 PRE_TMP=/tmp/desk3_${LABEL}_pre.json
-for i in $(seq 1 30); do
+T0=$(date +%s)
+for i in $(seq 1 90); do
   rocm-smi --showtemp --json > "$PRE_TMP" 2>/dev/null
   MAXEDGE=$(python3 - "$PRE_TMP" <<'EOF'
 import json, sys
@@ -26,8 +46,9 @@ except Exception:
     print(0)
 EOF
 )
-  [ "$MAXEDGE" -le 35 ] && break
-  [ $i -eq 1 ] && echo "[$LABEL] pre-boot cooldown: waiting for edge <= 35C (now ${MAXEDGE}C)"
+  AGE=$(( $(date +%s) - T0 ))
+  if [ "$AGE" -ge 120 ] && [ "$MAXEDGE" -le 35 ]; then break; fi
+  [ $i -eq 1 ] && echo "[$LABEL] pre-boot settle: waiting edge <= 35C and 120s (now ${MAXEDGE}C, ${AGE}s)"
   sleep 10
 done
 echo "[$LABEL] pre-boot temps: edge max ${MAXEDGE}C"
@@ -37,14 +58,13 @@ echo "[$LABEL] pre-boot temps: edge max ${MAXEDGE}C"
 # server log, so env delivery is proven via /proc instead)
 cd "$REPO"
 ENVF=/tmp/desk3_${LABEL}_env.txt
+: > "$ENVF"
 ( while kill -0 $$ 2>/dev/null; do
     PID=$(pgrep -f 'build-hip/bin/llama-server' | head -1)
-    if [ -n "$PID" ]; then
-      sleep 2  # let the final process settle
+    if [ -n "$PID" ] && [ -r "/proc/$PID/environ" ]; then
       tr '\0' '\n' < "/proc/$PID/environ" 2>/dev/null | grep '^GGML_CUDA' > "$ENVF" || true
-      break
     fi
-    sleep 2
+    sleep 5
   done ) &
 ENVSampler=$!
 
