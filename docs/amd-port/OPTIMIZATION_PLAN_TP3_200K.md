@@ -2174,3 +2174,38 @@ to Gemini's guard battery, die 3 is the dev cell.
   both admission paths + purge idle slots before denying a deferred
   task; probe re-run in both modes as validation. (3) RCCL transport
   and MMVQ kernel desks continue (the +15-25% and unknown-big levers).
+- E-090 2026-09-22 T3 COPY-BACK DECODE FIX COMPLETE (wt-t3-graph, branch
+  amd/t3-graph synced to d98e8cdcb; one served boot lane 8083 under
+  the boot lock; receipt results/T3FIX_20260922_183334.md). E-087 ROOT
+  CAUSE: the copy-back registration sized the D2D copy as the full 2-D
+  area (src0->ne[1] * ne[0] * sizeof(float)) while a T=1 mmvq result is
+  one float per weight row - the temp/dst hold row_diff floats; the count
+  was ne[0]-times oversized (Kcur-3: 256 KiB from a ~1 KiB pool block).
+  Eager prefill survived because first-fit pool blocks made the oversized
+  ranges stay in-allocation (silent tail corruption, no error); the first
+  DECODE capture crossed out-of-allocation ranges and HIP rejected the
+  CALL itself -> "invalid argument" at ggml-cuda.cu:5108. All three
+  briefed hypotheses EXCLUDED EMPIRICALLY (hipcc gfx900 capture matrix on
+  an idle die, /tmp/t3_diag/capture_diag.hip): plain D2D hipMemcpyAsync
+  on ctx.stream() captures, instantiates, replays x2 and verifies MATCH
+  (cases 3/5/6) - the API form, stream and pool-temp address class are
+  capture-legal; only the oversized count returns invalid argument at the
+  call (cases 2/4, eager AND captured). FIX: one line, cb.nbytes =
+  ggml_nbytes(member); test_t3_detect_host ALL PASS. SERVED EVIDENCE
+  (combo line + MMVQ_GROUP=1 + DEBUG): zero ROCm errors, clean teardown;
+  E-087's killer group ran - "group formed at Vcur-3 ... candidate Vcur-3
+  admitted as copy-back + candidate Kcur-3 admitted as copy-back" in the
+  decode-graph window (log lines 10729-10740) plus node_43/node_310
+  (rows 12/18); prefill chunks grouped too (node_14, 64-line debug budget
+  consumed exactly). Decode cell 14.82 t/s vs non-grouped combo refs
+  14.79-14.93 (mean 14.87) - INSIDE the band, -0.81% vs baseline file;
+  accept 0.66667 / mean len 3.00 exact; greedy sha 4beb1ba25219ee9b x2 =
+  the E-086 cross-arm sha -> BYTE-EXACT vs env-unset (and the copy-back
+  tail is now correct bytes; the old eager path silently corrupted it).
+  Design constraints hold: solo timing, bit-exact, capture/replay-safe.
+  T/s verdict needs the planned 3-rep A/B (single cell cannot resolve
+  under the 0.94% noise floor). LOCK LAW route-back: a released lock does
+  not imply a drained die - first boot attempt raced the coordinator's
+  teardown and lost 1154 MiB of KV alloc to OOM (dmesg clean); launch
+  gates now check live llama-server + per-die VRAM use, not just the
+  lock; convention text should add a post-teardown settle delay.
