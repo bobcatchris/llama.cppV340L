@@ -976,3 +976,10 @@ to Gemini's guard battery, die 3 is the dev cell.
   grouping never forms under the TP3 multi-stream machinery - NOT
   PROMOTED; reopen needs graph-level grouping design. Config of record
   unchanged: ub512, prefill 115.21, decode ~14.95, accept 0.66667.
+- E-045 2026-09-21 Two desks dispatched: wt-tile-chunked on
+  amd/tile-chunked-dequant (CHUNKED-DEQUANT tile: dequant K-chunks into a
+  single reusable scratch so the tile's pool footprint drops from
+  100s of MiB to a few MiB - the direct fix for the E-044 200k crash;
+  die 3) and the served-measurement lane for TP3 200k MTP-OFF/ON +
+  isolation decode cell (dies 0-2 + coordinated die-3 window; answers the
+  >2 GB-at-scale question and the W6/isolation A/B).
