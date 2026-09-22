@@ -1384,3 +1384,61 @@ to Gemini's guard battery, die 3 is the dev cell.
   decode collapse mechanism (draft embedding+LM-head on the 1x-
   bandwidth die + host hops) is now confirmed at 200k, doubling the
   weight behind the MTP-overhead desk's on-device sampling work.
+- E-054 2026-09-21 T3-reopen desk COMPLETE (worktree wt-t3-graph, branch
+  amd/t3-graph; zero GPU). E-042 "grouping never forms" ROOT-CAUSED with a
+  host-proven mechanism: ggml-alloc RECYCLES the ssm_beta MM dst range for the
+  ssm_alpha MM dst in the exact qwen35 GDN-layer graph (192 B block, identical
+  address, proven by allocating the real topology with ggml_gallocr on host -
+  results/T3_graph_2026-09-21.md), so the grouped path's pairwise dst-overlap /
+  WAR safety checks drop the only sub-whitelist same-src1 pair on every GDN
+  layer on every die -> zero grouped launches, census identical OFF/ON. The
+  rejection was CORRECT for the early-write design (an early grouped write of
+  alpha would clobber the range the sigmoid still reads as beta); the design
+  needed copy-back, not a weaker check. E-042's concurrency-gate hypothesis
+  REFUTED (concurrent_events only populate under GGML_CUDA_GRAPH_OPT=1 AND a
+  single visible device - inert at 3 dies), the meta-partitioning hypothesis
+  REFUTED (per-device subgraphs are order-preserving index-range copies with
+  stable per-device src pointers; the 16-node window sees the pair; served
+  decode proven T=1x1x1 from the census quantize/mmvq grid shapes). SECOND
+  structural blocker proven: attn k/v weights split at granularity
+  lcm(1536,256)/6 = 512 -> per-die shards 512 rows (or 0 on the rotating third
+  die) -> default MAX_ROWS=256 aborts every k/v group, and E-025's planned 384
+  sweep would have failed too (512 is the floor). FIX IMPLEMENTED behind the
+  same GGML_CUDA_MMVQ_GROUP=1 switch: aliased members admitted as COPY-BACK
+  (grouped launch writes a per-device pool temp; the graph loop issues one D2D
+  copy temp->dst at the member's OWN graph position - solo timing,
+  capture/replay-safe, bit-identical by construction); direct members and the
+  head keep the unchanged early write; copy-back rejected over split buffers
+  and off-device dsts (legacy paths keep strict rules); x-mutation and
+  fusion-span exclusions factored into ggml_cuda_mmvq_group_x_fusion_safe as
+  hard rules for both classes. INSTRUMENT: GGML_CUDA_MMVQ_GROUP_DEBUG=1 logs
+  gate-naming decline reasons + formation summaries at WARN (survives default
+  verbosity filtering, 64-line budget) - closes the evidence gap where the ON
+  census arm had no artifact proving env delivery (enable INFO line filtered).
+  HOST TESTS (no GPU): tests/test_t3_detect_host.cpp ALL PASS on a real
+  gallocr-allocated graph (pair forms 2 members, later member copy-back,
+  recycled-range overlap fires on real ranges, big-cell whitelist aborts +
+  raised-sweep admission, T=8 tail ineligible, kv 512/512/0 mirror);
+  tests/test_t3_alias_host.c banks the order-sensitivity trap (short chain does
+  not recycle, full chain does). gfx900 compile clean (build-hip flags,
+  syntax-only, zero diagnostics). Env unset = zero behavior change. DEFERRED
+  DEVICE VALIDATION (one dies 0-2 boot): MMVQ_GROUP=1 + DEBUG=1 server log
+  shows "group formed ... (copy-back)" per layer; census expects
+  mul_mat_vec_q_grouped = 144/step class with mmvq dropping equally,
+  quantize halving on the pair class, +1 copy kernel per pair; greedy sha gate
+  vs env-unset; then 3-rep A/B at the 200k config (bar >= +2%); optional kv
+  arm at MAX_ROWS=512 (not 384). Receipt: results/T3_graph_2026-09-21.md.
+- E-061 2026-09-22 Coordinator integration: amd/t3-graph merged into
+  amd/v340-port-v2 (ffbce3dc3, ledger conflict resolved keep-both).
+  Copy-back grouped-mmvq design is now in the campaign tree behind
+  GGML_CUDA_MMVQ_GROUP=1; env unset = zero behavior change. DEVICE
+  VALIDATION QUEUED behind the temp sweep (one dies 0-2 boot, lock
+  convention): boot with MMVQ_GROUP=1 + MMVQ_GROUP_DEBUG=1 -> expect
+  per-layer "group formed ... (copy-back)" WARN lines; rocprofv3
+  census -> expect mul_mat_vec_q_grouped ~144/step class, solo mmvq
+  dropping equally, quantize halving on the pair class, one 192 B D2D
+  copy per pair; greedy determinism sha vs env-unset; then 3-rep 200k
+  A/B (bar >= +2%); optional kv-class arm at MAX_ROWS=512 (512 is the
+  structural floor, not 384). Dispatched as a queued validation desk
+  (waits on the boot lock at 150 s cadence while the temp sweep owns
+  the dies).
