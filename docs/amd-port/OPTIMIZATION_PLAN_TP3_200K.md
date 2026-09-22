@@ -1170,3 +1170,11 @@ to Gemini's guard battery, die 3 is the dev cell.
   within-arm determinism, p512 trace cell, watch die-0 first-prefill vs
   window ask + 64 MiB margin - clean refusal if tight). Endgame door:
   fused dequant-in-staging tile deletes even the window.
+- E-053 2026-09-21 Two zero-GPU desks dispatched (GPU grant stays with the
+  TP2 ladder desk): wt-server-fixes on amd/server-exposures (fix the two
+  E-039 server exposures: per-slot n_ctx admission vs global unified KV
+  occupancy; slot fill order starving older mid-prompt requests - both
+  found in the contamination forensics, both host-testable) and
+  wt-t3-graph on amd/t3-graph (T3 reopen: design graph-level grouping that
+  forms under the TP3 multi-stream machinery - the E-044 zero-launch
+  finding). No die usage: both are impl + host-test desks.
