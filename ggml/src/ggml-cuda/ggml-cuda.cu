@@ -615,6 +615,9 @@ ggml_backend_cuda_context::~ggml_backend_cuda_context() {
     // cudaMalloc'd buffers, freed with each entry's device current
     tile_fp16_residency.clear();
 
+    // free the chunked-dequant slice windows (raw cudaMalloc'd, this ctx's device)
+    tile_fp16_chunk.clear(device);
+
     if (copy_event != nullptr) {
         CUDA_CHECK(cudaEventDestroy(copy_event));
     }

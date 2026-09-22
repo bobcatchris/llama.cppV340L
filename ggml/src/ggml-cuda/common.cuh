@@ -1562,6 +1562,47 @@ struct ggml_cuda_tile_fp16_residency {
     }
 };
 
+// Chunked-dequant slice windows for the tile route (GGML_CUDA_TILE_FP16_CHUNKED=1,
+// glue in tile-gemm.cu): one f16 window sized to a split-K slice x the tile's N
+// span plus the matching gathered quantized blocks, reused chunk-by-chunk so the
+// route never holds a whole f16 weight copy (the per-call pool alloc that OOMs at
+// 200k, E-044). Keyed by stream so ops on different streams never share a window.
+// Raw cudaMalloc, NOT graph-pool memory: the window must survive across pool
+// resets inside a graph compute. Grow-only in the max padded slice size seen;
+// steady state never reallocs.
+struct ggml_cuda_tile_fp16_chunk {
+    struct entry {
+        cudaStream_t stream = nullptr;
+        void * f16 = nullptr;      // row_diff x lmax halves
+        void * q   = nullptr;      // gathered quantized blocks of one slice
+        size_t f16_bytes = 0;
+        size_t q_bytes   = 0;
+    };
+
+    size_t cap_bytes = 0;
+    size_t total_bytes = 0;
+    std::vector<entry> entries;    // a handful at most; linear scan
+
+    entry * find(cudaStream_t stream) {
+        for (auto & e : entries) {
+            if (e.stream == stream) return &e;
+        }
+        return nullptr;
+    }
+
+    // runs in the context dtor with the owning device current
+    void clear(int device) {
+        if (entries.empty()) return;
+        ggml_cuda_set_device(device);
+        for (auto & e : entries) {
+            CUDA_CHECK(cudaFree(e.f16));
+            if (e.q) CUDA_CHECK(cudaFree(e.q));
+        }
+        entries.clear();
+        total_bytes = 0;
+    }
+};
+
 struct ggml_backend_cuda_context {
     int device;
     std::string name;
@@ -1634,6 +1675,8 @@ struct ggml_backend_cuda_context {
     ggml_cuda_q81_act_cache q81_act_cache;
 
     ggml_cuda_tile_fp16_residency tile_fp16_residency;
+
+    ggml_cuda_tile_fp16_chunk tile_fp16_chunk;
 
     ~ggml_backend_cuda_context();
 
