@@ -976,3 +976,41 @@ to Gemini's guard battery, die 3 is the dev cell.
   grouping never forms under the TP3 multi-stream machinery - NOT
   PROMOTED; reopen needs graph-level grouping design. Config of record
   unchanged: ub512, prefill 115.21, decode ~14.95, accept 0.66667.
+- E-045 2026-09-21 W5 tile-CHUNKED desk COMPLETE (worktree wt-tile-chunked,
+  branch amd/tile-chunked-dequant; die 3 only, ~20 min of windows; dies 0-2
+  untouched). The E-044 C2 OOM class is DELETED by construction: behind
+  GGML_CUDA_TILE_FP16=1 + GGML_CUDA_TILE_FP16_CHUNKED=1 the a8 tile now
+  dequantizes ONE split-K slice at a time into a 17.1 MiB reusable window
+  (f16 N_d x (ksl+bs) + gathered quant blocks; raw cudaMalloc, per-stream,
+  grow-only, 64 MiB budget + 64 MiB free-VRAM margin, refusal -> shipped route
+  with one WARN - never aborts). Bit-identity CONTRACT MET: chunk boundaries
+  are the unchunked kernel's own gridDim.z partition from pick_ks, each slice
+  launch runs the same half2 schedule over the same f16 values (gather feeds
+  the same to_fp16 kernels the per-call route uses), ACC epilogue adds the
+  slice f32 partials in the reduce's fixed order - oracle 10/10 PASS
+  (unchunked still 0.00e+00 vs the host spec, L2 band 2.9-6.1e-3, chunked
+  bit-diff 0/N on every shape) AND full-glue f32 dst dumps cmp 10/10
+  byte-identical on real IQ3_S; env unset + M=640 off-list behavior unchanged.
+  VRAM proof: measured peak transient delta (0.4 ms sampler, per-shape
+  steady-to-min) chunked 52 MiB @ M=128 / 56 MiB @ M=512 vs unchunked
+  104/144 MiB, envelope 200 MiB - FIT with margin; no partials buffer (P path
+  unused), pool only sees small src1 blocks. PERF (die 3, census, M=128,
+  3x20 median): wall call-weighted 2.77-2.81 TF/s/die vs unchunked 4.28-4.33
+  (the E-024 4.33 reference reproduced) = -35%; kernel GEMM-only call-weighted
+  3.68 vs 6.39 (6.10 reference class) - the slice launch gives up the
+  unchunked gridDim.z fill: per-launch grid (N_d/64, M/128, 1) is 26 blocks
+  for ffn_down / 4 for attn_k, so ks=8 shapes lose 40-87% GEMM while ks=4
+  big-N shapes lose only 4-6%; dequant+gather work itself is NOT the tax.
+  M=512 (served ub512 point): wall 5.17 vs 5.72 = -9.6%, grid.y=4 closes most
+  of the fill gap. VERDICT: memory-viable at 200k (bench level; served boot
+  confirmation = Gemini lane), perf-negative vs the unchunked tile at M=128,
+  but the unchunked tile is exactly the arm that OOM-aborts at 200k - the
+  honest 200k comparison is vs the shipped f32 SGEMM route. NEXT LINK named:
+  (1) N-span chunking with full-K windows - contiguous quant ROW slabs need
+  NO gather, launch keeps gridDim.z=ks + P/reduce per chunk so the fill tax
+  closes while bit-identity holds (same per-element slice schedule + reduce
+  order); (2) endgame = fused dequant-in-staging tile (per-quant-type kernel
+  project, deletes window and extra pass). Receipt:
+  results/W5_tile_chunked_2026-09-21.md; traces + run logs:
+  results/W5_tile_chunked_{trace_unchunk,trace_chunked,bench_unchunk,
+  bench_chunked}_2026-09-21.{csv,txt}; parser tests/parse_tile_chunked_trace.py.

@@ -16,6 +16,12 @@
 //
 // Kernels are defined in tile-gemm.cu (the non-template reduce has strong linkage,
 // so this header stays device-code free for the TUs that only call the glue).
+//
+// GGML_CUDA_TILE_FP16_CHUNKED=1 adds a chunked-dequant arm: one split-K slice at a
+// time is gathered + dequantized into a small reusable f16 window (dedicated
+// cudaMalloc, not the per-call pool) and the slice GEMMs accumulate into dst in the
+// fixed slice order - bit-identical to the unchunked arm, but the f16 weight
+// footprint drops from the full slice to N_d x (ksl + bs) x 2 B.
 
 // a8 geometry
 #define TILE_FP16_MT 128

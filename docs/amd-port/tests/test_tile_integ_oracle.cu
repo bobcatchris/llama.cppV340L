@@ -176,7 +176,8 @@ int main() {
 
         const dim3 grid((unsigned)(N / nt), (unsigned)(M / mt), (unsigned) ks);
         // gate at the launch-site geometry: ldc == N when not behind the split path
-        tile_fp16_gemm<mt, nt, ty, tx, kc><<<grid, block, 0, nullptr>>>(Wd, Xd, Cd, Pd, (int) N, (int) K, N);
+        tile_fp16_gemm<mt, nt, ty, tx, kc, false><<<grid, block, 0, nullptr>>>(
+            Wd, Xd, Cd, Pd, (int) N, (int) K, (int) (K / ks), N, (int) K);
         if (ks > 1) {
             const int mn = (int)(M * N);
             tile_fp16_reduce<<<(mn/4 + 255) / 256, 256, 0, nullptr>>>(Pd, Cd, mn, ks);
@@ -185,6 +186,37 @@ int main() {
 
         std::vector<float> out((size_t) M * N);
         CHECK(hipMemcpy(out.data(), Cd, out.size() * 4, hipMemcpyDeviceToHost));
+
+        // chunked arm: one launch per split-K slice, the slice gathered into a
+        // contiguous N x ksl window first (mirrors the glue's quant-block gather;
+        // hipMemcpy2D is the same operation on already-f16 data), ACC into C in
+        // slice order; output must be bit-identical to the unchunked P + reduce
+        float * Cd2;
+        __half * Wc;
+        const int ksl = (int) (K / ks);
+        CHECK(hipMalloc((void **) &Cd2, (size_t) M * N * 4));
+        CHECK(hipMalloc((void **) &Wc, (size_t) N * ksl * 2));
+        const dim3 grid1((unsigned)(N / nt), (unsigned)(M / mt), 1);
+        for (int z = 0; z < ks; z++) {
+            CHECK(hipMemcpy2DAsync(Wc, ksl * 2, Wd + z*ksl, K * 2, ksl * 2, N,
+                                   hipMemcpyDeviceToDevice, nullptr));
+            if (z == 0) {
+                tile_fp16_gemm<mt, nt, ty, tx, kc, false><<<grid1, block, 0, nullptr>>>(
+                    Wc, Xd + z*ksl, Cd2, nullptr, (int) N, ksl, ksl, N, (int) K);
+            } else {
+                tile_fp16_gemm<mt, nt, ty, tx, kc, true><<<grid1, block, 0, nullptr>>>(
+                    Wc, Xd + z*ksl, Cd2, nullptr, (int) N, ksl, ksl, N, (int) K);
+            }
+        }
+        CHECK(hipDeviceSynchronize());
+        std::vector<float> out2((size_t) M * N);
+        CHECK(hipMemcpy(out2.data(), Cd2, out2.size() * 4, hipMemcpyDeviceToHost));
+        size_t bit_diff = 0;
+        for (size_t i = 0; i < out.size(); i++) {
+            if (memcmp(&out[i], &out2[i], 4) != 0) bit_diff++;
+        }
+        CHECK(hipFree(Cd2));
+        CHECK(hipFree(Wc));
 
         size_t bad = 0;
         double mx = 0;
@@ -195,11 +227,11 @@ int main() {
         }
         const double l2 = l2_rel(out, ref);
         const double mismatch_pct = 100.0 * (double) bad / (double) out.size();
-        const bool pass = mismatch_pct < 0.1 && mx < 1e-3;
+        const bool pass = mismatch_pct < 0.1 && mx < 1e-3 && bit_diff == 0;
         if (!pass) failures++;
-        printf("  %-13s K=%5lld N_d=%4lld ks=%d: mismatch %6.3f%% max rel %.2e | L2 f64 %.3e -> %s\n",
+        printf("  %-13s K=%5lld N_d=%4lld ks=%d: mismatch %6.3f%% max rel %.2e | L2 f64 %.3e | chunked bit-diff %zu/%zu -> %s\n",
                s.name, (long long) K, (long long) N, ks, mismatch_pct, mx, l2,
-               pass ? "PASS" : "FAIL");
+               bit_diff, out.size(), pass ? "PASS" : "FAIL");
         fflush(stdout);
 
         CHECK(hipFree(Wd)); CHECK(hipFree(Xd)); CHECK(hipFree(Cd)); CHECK(hipFree(Pd));
