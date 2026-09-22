@@ -1323,3 +1323,28 @@ to Gemini's guard battery, die 3 is the dev cell.
   docs/amd-port/tests/probe_kv_admission.sh. TP3 200k ladder state:
   t3on1 under lock since 07:11:57 (runner chain tp3def200_on1/flag1/
   on2/flag2 in /home/chris/).
+- E-058 2026-09-22 TEMP PROGRAM, coordinator direct execution (Chris:
+  "what about the temp idea? do not message other agents"). CARD MAP
+  CORRECTION of record: card2 is the NVIDIA boot display (0x10de); the
+  V340L dies are card0 (0d:00.0), card1 (05:00.0), card3 (08:00.0),
+  card4 (10:00.0); serving = card0/1/3, draft = card4. Historical VRAM
+  log labels that say card1/2/3 need reinterpretation against PCI
+  order. Live thermal evidence during the t3flag1 ladder arm: card3
+  77-81 C junction - the confound the sweep targets. Undervolt path
+  verified: pp_od_clk_voltage writable on all four dies; stock OD_SCLK
+  level 5 = 1269 MHz @ 1150 mV, stock curve puts 1200 MHz at ~1125 mV;
+  OD_MCLK level 3 = 945 MHz @ 1150 mV is NEVER written. Sweep script
+  docs/amd-port/tests/voltage_sweep.sh: pin sclk 1200 via level-5
+  rewrite + manual perf level + level force; baseline decode cell at
+  1125 mV; steps 1100..850 in -25 mV; per-step gates = mclk still 945,
+  decode t/s >= 97% of baseline, accept >= 0.63 (when canary reports),
+  junction < 95 C with INSTANT revert to stock on any failure; phase 3
+  applies the winner to all four dies and re-stamps the 200k guard
+  battery; EXIT trap restores stock tables + perf level auto. Uses the
+  proven wt-tp2-mtp binary, lane 8081, guard battery as the only
+  measurement. Watcher launched detached: waits (150 s cadence) for the
+  ladder chain to end + lock-free + dies drained (< 500 MiB), then
+  holds the lock (desk=temp-sweep, 75 min) and runs the sweep under
+  sudo; watcher log /home/chris/tp3_temp_sweep_watcher.log (exact-name
+  LOG LAW applies). Receipt lands at docs/amd-port/results/
+  voltage_sweep_<ts>.log.
