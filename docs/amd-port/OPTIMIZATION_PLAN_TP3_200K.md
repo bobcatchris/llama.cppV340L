@@ -1442,3 +1442,27 @@ to Gemini's guard battery, die 3 is the dev cell.
   structural floor, not 384). Dispatched as a queued validation desk
   (waits on the boot lock at 150 s cadence while the temp sweep owns
   the dies).
+- E-063 2026-09-22 TEMP SWEEP FINAL + REAL v1-FLAG MEASUREMENT
+  LAUNCHED. Sweep complete (receipt results/voltage_sweep_20260922_
+  073449.log + _temps/_thermal): winner 1100 mV @ pinned 1200 MHz;
+  stock ref 15.60 t/s @ 77 C junc; pinned 1125 mV ref 15.98 @ 82 C;
+  1100 mV stable 15.94; 1075 mV UNSTABLE (t/s < 97% + 92 C) with
+  instant revert; full winner guard battery max_junc 92 C (inside the
+  95 C gate but close - watch it at 200k); stock tables restored by
+  the EXIT trap. Winner at 200k deliberately NOT re-stamped yet - the
+  E-062 v1-flag correction takes the dies first. Duplicate sweeps
+  stood down (Gemini hub #1359, TP2 desk messaged): temp program is
+  the coordinator lane per Chris. REAL TP3 v1-flag cell launched:
+  worktree wt-v1flag at b4ad90c5a (= 8a4ebbcaa^, the tree where
+  --spec-mtp-device is the v1 PARTIAL relocation, server-side impl in
+  tools/server/server-context.cpp, target head stays on the meta
+  group); arm t3flag via the desk's runner staged in that worktree
+  (BIN auto-resolves to the v1 build), VISIBLE 0,1,2,3,
+  --spec-mtp-device ROCm3, STRICT unset (does not exist in this tree);
+  200k x2 then 10k x1, lane 8081, lock honored, guard battery vs
+  baseline_tp2_200k.json; exact logs /home/chris/v1flag_200k_rep1.log,
+  v1flag_200k_rep2.log, v1flag_10k_rep1.log. ARM IDENTITY LAW
+  evidence: provenance = commit b4ad90c5a + binary sha256 recorded at
+  launch; expected signature if v1 is real: decode ~14-15 t/s class
+  (vs 7.58 full isolation) with draft die NOT carrying duplicated
+  output weights.
