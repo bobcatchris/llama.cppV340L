@@ -57,6 +57,21 @@ struct llama_context {
 
     void synchronize();
 
+    // light drain for the packed draft-step fetch (LLAMA_DRAFT_LIGHT_SYNC):
+    // synchronize only the backends that own the fetched output tensors,
+    // skipping the full scheduler sweep and the perf-stat closure of
+    // synchronize()
+    void wait_outputs();
+
+    // packed draft-step output fetch (LLAMA_DRAFT_PACKED_GET): issue the
+    // raw-logits and h_nextn D2H copies that decode() skips when packed fetch
+    // is enabled, then return the host row pointers without synchronizing.
+    // returns false if the outputs of the last decode cannot be handed out
+    // row-wise (the caller must then stop using packed rows)
+    bool fetch_nextn_outputs(int32_t idx, const float ** out_logits, const float ** out_h);
+
+    void set_packed_fetch(bool value);
+
     const llama_model   & get_model()   const;
     const llama_cparams & get_cparams() const;
 
@@ -340,6 +355,10 @@ private:
     ggml_backend_sched_ptr sched;
 
     bool sched_need_reserve = true;
+
+    // skip the raw-logits and h_nextn extraction in decode(); the draft loop
+    // fetches both rows with one packed call instead (LLAMA_DRAFT_PACKED_GET)
+    bool packed_fetch = false;
 
     ggml_backend_t backend_cpu = nullptr;
     std::vector<ggml_backend_ptr> backends;

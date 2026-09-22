@@ -1209,6 +1209,12 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
     bool    is_mem_shared = false;   // gemma4
     bool    chain_heads   = false;   // derived in the ctor: n_mtp_layers > 1 && !is_mem_shared
 
+    // packed draft-step output fetch + light drain (LLAMA_DRAFT_PACKED_GET /
+    // LLAMA_DRAFT_LIGHT_SYNC; the host-side levers against the per-step D2H +
+    // drain overhead). resolved once in the ctor
+    bool packed_get = false;
+    bool light_sync = false;
+
     // Per-sequence cross-batch carryover: pair (h_p, x_{p+1}) at MTP pos p+1.
     // The last h-row of one process() call needs the first token of the NEXT
     // call to pair with, so it's stashed here until that next call fires.
@@ -1284,6 +1290,30 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
 
         is_mem_shared = llama_get_ctx_other(ctx_dft) == ctx_tgt;
         chain_heads   = n_mtp_layers > 1 && !is_mem_shared;
+
+        // the packed fetch hands out raw host rows, so it must not run when a
+        // backend sampler is attached (its token would bypass the host rows)
+        // or when the draft shares the target context (gating decode() would
+        // hide the target's own outputs)
+        static const bool packed_get_env = getenv("LLAMA_DRAFT_PACKED_GET") != nullptr;
+        static const bool light_sync_env = getenv("LLAMA_DRAFT_LIGHT_SYNC") != nullptr;
+
+        bool has_backend_sampling = false;
+        for (auto * chain : backend_chains) {
+            has_backend_sampling |= (chain != nullptr);
+        }
+
+        packed_get = packed_get_env && !has_backend_sampling && !is_mem_shared;
+        if (packed_get_env && !packed_get) {
+            SPC_WRN("%s", "LLAMA_DRAFT_PACKED_GET ignored (backend sampling active or shared draft context)\n");
+        }
+
+        // the light drain replaces the sync of the packed path only
+        light_sync = light_sync_env && packed_get;
+
+        if (packed_get) {
+            llama_set_packed_fetch(ctx_dft, true);
+        }
 
         if (chain_heads) {
             this->params.n_max = std::min(this->params.n_max, n_mtp_layers);
@@ -1512,6 +1542,8 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
         int64_t t_sample_us = 0;
         int     n_tl_steps  = 0;
 
+        const int n_vocab_dft = llama_vocab_n_tokens(llama_model_get_vocab(llama_get_model(ctx_dft)));
+
         const int64_t t_draft_start = tl_on ? ggml_time_us() : 0;
 
         while (n_drafting > 0) {
@@ -1544,6 +1576,33 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
                 n_tl_steps++;
             }
 
+            // packed fetch (LLAMA_DRAFT_PACKED_GET): one call issues the
+            // raw-logits + h_nextn D2H gets that decode() skipped; the drain
+            // below completes them. unset keeps the extraction inside decode()
+            const float * row0_logits = nullptr;
+            const float * row0_h      = nullptr;
+            llama_seq_id   seq0       = -1;
+            if (packed_get) {
+                for (llama_seq_id s = 0; s < (llama_seq_id) n_seq; ++s) {
+                    if (drafting[s]) {
+                        seq0 = s;
+                        break;
+                    }
+                }
+                if (seq0 < 0 || !llama_fetch_nextn_outputs(ctx_dft, i_last[seq0], &row0_logits, &row0_h)) {
+                    // cannot happen for the sorted draft batch; stop drafting
+                    // rather than read stale rows
+                    SPC_WRN("packed fetch failed at step %d; stopping the draft round\n", i);
+                    break;
+                }
+
+                if (light_sync) {
+                    llama_wait_outputs(ctx_dft);
+                } else {
+                    llama_synchronize(ctx_dft);
+                }
+            }
+
             const int64_t t_sample_start = tl_on ? ggml_time_us() : 0;
 
             // rebuild the batch for the next step: the growing-KV paths re-add only the
@@ -1560,7 +1619,31 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
 
                 llama_token_data_array * cur_p = nullptr;
 
-                if (fast_topk) {
+                // the packed rows of this step (seq0 was resolved by the
+                // fetch; the rare other seqs read the already-drained ctx
+                // output buffers)
+                const float * row_l = nullptr;
+                const float * row_h = nullptr;
+                if (packed_get) {
+                    if (seq_id == seq0) {
+                        row_l = row0_logits;
+                        row_h = row0_h;
+                    } else {
+                        row_l = llama_get_logits_ith(ctx_dft, i_last[seq_id]);
+                        row_h = llama_get_embeddings_nextn_ith(ctx_dft, i_last[seq_id]);
+                    }
+                }
+
+                if (row_l) {
+                    if (fast_topk) {
+                        // k matches the draft chain's top-k(10) set in the ctor
+                        cur_p = common_sampler_sample_topk_row(smpl, row_l, n_vocab_dft, 10);
+                    } else {
+                        // full-vocab build from the row: candidate arrays match
+                        // the regular path exactly
+                        cur_p = common_sampler_sample_row(smpl, row_l, n_vocab_dft);
+                    }
+                } else if (fast_topk) {
                     // k matches the draft chain's top-k(10) set in the ctor
                     cur_p = common_sampler_sample_topk(smpl, ctx_dft, i_last[seq_id], 10);
                 }
@@ -1571,7 +1654,7 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
                     cur_p = common_sampler_get_candidates(smpl, true);
                 }
 
-                const float * h_row = llama_get_embeddings_nextn_ith(ctx_dft, i_last[seq_id]);
+                const float * h_row = row_h ? row_h : llama_get_embeddings_nextn_ith(ctx_dft, i_last[seq_id]);
 
                 for (int k = 0; k < std::min(3, (int) cur_p->size); ++k) {
                     SPC_DBG(" - seq_id %d, draft candidate %3d, pos %3d: %6d (%8.3f) '%s'\n",

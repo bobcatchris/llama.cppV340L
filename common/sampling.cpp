@@ -152,13 +152,25 @@ struct common_sampler {
         } else {
             const auto * logits = llama_get_logits_ith(ctx, idx);
             GGML_ASSERT(logits != nullptr);
-            cur.resize(n_vocab);
-            for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
-                cur[token_id] = llama_token_data{token_id, logits[token_id], 0.0f};
-            }
+            set_logits_row(logits, n_vocab);
+        }
+    }
+
+    // full-vocab candidate array from an explicit host row (the packed draft
+    // fetch hands out raw row pointers); identical to the raw-logits branch of
+    // set_logits
+    bool set_logits_row(const float * logits, int n_vocab) {
+        if (logits == nullptr || n_vocab <= 0) {
+            return false;
+        }
+
+        cur.resize(n_vocab);
+        for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
+            cur[token_id] = llama_token_data{token_id, logits[token_id], 0.0f};
         }
 
         cur_p = { cur.data(), cur.size(), -1, false };
+        return true;
     }
 
     // candidate selection without the full-vocab array: heap-select the top-k
@@ -174,10 +186,15 @@ struct common_sampler {
         const llama_model * model = llama_get_model(ctx);
         const llama_vocab * vocab = llama_model_get_vocab(model);
 
-        const int n_vocab = llama_vocab_n_tokens(vocab);
+        return set_logits_topk_row(llama_get_logits_ith(ctx, idx), llama_vocab_n_tokens(vocab), k);
+    }
 
-        const auto * logits = llama_get_logits_ith(ctx, idx);
-        GGML_ASSERT(logits != nullptr);
+    // row-based guts of set_logits_topk (the packed draft fetch hands out raw
+    // row pointers); identical heap-select over the explicit row
+    bool set_logits_topk_row(const float * logits, int n_vocab, int k) {
+        if (logits == nullptr || n_vocab <= 0) {
+            return false;
+        }
 
         if (k <= 0 || k > n_vocab) {
             k = n_vocab;
@@ -202,6 +219,28 @@ struct common_sampler {
         std::sort_heap(cur.begin(), cur.end(), comp);
 
         cur_p = { cur.data(), cur.size(), -1, true };
+        return true;
+    }
+
+    // eligibility of the fast top-k path for chains that carry no context
+    // state (grammar, reasoning budget and chain shape; the backend-sampled
+    // token guard needs the context and stays with the ctx-based entries)
+    bool topk_eligible() const {
+        if (grmr || rbudget) {
+            return false;
+        }
+
+        const int n_chain = llama_sampler_chain_n(chain);
+        if (n_chain < 1 || n_chain > 2) {
+            return false;
+        }
+        if (strcmp(llama_sampler_name(llama_sampler_chain_get(chain, 0)), "top-k") != 0) {
+            return false;
+        }
+        if (n_chain == 2 && strcmp(llama_sampler_name(llama_sampler_chain_get(chain, 1)), "dist") != 0) {
+            return false;
+        }
+
         return true;
     }
 
@@ -673,7 +712,7 @@ llama_token_data_array * common_sampler_sample_topk(struct common_sampler * gsmp
 
     // the fast path only covers plain top-k chains (the draft sampler); grammar,
     // reasoning budget and backend sampling need the regular path
-    if (gsmpl->grmr || gsmpl->rbudget) {
+    if (!gsmpl->topk_eligible()) {
         return nullptr;
     }
 
@@ -681,18 +720,51 @@ llama_token_data_array * common_sampler_sample_topk(struct common_sampler * gsmp
         return nullptr;
     }
 
-    const int n_chain = llama_sampler_chain_n(gsmpl->chain);
-    if (n_chain < 1 || n_chain > 2) {
-        return nullptr;
-    }
-    if (strcmp(llama_sampler_name(llama_sampler_chain_get(gsmpl->chain, 0)), "top-k") != 0) {
-        return nullptr;
-    }
-    if (n_chain == 2 && strcmp(llama_sampler_name(llama_sampler_chain_get(gsmpl->chain, 1)), "dist") != 0) {
+    if (!gsmpl->set_logits_topk(ctx, idx, k)) {
         return nullptr;
     }
 
-    if (!gsmpl->set_logits_topk(ctx, idx, k)) {
+    llama_sampler_apply(gsmpl->chain, &gsmpl->cur_p);
+
+    GGML_ASSERT(gsmpl->cur_p.selected != -1 && "no selected token during sampling - check your sampling configuration");
+
+    return &gsmpl->cur_p;
+}
+
+llama_token_data_array * common_sampler_sample_topk_row(struct common_sampler * gsmpl, const float * logits_row, int n_vocab, int k) {
+    // no synchronization here: the caller fetched the row and owns the drain
+    const auto tm = gsmpl->tm();
+
+    // the caller must have excluded backend sampling (a raw row cannot carry a
+    // backend-sampled token); the remaining guards match the ctx-based entry
+    if (!gsmpl->topk_eligible()) {
+        return nullptr;
+    }
+
+    if (!gsmpl->set_logits_topk_row(logits_row, n_vocab, k)) {
+        return nullptr;
+    }
+
+    llama_sampler_apply(gsmpl->chain, &gsmpl->cur_p);
+
+    GGML_ASSERT(gsmpl->cur_p.selected != -1 && "no selected token during sampling - check your sampling configuration");
+
+    return &gsmpl->cur_p;
+}
+
+llama_token_data_array * common_sampler_sample_row(struct common_sampler * gsmpl, const float * logits_row, int n_vocab) {
+    // packed draft-step variant of common_sampler_sample: the regular
+    // full-vocab candidate build and chain apply on an explicit host row.
+    // no synchronization - the caller fetched the row and owns the drain.
+    // grammar and reasoning budget need the regular context-based path
+    // (a nullptr return tells the caller to fall back to it)
+    if (gsmpl->grmr || gsmpl->rbudget) {
+        return nullptr;
+    }
+
+    const auto tm = gsmpl->tm();
+
+    if (!gsmpl->set_logits_row(logits_row, n_vocab)) {
         return nullptr;
     }
 
