@@ -4946,7 +4946,9 @@ static bool ggml_cuda_try_group_mmvq(ggml_backend_cuda_context & cuda_ctx, const
         ggml_cuda_mmvq_group_copyback cb = {};
         if (!direct[m]) {
             cb.temp   = temps[m];
-            cb.nbytes = members[m]->src[0]->ne[1] * members[m]->ne[0] * sizeof(float);
+            // the temp holds one float per row (T=1): copy the member's full
+            // result, not the full 2-D area
+            cb.nbytes = ggml_nbytes(members[m]);
         }
         pending.emplace(members[m], cb);
     }
