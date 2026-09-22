@@ -1525,3 +1525,40 @@ to Gemini's guard battery, die 3 is the dev cell.
   21.4-24.8 t/s = +40-61% vs today's 14.43-15.38 and a 1.76-2.04x MTP
   multiplier vs OFF (12.17-12.18) - up from 1.15-1.26x. Receipt:
   results/MTP_overhead_2026-09-22.md.
+- E-064 2026-09-22 REAL TP3 v1-FLAG CELL MEASURED (single rep, Chris:
+  one run). Provenance per ARM IDENTITY LAW: binary from wt-v1flag @
+  b4ad90c5a (= 8a4ebbcaa^, v1 partial-relocation semantics; boot log
+  has ZERO full-isolation lines - no "leading the backend list", no
+  isolation audit - and the v1 "MTP draft device: ROCm3" load line),
+  lane 8081, 200k, t3flag boot line identical to the ladder arms.
+  RESULT: decode 12.81 t/s, accept 0.66667, mean_len 3.0 (receipt
+  /home/chris/v1flag_single.jsonl, server log /home/chris/
+  v1flag_single_server.log). PLACEMENT: between in-split 14.73/14.67
+  (-13%) and full isolation 7.58 (+69%) - v1 is decisively NOT the
+  full-isolation collapse; the TP2 ordering (in-split >= v1-flag >>
+  full iso) holds at TP3@200k, with v1's cost vs in-split larger at
+  200k than the TP2@10k -2.4%. Full-battery second rep + 10k v1 cell
+  queued to complete the table of record; MTP-OFF @ 200k (never run
+  in this campaign) also queued x2. Table of record follows when the
+  cells land.
+- E-065 2026-09-22 Integration: amd/mtp-overhead merged (2ad756a59,
+  ledger keep-both). DELIVERABLES (all env-gated, unset =
+  byte-identical, host-tested): LLAMA_DRAFT_FAST_TOPK=1 (heap top-k
+  off the logits row, deletes full-vocab candidate build + full-size
+  partial_sort per draft step; bit-exact arrays + drafted token in
+  ~222k trials, ties documented), LLAMA_TP_BACKEND_SAMPLING=1
+  (instrumented unrefusal; meta aborts at TOP_K/ARGSORT split state
+  prove on-device sampling needs head re-shard or a per-shard top-k op
+  - a subsystem project), LLAMA_SPEC_TIMELINE=1 + LLAMA_DECODE_TIMELINE=1
+  (step/batch/drain attribution). FACTS OF RECORD: the refusal is the
+  defensive "-sm tensor" fallback from #23287, unimplemented not
+  fundamental; output.weight is vocab-axis sharded and the 517 KB row
+  materializes only via spliced host gets (no post-head allreduce in
+  this fork); the draft loop is inherently lockstep (id(N) is a
+  compute input of step N+1 via eh_proj) so CPU/draft overlap is dead
+  on dependency. REVISED MODEL: 12-15 ms/step -> 21.4-24.8 t/s class
+  (+40-61% vs today's 14.7, MTP multiplier 1.76-2.04x vs OFF);
+  fast-topk recovers only the CPU slice; the ~20 ms/step drain/
+  relaunch needs the TIMELINE attribution cell then device-side work.
+  SERVED VALIDATION QUEUE: TIMELINE attribution cell, FAST_TOPK A/B
+  (greedy byte-identical gate), backend-sampling abort capture.
