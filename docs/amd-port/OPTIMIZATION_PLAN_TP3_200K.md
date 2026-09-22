@@ -2042,3 +2042,53 @@ to Gemini's guard battery, die 3 is the dev cell.
   sha, accept 0.66667/3.00 gate, engagement = one INFO line at first decode +
   [decode-timeline] inputs columns collapse to ~0.00-0.01 ms/ubatch; round
   -0.0..-0.15 ms (inside noise). Composable with all merged arms.
+
+- E-085 2026-09-22 VERIFY-TRANSPORT DESK COMPLETE (wt-verify-transport on
+  amd/verify-transport, campaign HEAD dd9b275f6; RCCL spike run under the
+  campaign boot lock, dies 0/1/2, receipts rccl_probe_full2_20260922_174518.txt
+  + rccl_probe_transport2_20260922_174701.txt, desk receipt
+  VERIFY_TRANSPORT_2026-09-22.md). (1) MAP - the transport swap needs no new
+  subsystem: ggml-cuda already registers ggml_backend_comm_init /
+  comm_allreduce_tensor proc addresses (HIP included) and the meta backend
+  already prefers comm_allreduce over the butterfly; the serving build has
+  GGML_HIP_RCCL=OFF so GGML_USE_NCCL is never defined and every boundary
+  falls to allreduce_fallback. The internal AR (allreduce.cu) is compiled
+  out on HIP and is 2-rank only. Butterfly fp32 sum order for n=3 derived
+  from the meta code: ((r0+r2)+r1), bit-identical across ranks (commutativity
+  + copyback). (2) RCCL SPIKE - FEASIBLE, WINS: RCCL 2.20.5 (gfx900 device
+  code embedded in librccl.so.1.0.60200) initializes 3 ranks in ~650 ms with
+  canAccessPeer=0 all pairs; transport = SHM/direct/direct on every channel
+  (host shared memory, pipelined, 2 channels, ring+tree). Grouped
+  ncclAllReduce from one host thread (the exact ggml integration shape):
+  32 KB fp32 avg 94.0 us vs 212.0 us for a faithful butterfly primitive
+  emulation on the same boot (2.26x); 128 KB: 152.4 vs 340.3 us (2.23x).
+  Against the SERVED ~1 ms/boundary (4 staged copies + 3 graph dispatches
+  on top of the primitive) RCCL removes ~85-90% of the boundary tax:
+  modeled ~35-45 ms/round of the ~48 ms tax = +15-25% decode class.
+  (3) ACCEPTANCE EXPERIMENT (probe tier, 64 seeds x 2 sizes): NOT BIT-EXACT,
+  as fp non-associativity predicts: 0/64 seeds byte-match the butterfly
+  grouping; ~3.5% (8192 elems) / ~4.4% (32768 elems) of elements differ,
+  max ULP 64/256, bounded dust (no sign flips); RCCL outputs byte-identical
+  ACROSS ranks 64/64 (replica consistency preserved). VERDICT per campaign
+  law: sum-order reorder = numerics class change = NEEDS CHRIS'S EXPLICIT
+  SIGN-OFF. No RCCL algo/proto can reproduce a uniform association (ring
+  reduce-scatter reorders per chunk), so bit-exactness is unreachable by
+  env tuning; the only bit-exact device collective shape is a fixed-order
+  one-shot AR (allreduce.cu class) - separate desk if the reorder is
+  declined. (4) INTEGRATION (implemented, gated): ggml-cuda.cu HIP default
+  comm mode = init_none (butterfly) - unset env keeps today's bytes on
+  every build, RCCL stays opt-in via the existing GGML_CUDA_ALLREDUCE=nccl
+  (a GGML_RCCL_BOUNDARY alias was rejected as a second knob). Served-arm
+  spec for the sign-off window: build -DGGML_HIP_RCCL=ON (compile clean,
+  librccl links), run GGML_CUDA_ALLREDUCE=nccl, record RCCL connect lines
+  as the acceptance fingerprint; greedy sha WILL differ (that is the
+  signed-off change) - gates that must hold: same-sha determinism across
+  two boots of the arm, accept 0.66667/3.00 band, 8-needle, engagement =
+  boundary tax lines gone + decode +15-25% class. Host tests:
+  test_pinned_staging_host, test_verify_row_sampling_host,
+  test_mtp_sampling_host, test_packed_get_host, test_async_input_host all
+  PASS; gfx900 compile clean 0 warnings with and without
+  GGML_HIP_RCCL=ON. (5) SECONDARY (pinned-ring async staging for the
+  legacy butterfly, -2..-6 ms/round): designed, deliberately NOT
+  implemented while the ~35-45 ms RCCL lever awaits sign-off; it becomes
+  the fallback lever only if the reorder is declined.
