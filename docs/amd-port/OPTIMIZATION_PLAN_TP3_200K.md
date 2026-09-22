@@ -1826,3 +1826,33 @@ to Gemini's guard battery, die 3 is the dev cell.
   state: lane 8083 clean, lock released, stock clocks throughout, no
   driver events.
 
+- E-077 2026-09-22 OPERATING POINT CLOSED + ATTRIBUTION CORRECTION
+  (MTPgains receipt, E-073..E-076 integrated; coordinator entries).
+  (1) VRAM VERDICT: at 200k, v1 (partial, mode line verified) frees
+  ~456-491 MiB per serving die at ZERO decode cost (probe 14.935 =
+  parity; post-probe free in-split 9.5/106.1/54.0 MiB = OOM-adjacent
+  vs v1 500.6/570.4/510.5; draft die 2.32 GiB used). CANONICAL LAUNCH
+  SCRIPT /home/chris/launch_tp3_200k.sh FLIPPED to v1 default
+  (--spec-mtp-device ROCm3, HIP_VISIBLE_DEVICES 0,1,2,3); full
+  isolation stays opt-in behind LLAMA_SPEC_MTP_STRICT=1. Baseline
+  config block to be re-stamped on the v1 config at the next green
+  battery. (2) ATTRIBUTION CORRECTION (210 rounds): the 37 ms/step
+  draft-loop model was MISATTRIBUTED - the draft loop costs 11.05
+  ms/round total (2.3-2.7 ms/step device, 1.1 ms/step CPU). The round
+  (~190-195 ms at 14.9 t/s) is owned by the TARGET VERIFY decode: the
+  4-token verify ubatch issues blocking at mean 85 / median 138 ms
+  inside graph_compute (sync drain only 0.04 ms - the wait is the
+  device serial chain: 9 subgraph replays x 3 dies + n=3 host-staged
+  butterfly allreduce boundaries), plus ~40-55 ms/round of host
+  sampling/batch. FAST_TOPK verdict: engaged (-15% sample time,
+  round 10.9 -> 10.27 ms), byte-exact (sha 4beb1ba25219ee9b across
+  all arms), +0.2% t/s = noise at 200k - keep enabled, not a lever.
+  Arm G: on-device sampling blocker pinned at ggml-backend-meta.cpp:814
+  (SPLIT_AXIS_UNKNOWN assert) - head re-shard or per-shard top-k op
+  required, as designed. (3) RETARGET: the gains road is now (a) the
+  40-55 ms/round host slice (plain C++ - profile then optimize),
+  (b) the verify-ubatch device chain (allreduce transport + replay
+  count - the device-side subsystem), (c) drain arms (PACKED_GET/
+  LIGHT_SYNC) validation on the rebuilt binary. Verify-round attack
+  desk dispatched; timeline logs (T1/F1, -lv 4) on disk for offline
+  profiling.
