@@ -1097,3 +1097,7 @@ to Gemini's guard battery, die 3 is the dev cell.
   design that could give memory-fit AND parity. Until then the 200k tile
   question stays: unchunked crashes, chunked is slower than shipped f32
   SGEMM at M=128 (2.8 vs ~4.3 wall).
+- E-050 2026-09-21 N-span chunking desk dispatched: wt-tile-nspan on
+  amd/tile-nspan - the named E-049 next link (N-span windows with full-K
+  contiguous slabs: no gather, keeps gridDim.z fill, targets memory-fit
+  AND M=128 parity vs the 4.28-4.33 unchunked reference). Die 3.
