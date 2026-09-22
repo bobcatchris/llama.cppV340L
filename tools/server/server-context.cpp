@@ -4078,6 +4078,14 @@ private:
 
             SLT_DBG(slot, "accepted %d/%d draft tokens, new n_tokens = %d\n", (int) ids.size() - 1, (int) n_draft, slot.prompt.n_tokens());
         });
+
+        // LLAMA_DRAFT_PREFIX_CATCHUP: decode the staged catch-up batches now
+        // that the accept loop has decided the accepted prefixes (a no-op for
+        // the regular in-process catch-up)
+        if (!common_speculative_catchup(spec.get())) {
+            SRV_ERR("%s", "failed to process speculative catch-up\n");
+            throw std::runtime_error("failed to process speculative catch-up");
+        }
     }
 
     int get_slot_n_ctx() {

@@ -167,6 +167,10 @@ struct common_speculative_impl {
 
     virtual void accept(llama_seq_id seq_id, uint16_t n_accepted, bool is_other) = 0;
 
+    // decode batches staged by process() once the accepted prefix is known
+    // (LLAMA_DRAFT_PREFIX_CATCHUP); the base implementation is a no-op
+    virtual bool catchup() { return true; }
+
     // (optional) serialize/restore per-seq internal state (e.g. eagle3's deferred boundary).
     virtual bool get_state(llama_seq_id /*seq_id*/, std::vector<uint8_t> & /*data*/) const { return false; }
     virtual void set_state(llama_seq_id /*seq_id*/, const std::vector<uint8_t> & /*data*/) {}
@@ -1215,6 +1219,17 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
     bool packed_get = false;
     bool light_sync = false;
 
+    // accepted-prefix catch-up (LLAMA_DRAFT_PREFIX_CATCHUP): process() stages
+    // the catch-up batch instead of decoding it, and catchup() decodes only
+    // rows 0..n_accepted per seq once the accept loop has run. the rejected
+    // rows' cells are never written, so there is nothing to roll back.
+    // catchup_rows[seq]: -1 = staged, full rows (no accept decision yet);
+    // >= 0 = keep exactly this many rows
+    bool prefix_catchup = false;
+    bool catchup_staged = false;
+    llama_batch batch_catchup;
+    std::vector<int32_t> catchup_rows;
+
     // Per-sequence cross-batch carryover: pair (h_p, x_{p+1}) at MTP pos p+1.
     // The last h-row of one process() call needs the first token of the NEXT
     // call to pair with, so it's stashed here until that next call fires.
@@ -1259,6 +1274,9 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
         // llama_batch_init allocates only one of token/embd; MTP needs both.
         // TODO: fix, how to call without malloc
         batch.token = (llama_token *) malloc(sizeof(llama_token) * n_b);
+
+        batch_catchup = llama_batch_init(/*n_tokens=*/ n_b, /*embd=*/ n_embd, /*n_seq_max=*/ 1);
+        batch_catchup.token = (llama_token *) malloc(sizeof(llama_token) * n_b);
 
         smpls.resize(n_seq);
         for (auto & s : smpls) {
@@ -1315,6 +1333,16 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
             llama_set_packed_fetch(ctx_dft, true);
         }
 
+        // the prefix catch-up has nothing to skip when the draft shares the
+        // target KV (no catch-up decode runs at all)
+        static const bool prefix_catchup_env = getenv("LLAMA_DRAFT_PREFIX_CATCHUP") != nullptr;
+
+        prefix_catchup = prefix_catchup_env && !is_mem_shared;
+        if (prefix_catchup_env && !prefix_catchup) {
+            SPC_WRN("%s", "LLAMA_DRAFT_PREFIX_CATCHUP ignored (shared draft context)\n");
+        }
+        catchup_rows.assign(n_seq, -1);
+
         if (chain_heads) {
             this->params.n_max = std::min(this->params.n_max, n_mtp_layers);
 
@@ -1352,6 +1380,100 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
             batch.token = nullptr;
         }
         llama_batch_free(batch);
+
+        if (batch_catchup.token != nullptr) {
+            free(batch_catchup.token);
+            batch_catchup.token = nullptr;
+        }
+        llama_batch_free(batch_catchup);
+    }
+
+    // decode the staged catch-up batch (LLAMA_DRAFT_PREFIX_CATCHUP): rows
+    // 0..n_accepted for each staged seq that went through the accept loop,
+    // all staged rows for the rest (e.g. prefill ubatches, non-spec decodes).
+    // resets the staging state.
+    bool catchup_decode() {
+        if (!catchup_staged) {
+            return true;
+        }
+
+        auto * ctx_dft = this->params.ctx_dft;
+
+        static const bool tl_on = getenv("LLAMA_SPEC_TIMELINE") != nullptr;
+
+        const int64_t t_catchup_start = tl_on ? ggml_time_us() : 0;
+
+        const size_t row_bytes = (size_t) n_embd * sizeof(float);
+
+        common_batch_clear(batch_catchup);
+
+        std::vector<llama_pos> pos_beg(n_seq, -1);
+
+        int n_rows = 0;
+        for (llama_seq_id seq_id = 0; seq_id < (llama_seq_id) n_seq; ++seq_id) {
+            if (i_batch_beg[seq_id] < 0) {
+                continue;
+            }
+
+            const int32_t n_seq_rows = i_batch_end[seq_id] - i_batch_beg[seq_id] + 1;
+            const int32_t n_keep = catchup_rows[seq_id] < 0 ? n_seq_rows :
+                    std::min<int32_t>(catchup_rows[seq_id], n_seq_rows);
+
+            for (int32_t i = 0; i < n_keep; ++i) {
+                const int32_t b = i_batch_beg[seq_id] + i;
+
+                common_batch_add(batch_catchup, batch.token[b], batch.pos[b], { seq_id }, 0);
+                std::memcpy(batch_catchup.embd + (size_t) (batch_catchup.n_tokens - 1) * n_embd,
+                        batch.embd + (size_t) b * n_embd, row_bytes);
+                n_rows++;
+            }
+
+            if (n_keep > 0) {
+                pos_beg[seq_id] = batch.pos[i_batch_beg[seq_id]];
+            }
+        }
+
+        bool ok = true;
+        if (n_rows > 0) {
+            auto * mem_dft = llama_get_memory(ctx_dft);
+
+            for (int head = 0; head < n_mtp_layers; ++head) {
+                if (chain_heads) {
+                    // same per-head KV rebuild as the in-process catch-up
+                    for (llama_seq_id seq_id = 0; seq_id < (llama_seq_id) n_seq; ++seq_id) {
+                        if (pos_beg[seq_id] >= 0) {
+                            llama_memory_seq_rm(mem_dft, seq_id, pos_beg[seq_id], -1);
+                        }
+                    }
+                    llama_set_nextn_layer_offset(ctx_dft, head);
+                }
+
+                const int32_t rc = llama_decode(ctx_dft, batch_catchup);
+                if (rc != 0) {
+                    SPC_ERR("llama_decode(ctx_dft) catchup head=%d failed rc=%d\n", head, (int) rc);
+                    ok = false;
+                    break;
+                }
+            }
+
+            if (chain_heads) {
+                llama_set_nextn_layer_offset(ctx_dft, 0); // restore default for non-draft decodes
+            }
+        }
+
+        catchup_staged = false;
+        std::fill(catchup_rows.begin(), catchup_rows.end(), -1);
+
+        if (tl_on && n_rows > 0) {
+            LOG_INF("[spec-timeline] catchup: rows = %d, decode_issue = %.3f ms\n",
+                    n_rows, (ggml_time_us() - t_catchup_start)/1e3);
+        }
+
+        return ok;
+    }
+
+    bool catchup() override {
+        return catchup_decode();
     }
 
     void begin(llama_seq_id seq_id, const llama_tokens & prompt) override {
@@ -1385,6 +1507,13 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
         if (batch_in.token == nullptr || batch_in.embd != nullptr) {
             return true;
         }
+
+        // a staged batch that was not followed by catchup() (e.g. from the
+        // mtmd chunk path) is decoded in full before anything reads the cache
+        if (!catchup_decode()) {
+            return false;
+        }
+
         const int32_t n_tokens = batch_in.n_tokens;
 
         // remember the frist and last batch index for each sequence
@@ -1440,35 +1569,43 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
                 set_h(i_batch_beg[seq_id], pending_h[seq_id].data());
             }
 
-            auto * mem_dft = llama_get_memory(ctx_dft);
+            if (prefix_catchup) {
+                // stage the batch; catchup() decodes the accepted prefix rows
+                // once the accept loop has run. the rejected rows' cells are
+                // never written, so there is nothing to roll back
+                catchup_staged = true;
+                std::fill(catchup_rows.begin(), catchup_rows.end(), -1);
+            } else {
+                auto * mem_dft = llama_get_memory(ctx_dft);
 
-            bool ok = true;
-            for (int head = 0; head < n_mtp_layers; ++head) {
-                if (chain_heads) {
-                    // ref: https://github.com/ggml-org/llama.cpp/pull/24340/changes#r3413498544
-                    for (llama_seq_id seq_id = 0; seq_id < (llama_seq_id) n_seq; ++seq_id) {
-                        if (i_batch_beg[seq_id] < 0) {
-                            continue;
+                bool ok = true;
+                for (int head = 0; head < n_mtp_layers; ++head) {
+                    if (chain_heads) {
+                        // ref: https://github.com/ggml-org/llama.cpp/pull/24340/changes#r3413498544
+                        for (llama_seq_id seq_id = 0; seq_id < (llama_seq_id) n_seq; ++seq_id) {
+                            if (i_batch_beg[seq_id] < 0) {
+                                continue;
+                            }
+                            llama_memory_seq_rm(mem_dft, seq_id, batch_in.pos[i_batch_beg[seq_id]], -1);
                         }
-                        llama_memory_seq_rm(mem_dft, seq_id, batch_in.pos[i_batch_beg[seq_id]], -1);
+                        llama_set_nextn_layer_offset(ctx_dft, head);
                     }
-                    llama_set_nextn_layer_offset(ctx_dft, head);
+
+                    const int32_t rc = llama_decode(ctx_dft, batch);
+                    if (rc != 0) {
+                        SPC_ERR("llama_decode(ctx_dft) head=%d failed rc=%d (pos=%d)\n",
+                                head, (int) rc, (int) batch_in.pos[0]);
+                        ok = false;
+                        break;
+                    }
                 }
 
-                const int32_t rc = llama_decode(ctx_dft, batch);
-                if (rc != 0) {
-                    SPC_ERR("llama_decode(ctx_dft) head=%d failed rc=%d (pos=%d)\n",
-                            head, (int) rc, (int) batch_in.pos[0]);
-                    ok = false;
-                    break;
+                if (chain_heads) {
+                    llama_set_nextn_layer_offset(ctx_dft, 0); // restore default for non-draft decodes
                 }
-            }
-
-            if (chain_heads) {
-                llama_set_nextn_layer_offset(ctx_dft, 0); // restore default for non-draft decodes
-            }
-            if (!ok) {
-                return false;
+                if (!ok) {
+                    return false;
+                }
             }
         }
 
@@ -1500,6 +1637,12 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
 
     void draft(common_speculative_draft_params_vec & dparams) override {
         auto & ctx_dft = params.ctx_dft;
+
+        // an unflushed staging means the last process() call had no catchup()
+        // follow-up - decode it in full before drafting reads the cache
+        if (!catchup_decode()) {
+            SPC_ERR("%s", "catchup before draft failed\n");
+        }
 
         common_batch_clear(batch);
 
@@ -1756,6 +1899,12 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
         const int32_t i_h = std::min<int32_t>(n_accepted, n_rows - 1);
         const size_t row_bytes = (size_t) n_embd * sizeof(float);
         std::memcpy(pending_h[seq_id].data(), verify_h[seq_id].data() + (size_t) i_h * n_embd, row_bytes);
+
+        if (prefix_catchup && catchup_staged && i_batch_beg[seq_id] >= 0) {
+            // keep rows 0..n_accepted: the sampled token (row 0) plus the
+            // accepted draft rows; the rest is never written
+            catchup_rows[seq_id] = i_h + 1;
+        }
     }
 
     bool need_embd() const override {
@@ -2668,6 +2817,20 @@ void common_speculative_accept(common_speculative * spec, llama_seq_id seq_id, u
             impl_other->accept(seq_id, n_accepted, true);
         }
     }
+}
+
+bool common_speculative_catchup(common_speculative * spec) {
+    bool result = true;
+
+    if (spec == nullptr) {
+        return result;
+    }
+
+    for (auto & impl : spec->impls) {
+        result = result && impl->catchup();
+    }
+
+    return result;
 }
 
 // TODO: support the case of more than one speculative implementations having a state
