@@ -1222,3 +1222,17 @@ to Gemini's guard battery, die 3 is the dev cell.
   expect defer line + zero retries + zero 500s; and residual exposures:
   generation pressure vs the nb=1 TODO, parent/child copy_state_to cell
   duplication not modeled at admission).
+- E-055 2026-09-22 Integration: amd/server-exposures merged (7b1e43505).
+  BOTH E-039 SERVER EXPOSURES FIXED, host-tested to the exact incident
+  cells: (1) global unified-KV admission control (default ON,
+  --kv-admission/--no-kv-admission): a task launches only if its remaining
+  cells plus every in-flight request's remaining cells fit n_ctx; purge
+  idle cached prompts first; 400 if over-cache, else defer to the existing
+  deferred queue - the incident trajectory (6587+3584 trickled 64/4/1 ->
+  off=69 HTTP 500) can no longer occur; (2) FIFO slot fill order (default
+  ON, --kv-fifo-fill): older mid-prompt requests get priority over newer
+  on remaining cells. Host suites ALL PASS incl. predecessor W6 suite;
+  compile-clean. Served validation queued (10k boot, two concurrent 7857
+  prompts: second defers with log line, completes after first, zero
+  context-exceeded). Residual exposures documented (generation pressure,
+  parent/child n_cmpl>1 cell duplication) - out of desk scope, ledgered.
