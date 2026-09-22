@@ -1936,3 +1936,13 @@ to Gemini's guard battery, die 3 is the dev cell.
   overlap with a dependency diagram, RCCL feasibility spike (gfx900
   x4 no-P2P; fp-sum-order acceptance experiment designed, not run).
   (3) disc3 (v1 warm battery) result = record only.
+- E-080 2026-09-22 disc3 RECORD (v1 full battery, cooled dies, single
+  boot after idle): 5/5 GREEN - decode 15.20 (+1.72% vs 14.94),
+  prefill 116.72, canary/determinism/needle clean. The 13.27 re-stamp
+  FAIL is thereby attributed: THERMAL SOAK from the fifth consecutive
+  boot, not a v1 cost. Final mode ranking on clean silicon: v1
+  15.08-15.20 across every regime >= in-split 14.87-15.23 (parity to
+  slightly ahead) >> full isolation 7.58. The in-split serving
+  default stands per Chris's call; the v1 flag path is proven healthy
+  at full battery and carries the ~490 MiB/die dividend whenever
+  serving-die headroom is needed.
