@@ -1297,10 +1297,13 @@ struct ggml_tensor * llama_model_loader::create_tensor(
         n_created++;
     }
 
-    // full MTP isolation: the draft reads the shared embeddings/LM head, so also
-    // create a whole copy on the MTP device (dedup by name for tied embeddings);
-    // the original tensor and its placement are untouched
-    if (dev_mtp && (tn.tensor == LLM_TENSOR_TOKEN_EMBD || tn.tensor == LLM_TENSOR_OUTPUT)) {
+    // full MTP isolation (LLAMA_SPEC_MTP_STRICT=1): the draft reads the shared
+    // embeddings/LM head, so also create a whole copy on the MTP device (dedup
+    // by name for tied embeddings); the original tensor and its placement are
+    // untouched. the default draft-device mode (partial, v1) leaves them on
+    // the model split
+    static const bool mtp_full = getenv("LLAMA_SPEC_MTP_STRICT") != nullptr && atoi(getenv("LLAMA_SPEC_MTP_STRICT")) != 0;
+    if (mtp_full && dev_mtp && (tn.tensor == LLM_TENSOR_TOKEN_EMBD || tn.tensor == LLM_TENSOR_OUTPUT)) {
         ggml_context * ctx_mtp = ctx_for_buft(ggml_backend_dev_buffer_type(dev_mtp));
         if (!ggml_get_tensor(ctx_mtp, ggml_get_name(tensor))) {
             ggml_tensor * tensor_mtp = ggml_dup_tensor(ctx_mtp, cur);

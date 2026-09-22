@@ -1270,8 +1270,12 @@ private:
             }
 
             if (params_base.dev_mtp) {
-                SRV_INF("MTP draft context runs on %s (fully isolated: nextn weights + KV + duplicated embeddings/LM head)\n",
-                        ggml_backend_dev_name(params_base.dev_mtp));
+                const bool mtp_full = getenv("LLAMA_SPEC_MTP_STRICT") != nullptr && atoi(getenv("LLAMA_SPEC_MTP_STRICT")) != 0;
+                SRV_INF("draft-device mode: %s\n", mtp_full ? "full isolation" : "partial (v1)");
+                SRV_INF("MTP draft context runs on %s (%s)\n",
+                        ggml_backend_dev_name(params_base.dev_mtp),
+                        mtp_full ? "full isolation: nextn weights + KV + duplicated embeddings/LM head"
+                                 : "partial (v1): nextn weights + KV on the draft device, shared embeddings/LM head on the model split");
             }
 
             params_base.speculative.draft.ctx_tgt = ctx_tgt;
