@@ -1584,3 +1584,20 @@ to Gemini's guard battery, die 3 is the dev cell.
   isolation is NOT a candidate for any latency-sensitive lane; its value is
   headroom (~602 MiB/die at TP3/200k, ~177 MiB/die at TP2/10k vs in-split).
   Voltage/clock sweep authorized next (Chris-directed, separate receipt).
+- E-066 2026-09-22 REGRESSION CANDIDATE #3 + pipeline state. MTP-OFF
+  @ 200k rep 1 (merged tree, stock clocks, lane 8081, boot
+  tp3off-rep1 08:05:43): decode 10.47 t/s, prefill 100.52. Decode is
+  -29.9% vs the MTP baseline (expected for OFF) but -14% vs the
+  12.24 no-spec reference at 200k (baseline_tp3_200k.json config
+  block) - the merged tree's OFF path is a THIRD regression candidate
+  alongside the ub512 decode cost (-4%) and thermal slide (~-2%).
+  Rep 2 running; if confirmed, the b512-vs-ub512 A/B (assigned to
+  Gemini, hub #1362) plus an arm-level bisect (which merge moved OFF
+  from ~12.2 to ~10.5) goes to the top of Priority Zero. STEP A
+  merged this tick (eca7a14df; server-context conflict resolved
+  keep-both-invariant); Gemini's duplicate STEP B cancelled (hub
+  #1362). Cell chain: off1 done, off2 running, v1-flag 200k rep2 +
+  10k queued, then the interleaved 2k A/B (in-split vs draft-device,
+  merged build, probe_2k_decode.py, mode-line artifacts, per-die
+  VRAM) - answers Chris's origin question: was the draft device ever
+  actually faster at 2k on real code.
