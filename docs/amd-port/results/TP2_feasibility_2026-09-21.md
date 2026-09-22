@@ -352,3 +352,16 @@ more serving-die headroom than the config of record and identical acceptance
 200k serving lane: NO on decode-sensitive workloads; the config of record
 (14.7 t/s) stands. The headroom reading matters only if a future lane needs
 the serving-die margin (e.g. longer contexts or larger ubatch experiments).
+
+## Result 9 - STEP A restore verified served (2026-09-22)
+
+STEP A commit 3e576bca4 (v157, 15ebc5165 + mode split) verified on TP2@10k,
+port 8082, STRICT UNSET (partial/v1 default):
+- "load_model: draft-device mode: partial (v1)" (SRV_INF, default verbosity)
+- no duplication lines, no isolation audit line (audit is full-mode only)
+- decode probe (32 tokens after 2k prefill): 11.20 t/s, accept-path healthy;
+  the exact-cell v1-class measurement lands in STEP B on the merged tree
+  (9f4a4b19d) after the coordinator's merge.
+Full-mode engagement text ("full isolation" + duplication + audit 0.00) was
+verified earlier on the same tree (Results 4/7/8). Artifacts:
+mode_partial_smoke_20260922.log.
