@@ -295,3 +295,35 @@ binding constraint (its B-vs-D saving is real but small: ~169 MiB/die over
 in-split, and in-split itself only leaves 63-67 MiB/die free at 10k).
 
 Artifacts: tp2feas_t2flag10k{5,6}_20260922_* (battery jsonl committed).
+
+## Result 7 - TP3 three-way at 10k on the isolation build (2026-09-22)
+
+Same protocol as Result 5, TP3 (dies 0/1/2; draft die 3 in arm C), -c 10000,
+b512/ub512, q4_0 KV, FA, 2 reps, STRICT=1, port 8083.
+
+| arm | boot-ready used c0,c1,c2 (free) | post-probe used (free) | pp 2k | decode ~7.9k | accept / mean |
+|-----|---------------------------------|------------------------|-------|--------------|---------------|
+| A MTP-OFF  r1,r2 | 4535.3/4501.3/4502.9 (3641-3675) | 5191.6/5105.7/5101.3 (2984-3075) | 122.58 / 120.74 | 12.17 / 12.18 | - |
+| B in-split r1,r2 | 5306.1/5264.1/5263.9 (2870-2912) | 6207.2/6117.4/6121.0 (1955-2059) | 117.39 / 118.48 | 15.38 / 15.58 | 0.66667 / 3.00 |
+| C draft-die r1,r2 | 5068.9/5046.8/5046.5 (3107-3129) + die3 1417.3 | 5673.4/5603.6/5607.3 (2503-2572) + die3 2297.2 (5878.8) | 117.64 / 117.88 | 7.57 / 7.58 | 0.66667 / 3.00 |
+
+Audit gate: 0.00 MiB on the model split expected in C; captured at boot in the
+TP2 runs - the TP3 10k boots ran without --verbose where the INFO-level audit
+line did not surface; VERBOSE=1 confirmation boots follow with the 200k arms
+(the physical signature is unambiguous: die 3 holds 1417.3 MiB at boot-ready =
+853.12 duplication + nextn 169.3 + KV + compute, and 2297.2 MiB post-probe).
+
+SAVED per serving die (boot-ready): in-split costs ~765 over OFF; the flag
+costs ~541 over OFF; the flag SAVES ~224/die vs in-split. Post-probe: in-split
+costs ~1015 over OFF; the flag SAVES ~503/die vs in-split.
+
+THE HEADLINE DEFECT CONFIRMED ON TP3: full-isolation decode at 10k is
+7.57/7.58 t/s = -51% vs in-split (15.38/15.58) and -38% vs MTP-OFF
+(12.17/12.18), with acceptance identical (0.66667/3.00) - the same collapse
+measured on TP2 (7.42/7.41). The draft cycle under full isolation roughly
+doubles its per-token cost: the duplicated embedding/LM-head run on the draft
+die at 1x bandwidth and two host-staged hops per draft step replace the
+3-die-bandwidth meta-side path. Prefill is unaffected (117.6-117.9 vs
+117.4-118.5 in-split).
+
+## TP3 200k arms (B in-split / C draft-die, 2 reps) - appended below when complete
