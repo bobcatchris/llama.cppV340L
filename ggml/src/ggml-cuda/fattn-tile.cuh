@@ -216,6 +216,11 @@ static constexpr __host__ __device__ uint32_t ggml_cuda_fattn_tile_get_config_am
     GGML_CUDA_FATTN_TILE_CONFIG_CASE(256, 256,  8, 256, 2,  64, 128)
     GGML_CUDA_FATTN_TILE_CONFIG_CASE(256, 256, 16, 256, 2,  32, 128)
     GGML_CUDA_FATTN_TILE_CONFIG_CASE(256, 256, 32, 256, 2,  32, 128)
+    // Wide-GQA wave64 decode arms (GGML_CUDA_FATTN_TILE_GQA_WIDE): one block
+    // covers all Q heads of a KV head so the KV cache is streamed once instead
+    // of being re-read by gqa_ratio/ncols2 z-blocks.
+    GGML_CUDA_FATTN_TILE_CONFIG_CASE(256, 256, 12, 192, 2,  64, 128)
+    GGML_CUDA_FATTN_TILE_CONFIG_CASE(256, 256, 24, 384, 2,  64, 128)
 
     GGML_CUDA_FATTN_TILE_CONFIG_CASE(320, 256, 32, 512, 1, 128,  64)
 
@@ -1296,6 +1301,39 @@ static void launch_fattn_tile_switch_ncols2(ggml_backend_cuda_context & ctx, ggm
         }
         GGML_ABORT("flash-attn tile (192/128): expected GQA ratio multiple of 8");
     }
+
+#ifdef GGML_USE_HIP
+    // Wide-GQA wave64 decode arm (GGML_CUDA_FATTN_TILE_GQA_WIDE): one block
+    // covers all Q heads of a KV head, so the f16 KV pool is streamed once
+    // instead of being re-read by gqa_ratio/ncols2 z-blocks. nbatch_fa and
+    // nbatch_K match the ncols2=2 instance, so the per-element KQ dot order is
+    // unchanged; the parallel-block scan may pick a different KV split, which
+    // is fp-dust in the final combine (flagged for owner sign-off).
+    if constexpr (DKQ == 256 && DV == 256) {
+        static const bool gqa_wide = getenv("GGML_CUDA_FATTN_TILE_GQA_WIDE") != nullptr;
+        if (gqa_wide && use_gqa_opt && Q->ne[1] <= 4) {
+            const int cc = ggml_cuda_info().devices[ggml_cuda_get_device()].cc;
+            const int warp_size = 32;
+            constexpr size_t nbytes_shared = 0;
+            if (gqa_ratio % 6 == 0) {
+                const int nwarps    = ggml_cuda_fattn_tile_get_nthreads (DKQ, DV, 24, cc) / warp_size;
+                const int nbatch_fa = ggml_cuda_fattn_tile_get_nbatch_fa(DKQ, DV, 24, cc);
+                GGML_LOG_INFO("ggml-cuda: GGML_CUDA_FATTN_TILE_GQA_WIDE=1, fattn tile ncols1=4 ncols2=6 (gqa_ratio %d, T %d)\n", gqa_ratio, (int) Q->ne[1]);
+                launch_fattn<DV, 4, 6>(ctx, dst, flash_attn_tile<DKQ, DV, 4, 6, use_logit_softcap>,
+                    nwarps, nbytes_shared, nbatch_fa, true, true, false, warp_size);
+                return;
+            }
+            if (gqa_ratio % 3 == 0) {
+                const int nwarps    = ggml_cuda_fattn_tile_get_nthreads (DKQ, DV, 12, cc) / warp_size;
+                const int nbatch_fa = ggml_cuda_fattn_tile_get_nbatch_fa(DKQ, DV, 12, cc);
+                GGML_LOG_INFO("ggml-cuda: GGML_CUDA_FATTN_TILE_GQA_WIDE=1, fattn tile ncols1=4 ncols2=3 (gqa_ratio %d, T %d)\n", gqa_ratio, (int) Q->ne[1]);
+                launch_fattn<DV, 4, 3>(ctx, dst, flash_attn_tile<DKQ, DV, 4, 3, use_logit_softcap>,
+                    nwarps, nbytes_shared, nbatch_fa, true, true, false, warp_size);
+                return;
+            }
+        }
+    }
+#endif // GGML_USE_HIP
 
     if constexpr (DKQ <= 512 && DKQ != 320 && DKQ != 192) {
         if (use_gqa_opt && gqa_ratio % 8 == 0) {
