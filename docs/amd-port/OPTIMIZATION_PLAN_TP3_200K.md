@@ -2773,3 +2773,144 @@ to Gemini's guard battery, die 3 is the dev cell.
   Above 262k requires YaRN rope scaling and memory refuses it anyway
   (800k attempt: compute-graph reserve alone OOM'd at 3986 MiB on
   device 0). TP4 max content length of record: 262,144 tokens.
++- E-106 2026-09-23 MMVQ ALN LAYOUT DESK CLOSED: THE BANKED -50.4% LEVER IS
++  AN SCHEDULE-CLONE ARTIFACT, MEASURED NEGATIVE ON THE SERVED SCHEDULE.
++  The W2 t4_aln arm (-50.4% vs base at T=4) ran on the rpb=1 clone; the W3
++  lesson (clone schedules inflate wins) INVERTED for aln. On the real served
++  GCN schedule (rpb=2, nwarps=2) the 48 B uint4 y-operand consumer REGRESSES
++  every gated type at T=4 vs the shipped share arms: q3_K +372.7%, q4_K
++  +113.2%, q5_K +116.2%, q6_K +99.4%, iq3_xxs +10.4%, iq3_s +9.2% (3 sessions
++  each, PASS + VOID spread mix, all >= 5% unambiguous; bit-exact everywhere).
++  T=2/3 also regress (q4_K +107/+106%) - no shape wins, no gate case left.
++  MECHANISM: gfx900 decomposes dwordx4; per sub-block aln issues 4x the
++  y-operand load instructions to use 1 lane plus extract ALU - the legacy
++  dword loads + wave coalescing are already the operand optimum. Producer
++  pair SHIPPED default-OFF and honest: quantize_q8_1<aln> DUAL-emits legacy
++  36 B at +0 (every type stays readable) + 48 B aln region behind it
++  (+3.0% emit cost = 0.13 us, q81-cache amortized), consumer = exact
++  *_apply_aln twins in vecdotq.cuh behind LLAMA_MMVQ_ALN=1, single gate
++  through both sides, unset = byte-identical. DEVICE ORACLE
++  (test_mmvq_aln_oracle.cu) caught the v1 single-layout defect class
++  (iq4_xs read aln bytes as legacy - the exact producer/consumer mismatch
++  the desk was warned about; one src1 feeds many weight types, so
++  single-layout can never be type-safe) and now proves md5-identical dst
++  across unset / share / share+aln x q81-cache on-off, 7 types, T=1..4.
++  q81 cache key grew a layout field (test_q81_cache_host extended, ALL
++  PASS); 16 host suites: 15 PASS + t3_alias documented exit-2. SERVED SPEC:
++  LLAMA_MMVQ_ALN stays UNSET - enabling it would cost ~+2378 ms of the
++  4911 ms T=4 band. Served projection of the desk: 0 (nothing banked); the
++  20 t/s line stays owned by the E-105 TP4+RCCL stack. Re-evaluate aln only
++  on RDNA4+ class (128-bit loads are single instructions) or a schedule
++  where the y stream is again binding. Receipt: W4_mmvq_aln_2026-09-23.md.
+- E-106 (cont.) ALN DESK MERGED (5439aa8df, rebuilt): the named
+  negative + the dual-region producer pair (default OFF, byte-
+  identical unset) + the oracle that caught the single-layout
+  iq4_xs-garbage defect are in the campaign tree. The bandwidth desk
+  (wt-mmvq-bw, amd/mmvq-bw) was forwarded the calibration: the
+  y-operand stream is proven optimal (aln negative); its live rungs
+  are the WEIGHT-stream access pattern + A4 pure-consume ceilings per
+  type - the instrument that names whether the 91-vs-327 GB/s gap has
+  headroom. Both kernel branches merge at landing (keep-both, env
+  gates compose).
+- E-106 (cont.) TP4 APPROVED AS SERVING DEFAULT (Chris: "tp4 is good
+  to go, why even ask") - launch_tp3_200k.sh flipped to 4 ranks
+  (HIP 0,1,2,3 + ROCm0-3), full optimization set + share gates
+  unchanged. PER-LAYER 2x QUESTION ANSWERED (Chris: "1 or 2 layers to
+  2x?"): NO - the decode-ALU tax is distributed proportionally to
+  weight bytes across all 65 blocks (every MMVQ kernel runs ~91 GB/s
+  effective vs 184+ HBM); 2 layers = ~3% of bytes = ~3% max. The 2x-
+  class levers are structural only: (a) the W1 rung set (C1 K-split /
+  A1 staging / B1-equiv perm atom / C2 KSC4) applied to the four
+  dominant types - q3's identical disease measured +22% served - DESK
+  DISPATCHED (wt-mmvq-rungs on amd/mmvq-rungs, off the bandwidth
+  desk's tip); (b) weight-bit reduction (owner's bit-exact rule
+  guards); (c) draft acceptance (trained). MMVQ share extension desk
+  separately delivered + landed (6 per-type bit-exact share kernels,
+  E-103) - its served A/B folds into the same window.
+- E-107 2026-09-23 SESSION STATE OF RECORD (pre-compaction, for the
+  post-compaction restart). SERVING OF RECORD: TP4 (all 4 dies,
+  Chris-approved) + RCCL + the full validated optimization set (6
+  per-type MMVQ share gates + 7 byte-exact fixes) - launch_tp3_200k.sh
+  is the canonical boot. Validated 5/5 GREEN: decode 23.34 @200k /
+  23.23 @10k, prefill 217.71, accept 0.66667, needle 3/3, within-boot
+  determinism. THE JOURNEY: 14.86 butterfly era -> 19.0 (RCCL, E-090/
+  E-094 sign-off) -> 20.01 (per-type share kernels, E-104) -> 23.34
+  (TP4, E-105) = +57%. DECISIONS CLOSED: prefill numerics = bf16-
+  compress stays (f32 measured -7.9/-12-17% and rejected, E-101);
+  v1 draft-device = flag-ready VRAM mode (parity, ~490 MiB/die);
+  efficiency trade = parked (second cooling upgrade removed the
+  constraint, E-100). MEASURED NEUTRAL/OFF: catch-up, hygiene set
+  (shipped byte-exact), T3 grouped, MMVQ share beyond per-type wins,
+  MMVQ aln (named negative, E-106), layer-split (dead, crash + -63%
+  prefill, Chris's early data confirmed). OPERATIONAL LAWS: driver
+  decay ~4-6 h heavy booting -> scheduled reboots; lock settle rule;
+  arm identity law; zombie rule; PID-targeted kills only. ACTIVE:
+  two kernel desks (mmvq-rungs: W1 rung set per type; mmvq-bw:
+  weight-stream A-rungs + pure-consume ceilings) - both zero-GPU in
+  own worktrees, merge keep-both at landing, then one combined served
+  window. THE ROAD TO 40 @10k: effective weight-stream bandwidth
+  (91 vs 327 GB/s measured gap); the only true 2x beyond that is
+  weight-bit reduction (owner's bit-exact rule guards). Note this
+  session's coordinator errors are on the record: E-082 (lock
+  violation), the rocprofv3 self-pkill, the run_mmqab.sh vanish -
+  all remediated, all laws amended.
+- E-108 2026-09-23 POST-COMPACTION CYCLE (desk health + staging).
+  Inbox check: newest Gemini message #1363 (09-22 18:04, ub512 decode
+  A/B GO) is SUPERSEDED - those cells were absorbed by the E-104/E-105
+  measurement chains; no live action items from the comm lane. DESK
+  HEALTH (zombie-rule check): mmvq-bw ALIVE and fast - worktree created
+  08:55, artifacts P0 repro 08:59 / v2 consume-wide 09:24 / v3 s2r
+  09:48, currently running arm dbg_s2r under its own boot lock
+  (desk=mmvq-bw, taken 09:50:46, law-abiding). mmvq-rungs PENDING
+  VERDICT, not yet zombie - worktree created 09:26 today, zero
+  artifacts at 09:51 (25 min, under the 90-min line), consistent with
+  a P0/P1 code-reading phase; relaunch trigger = 90 min silent AND
+  zero artifacts. Note the session task-handle registry lost both
+  agent IDs at compaction (TaskOutput: no task found) while the bw
+  desk's processes demonstrably run - post-compaction, PROCESS-LEVEL
+  evidence (worktree reflog, artifact mtimes, boot lock, ps) is the
+  truth source for desk health, not task handles. STAGING:
+  /home/chris/run_combined_window.sh written + syntax-checked - the
+  TP4-native combined served validation window (200k 5-cell battery +
+  10k decode-only, lane 8081, lock check-and-hold, lock settle rule
+  75 s + per-die <200 MiB, cooldown gate <60 C, arm-identity env/cmdline
+  echo into log head); arms: "regress" (canonical env, post-merge
+  regression guard vs E-105 anchors 23.34/23.23) and arbitrary
+  "<name> EXTRA_ENV" arms for the winning rungs. launch_tp3_200k.sh
+  header stamped with the E-105 TP4 approval + 262144 context ceiling
+  (was still reading as the 3-rank sign-off era). Next: desks run;
+  on landing merge keep-both (rungs then bw, both touch
+  mmvq.cu/vecdotq.cuh), rebuild build-hip, fire combowin regress +
+  winning-rung arms.
+- E-106 2026-09-23 MMVQ WEIGHT-STREAM CELL: S2R BANKED (BIT-EXACT, 5-TYPE
+  WIRE SET) + CONSUME CEILINGS NAMED. Desk mmvq-bw (wt-mmvq-bw,
+  amd/mmvq-bw). (1) P0: W3 anchors reproduce (q3_K share verdict -28.4%
+  exact; aln T=4 negative re-confirmed on all types). (2) A4 pure-consume
+  decomposition (new cfull/cx/cy arms, real rpb=2 schedule): the
+  access-pattern ceiling itself is 70-120 GB/s vs the 327 sequential-read
+  figure - the T=2-4 MMVQ kernels are STALL-bound (SASS census: 1446
+  inst/iteration, 61 VGPR, issue demand ~144 us vs ~800 us measured; dp4a
+  emulation = 6 VALU is SASS-optimal per-op); x/y stream mix costs
+  +41-100%; decode+dp4a tax +29-69% on top. (3) A2 wide-x loads (funnel
+  trio for the 2B-aligned IQ3 pair, uint2 for iq4_xs): NOT-MOVEMENT
+  (-0.9..-1.2%) - x-loads are only 12-20% of the stream; named negative,
+  do not re-open. (4) A3 s2r (row-shared y preload; the rpb=2 schedule
+  makes both rows read the same y words and the compiler does not CSE
+  them): BIT-EXACT at T=2/3/4 on all 7 types (device memcmp) and T=4
+  increment vs the served arm: iq3_s -6.6%, q4_K -6.2% (PASS session),
+  q5_K -5.3%, iq3_xxs -3.1%, iq4_xs -7.7% vs its served base (share OFF
+  there); q3_K/q6_K no increment (OFF). Defect of record: ds word is
+  offset 0 in this tree (ds-first block_q8_1); an upstream qs-first
+  assumption produced NaN and was caught by the oracle before any verdict
+  (tree-check every layout assumption). (5) SERVED-ARM SPEC stacked on
+  E-104: GGML_CUDA_MMVQ_{IQ3S,IQ3XXS,Q4K,Q5K}_S2R=1 + GGML_CUDA_MMVQ_IQ4XS_S2R=1
+  (IQ4XS_SHARE stays unset; LLAMA_MMVQ_ALN stays unset - hard-excluded).
+  Static projection: ~-250 ms of 5873 ms MMVQ (-4.3% MMVQ) on top of the
+  E-104 -6.3% -> decode t/s upper bound ~+3% at 10k class. Gates: mmvq.cu
+  gfx900 TU clean + cmake ggml-hip build gate; oracle zero-defect after
+  the ds-offset fix. Receipts: results/W5_mmvq_bw_receipt_2026-09-23.md +
+  W5_bw_*.txt session logs. NEXT LINK (cost class): the cfull 70-120 GB/s
+  wall is schedule-bound (1.25 kbx iterations of runway per lane) - LDS-y
+  staging design banked in the receipt (occupancy-budgeted), C-rung build
+  cell; decode tax is B-rung but dp4a is per-op optimal, only
+  format-level decode reduction helps.

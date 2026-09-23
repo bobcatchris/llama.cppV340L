@@ -1,15 +1,17 @@
 #include "quantize.cuh"
 #include <cstdint>
 
-// aln=true emits the 48-byte block_q8_1_aln layout (GGML_CUDA_MMVQ_ALN):
-// identical q/ds values, only the store addresses change. aln=false is the
-// shipped layout, byte-identical for every existing consumer.
+// aln=false emits the shipped block_q8_1 layout, byte-identical for every
+// existing consumer. aln=true DUAL-emits: the legacy layout at +0 (so every
+// consumer type keeps reading values, whatever its gate) plus the 48-byte
+// block_q8_1_aln layout at +aln_off for the aln-gated T=4 share arms. The
+// q/ds values are identical in both regions; only store addresses differ.
 template <bool aln>
 __launch_bounds__(CUDA_QUANTIZE_BLOCK_SIZE, 1)
 static __global__ void quantize_q8_1(
         const float * x_ptr, void * vy_ptr,
         const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
-        const int64_t ne0, const uint32_t ne1, const uint3 ne2) {
+        const int64_t ne0, const uint32_t ne1, const uint3 ne2, const int64_t aln_off) {
     ggml_cuda_pdl_lc();
     const float * GGML_CUDA_RESTRICT x  = x_ptr;
     void        * GGML_CUDA_RESTRICT vy = vy_ptr;
@@ -45,12 +47,15 @@ static __global__ void quantize_q8_1(
     const int8_t q = amax == 0.0f ? 0 : roundf(xi / d);
 
     if constexpr (aln) {
-        block_q8_1_aln * y = (block_q8_1_aln *) vy;
-        y[ib].qs[iqs] = q;
+        block_q8_1     * y  = (block_q8_1 *) vy;
+        block_q8_1_aln * ya = (block_q8_1_aln *) ((char *) vy + aln_off);
+        y[ib].qs[iqs]  = q;
+        ya[ib].qs[iqs] = q;
         if (iqs > 0) {
             return;
         }
-        y[ib].ds = make_half2(d, sum);
+        y[ib].ds  = make_half2(d, sum);
+        ya[ib].ds = make_half2(d, sum);
     } else {
         block_q8_1 * y = (block_q8_1 *) vy;
         y[ib].qs[iqs] = q;
@@ -396,9 +401,12 @@ void quantize_row_q8_1_cuda_layout(
     const dim3 block_size(CUDA_QUANTIZE_BLOCK_SIZE, 1, 1);
     const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(num_blocks, block_size, 0, stream);
     if (aln) {
-        ggml_cuda_kernel_launch(quantize_q8_1<true>, launch_params, x, vy, ne00, s01, s02, s03, ne0, ne1, ne2_fastdiv);
+        // legacy region first, aln region right behind it (16 B aligned: the
+        // legacy region is a whole number of 16 B units)
+        const int64_t aln_off = (ne0/QK8_1)*ne1*ne2*ne3 * (int64_t) sizeof(block_q8_1);
+        ggml_cuda_kernel_launch(quantize_q8_1<true>, launch_params, x, vy, ne00, s01, s02, s03, ne0, ne1, ne2_fastdiv, aln_off);
     } else {
-        ggml_cuda_kernel_launch(quantize_q8_1<false>, launch_params, x, vy, ne00, s01, s02, s03, ne0, ne1, ne2_fastdiv);
+        ggml_cuda_kernel_launch(quantize_q8_1<false>, launch_params, x, vy, ne00, s01, s02, s03, ne0, ne1, ne2_fastdiv, /*aln_off=*/ 0);
     }
     GGML_UNUSED(type_src0);
 }

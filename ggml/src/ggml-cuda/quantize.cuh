@@ -21,9 +21,10 @@ void quantize_row_q8_1_cuda(
         ggml_type type_src0, int64_t ne00, int64_t s01, int64_t s02, int64_t s03,
         int64_t ne0, int64_t ne1, int64_t ne2, int64_t ne3, cudaStream_t stream);
 
-// aln = true emits the 48-byte block_q8_1_aln layout (GGML_CUDA_MMVQ_ALN,
-// T=4 MMVQ share arms only); aln = false is the shipped layout. The caller
-// sizes vy for 48 B per block when aln is true (see ggml_cuda_mul_mat_vec_q).
+// aln = true DUAL-emits the shipped block_q8_1 layout at +0 plus the 48-byte
+// block_q8_1_aln layout at +legacy_nbytes (GGML_CUDA_MMVQ_ALN, T=4 MMVQ share
+// arms only); aln = false is the shipped layout alone. The caller sizes vy
+// for 36 + 48 B per block when aln is true (see ggml_cuda_mul_mat_vec_q).
 void quantize_row_q8_1_cuda_layout(
         const float * x, const int32_t * ids, void * vy,
         ggml_type type_src0, int64_t ne00, int64_t s01, int64_t s02, int64_t s03,
