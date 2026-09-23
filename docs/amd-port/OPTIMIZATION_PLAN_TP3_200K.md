@@ -2495,3 +2495,52 @@ to Gemini's guard battery, die 3 is the dev cell.
   the per-shard argmax implementation (predecessor died in design,
   zero WIP). All zero-GPU, env-gated unset = byte-identical, 90-min
   zombie rule armed.
+- E-098 2026-09-22 RCCL COVERAGE EXTENSION DESK COMPLETE (wt-rccl-ext
+  on amd/rccl-ext, resumption of the E-097 rescue; synced onto
+  amd/v340-port-v2 @ 0cd4ffd88 clean; zero-GPU: gate implementation,
+  host tests, transfer-class audit, gfx900 compile; receipt
+  RCCL_EXT_2026-09-22.md). (1) BENCH (predecessor, stands): RCCL-F32
+  2.26-2.4x over the butterfly at EVERY prefill size (-7.69
+  ms/boundary at 10 MiB); RCCL-BF16 (today's served nccl branch) is
+  1.9x faster still but a WIDER numerics class than the E-094
+  sign-off text names (~99.998% elements differ, rel err 3.3e4 at
+  cancellation sites). (2) GATE SHIPPED: GGML_RCCL_PREFILL =
+  f32 | bf16 | butterfly - a size-class switch for prefill-sized
+  boundaries (ne >= 131072) so the owner picks the class; UNSET =
+  today's behavior byte-identical (supersedes the rescued fp32-only
+  bool). Dispatch routes the gate at the boundary: butterfly class,
+  or an rccl class with comms down (init failure / mode not nccl,
+  WARN at init), falls to the meta-backend staging; the nccl path
+  honors the class at ne >= 131072 only, upstream per-rank heuristic
+  below untouched; decode is byte-identical in every gate state.
+  =f32 is the narrow class (sum-order dust only, +2.61 ms/boundary
+  vs bf16, ~+1% prefill wall modeled, 2.4x vs butterfly); =bf16 pins
+  today's served class explicitly; =butterfly is the byte-exact exit
+  that keeps the signed-off decode win. (3) HOST TESTS: gate test
+  rewritten to the final mirror (both classes at the exact
+  131071/131072 edge, init-failure fallback n=3->none and n=2
+  internal-up, gate scoping vs the n=2/n>=4 bands, full 1..512-row
+  prefill ladder x 4 gate states) - ALL PASS; 13/13 host suites
+  re-run green; gfx900 compile clean with and without GGML_HIP_RCCL,
+  zero compiler warnings. (4) TRANSFER-CLASS AUDIT (E-084/E-078
+  maps, table in the receipt): after the boundaries every remaining
+  PCIe class is async-staged or needs logic, not a collective -
+  input fan-out 39 die trips staging-able DONE (E-084 ring; rccl
+  bcast NOT competitive, 94-126 us entry vs 10-27 us posted set);
+  draft-ctx h rows + h_nextn fetch irreducible by transport (host
+  relay is structural, needs device->device graph wiring - W6/
+  onsample-class project); logits drains (draft 3 x 517 KB, target
+  4 rows) irreducible today, removed only by on-device sampling
+  (wt-onsample); q4_0 KV never crosses dies. NO further RCCL-able
+  transport exists - the collective-shaped traffic is exactly the
+  boundary allreduces, decode (E-094) + prefill (this gate).
+  (5) SERVED-ARM SPEC (coordinator window): EXT = canonical line +
+  GGML_RCCL_PREFILL=f32; controls REF0 (as-is) and REF- (ALLREDUCE
+  unset) + optional BF16-EXPLICIT (must be byte-identical to REF0 at
+  TP3, free gate sanity cell); gates: prefill guard cell (modeled
+  +1% wall, worst +5.5% - beyond the fail band is a bug), accept
+  0.66667 / len 3.00, needle 3/3, determinism = same greedy sha
+  across two EXT boots (vs REF0 it WILL differ at prefill boundary
+  dust - that is the signed-off class extending, must be STABLE not
+  equal); capture RCCL_DEBUG=INFO connect lines for the prefill size
+  class. Owner decision queued: f32 class vs today's bf16 at prefill.
