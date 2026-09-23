@@ -2631,3 +2631,15 @@ to Gemini's guard battery, die 3 is the dev cell.
   SPEC/DECODE_TIMELINE (expected effect modest: ms/round class; strategic
   value = deletes the draft loop's host row round trips, prerequisite for
   step-batching). Receipt: results/ONSAMPLE_2026-09-22.md.
+- E-099 (cont.) ONSAMPLE MERGED (6067ba75c, rebuilt 22:19). All three
+  subsystem projects are now IN the campaign tree, env-gated, unset =
+  byte-identical: LLAMA_DRAFT_ONDEVICE_ARGMAX (GGML_OP_ARGMAX_SHARD +
+  single-shard sub-row fetch - 24 B/step draft fetch vs 517 KB splice),
+  LLAMA_DRAFT_PACKED_GET / LIGHT_SYNC / PREFIX_CATCHUP / FAST_TOPK /
+  VERIFY_ROW_SAMPLING / ASYNC_INPUT / PINNED_DEV_COPY hygiene set,
+  GGML_RCCL_PREFILL three-way gate, LLAMA_LAUNCH_TIMELINE
+  instrumentation. ALL served arms (onsample A/B, RCCL gate window,
+  launch-timeline proof) queue behind the reboot - staged, one command
+  each. Campaign waiting state: driver decay (reboot pending Chris),
+  prefill numerics class decision, MMVQ share A/B done (neutral,
+  banked).
