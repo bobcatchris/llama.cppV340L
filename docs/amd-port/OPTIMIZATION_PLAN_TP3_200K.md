@@ -2359,3 +2359,15 @@ to Gemini's guard battery, die 3 is the dev cell.
   itself stays merged (removes the abort AND a silent eager tail
   corruption); grouped decode stays env-gated OFF by default, not in
   the stack-up. Receipts t3ab_*.jsonl.
+- E-094 2026-09-22 RCCL SIGN-OFF + SERVING PROMOTION (Chris: "i
+  approve rccl"). Canonical launch script /home/chris/
+  launch_tp3_200k.sh now sets GGML_CUDA_ALLREDUCE=nccl; numerics class
+  change accepted (RCCL sum order, bounded dust, ranks consistent,
+  boot-deterministic - E-090). BASELINE RE-STAMPED UP on the RCCL
+  config: decode gate 14.94 -> 18.72 (measured 19.01/18.72/18.74
+  across three boots; conservative median), allreduce=rccl recorded in
+  the baseline config block. WAYPOINT STATUS vs origin: 17.8@2k era ->
+  18.72-19.01 @200k = the origin number is BEATEN at 5x the context
+  (first time any config has passed 17.8 at deep context). 20 t/s at
+  10k is one lever away (MMVQ kernel arms pending). Byte-exact
+  butterfly remains available by unsetting the env.

@@ -1,5 +1,5 @@
 {
-  "description": "Baseline gates for llama-server TP3 200k (Qwen3.8-27B-ASCII-P1M, draft-mtp)",
+  "description": "Baseline gates for llama-server TP3 200k (Qwen3.8-27B-ASCII-P1M, draft-mtp) - re-stamped 2026-09-22 on the RCCL serving config (Chris sign-off, E-090/E-094): decode 18.72-19.01 across 3 boots",
   "source": "PLOG-101 canonical 200k boot receipt & W0 census decode receipt",
   "ratchets": 1,
   "config": {
@@ -13,7 +13,8 @@
     "batch_size": 512,
     "ubatch_size": 512,
     "temperature": 0.0,
-    "untraced_no_spec_reference_tps": 12.24
+    "untraced_no_spec_reference_tps": 12.24,
+    "allreduce": "rccl"
   },
   "thresholds": {
     "decode_tps_warn_pct": 5.0,
@@ -37,7 +38,7 @@
     "decode_8k_10k": {
       "ctx_target": 7857,
       "completion_tokens": 128,
-      "decode_per_second": 14.94,
+      "decode_per_second": 18.72,
       "mtp_accept_ratio": 0.667,
       "mtp_mean_len": 3.0,
       "description": "Decode throughput at 8k-10k primed context with draft-mtp (PLOG-101)"
