@@ -1,0 +1,190 @@
+== building oracles
+oracle-base BUILD-EXIT:0
+oracle-mine BUILD-EXIT:0
+== base build: no-env dump
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+type 11 done
+type 12 done
+type 13 done
+type 14 done
+type 18 done
+type 21 done
+type 23 done
+dump written: docs/amd-port/results/W7_dump_base_noenv.bin (458752 bytes, 7 types x T=1..4 x 2 outputs)
+== base build: share-spec dump
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+ggml-cuda: GGML_CUDA_MMVQ_Q3K_SHARE=1, q3_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q4K_SHARE=1, q4_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q5K_SHARE=1, q5_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q6K_SHARE=1, q6_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ3XXS_SHARE=1, iq3_xxs decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ3S_SHARE=1, iq3_s decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ4XS_SHARE=1, iq4_xs decode-once share enabled for ncols_dst 2-4
+type 11 done
+type 12 done
+type 13 done
+type 14 done
+type 18 done
+type 21 done
+type 23 done
+dump written: docs/amd-port/results/W7_dump_base_share.bin (458752 bytes, 7 types x T=1..4 x 2 outputs)
+== base build: share+s2r spec dump (s2r dead there - defect of record)
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+ggml-cuda: GGML_CUDA_MMVQ_Q3K_SHARE=1, q3_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q4K_SHARE=1, q4_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q5K_SHARE=1, q5_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q6K_SHARE=1, q6_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ3XXS_SHARE=1, iq3_xxs decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ3S_SHARE=1, iq3_s decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ4XS_SHARE=1, iq4_xs decode-once share enabled for ncols_dst 2-4
+type 11 done
+type 12 done
+type 13 done
+type 14 done
+type 18 done
+type 21 done
+type 23 done
+dump written: docs/amd-port/results/W7_dump_base_s2r.bin (458752 bytes, 7 types x T=1..4 x 2 outputs)
+== my build: no-env dump
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+type 11 done
+type 12 done
+type 13 done
+type 14 done
+type 18 done
+type 21 done
+type 23 done
+dump written: docs/amd-port/results/W7_dump_mine_noenv.bin (458752 bytes, 7 types x T=1..4 x 2 outputs)
+== my build: share-spec dump
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+ggml-cuda: GGML_CUDA_MMVQ_Q3K_SHARE=1, q3_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q4K_SHARE=1, q4_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q5K_SHARE=1, q5_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q6K_SHARE=1, q6_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ3XXS_SHARE=1, iq3_xxs decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ3S_SHARE=1, iq3_s decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ4XS_SHARE=1, iq4_xs decode-once share enabled for ncols_dst 2-4
+type 11 done
+type 12 done
+type 13 done
+type 14 done
+type 18 done
+type 21 done
+type 23 done
+dump written: docs/amd-port/results/W7_dump_mine_share.bin (458752 bytes, 7 types x T=1..4 x 2 outputs)
+== my build: share+s2r spec dump (wiring fix engages)
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+ggml-cuda: GGML_CUDA_MMVQ_Q3K_SHARE=1, q3_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q4K_SHARE=1, q4_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q4K_S2R=1, q4_K s2r decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q5K_SHARE=1, q5_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q5K_S2R=1, q5_K s2r decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_Q6K_SHARE=1, q6_K decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ3XXS_SHARE=1, iq3_xxs decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ3XXS_S2R=1, iq3_xxs s2r decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ3S_SHARE=1, iq3_s decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ3S_S2R=1, iq3_s s2r decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ4XS_SHARE=1, iq4_xs decode-once share enabled for ncols_dst 2-4
+ggml-cuda: GGML_CUDA_MMVQ_IQ4XS_S2R=1, iq4_xs s2r decode-once share enabled for ncols_dst 2-4
+type 11 done
+type 12 done
+type 13 done
+type 14 done
+type 18 done
+type 21 done
+type 23 done
+dump written: docs/amd-port/results/W7_dump_mine_s2r.bin (458752 bytes, 7 types x T=1..4 x 2 outputs)
+== comparisons
+DEFAULT-PATH byte-identity: PASS
+SHARE-ARMS value-identity vs base tree: PASS
+base-tree s2r arm == default (defect confirmed on served build)
+s2r(engaged) bit-exact vs default: PASS
+== SASS check: default-variant kernels
+0 /tmp/w7_sass_bin.txt
+0 /tmp/w7_sass_bin.txt
+[iq3_s] base           us: 1843.1 1834.9 1847.4 | med 1843.1 spread 0.67%
+[iq3_s] share          ORACLE BITEXACT
+[iq3_s] share          us: 687.6 689.5 687.6 | med 687.6 spread 0.27%
+[iq3_s] s2r            ORACLE BITEXACT
+[iq3_s] s2r            us: 687.7 688.3 687.3 | med 687.7 spread 0.15%
+[iq3_s] base           ORACLE BITEXACT
+[iq3_s] base           us: 1832.7 1844.0 1841.2 | med 1841.2 spread 0.61%
+[q4_K] base           us: 1108.4 1108.6 1098.4 | med 1108.4 spread 0.92%
+[q4_K] share          ORACLE BITEXACT
+[q4_K] share          us: 854.6 849.3 844.9 | med 849.3 spread 1.13% SPREAD-FAIL
+[q4_K] s2r            ORACLE BITEXACT
+[q4_K] s2r            us: 850.8 849.9 865.7 | med 850.8 spread 1.85% SPREAD-FAIL
+[q4_K] base           ORACLE BITEXACT
+[q4_K] base           us: 1106.0 1104.1 1103.1 | med 1104.1 spread 0.27%
+[iq3_xxs] base           us: 1937.7 1923.3 1909.3 | med 1923.3 spread 1.48% SPREAD-FAIL
+[iq3_xxs] share          ORACLE BITEXACT
+[iq3_xxs] share          us: 707.7 702.8 706.2 | med 706.2 spread 0.69%
+[iq3_xxs] s2r            ORACLE BITEXACT
+[iq3_xxs] s2r            us: 689.0 689.2 689.0 | med 689.0 spread 0.04%
+[iq3_xxs] base           ORACLE BITEXACT
+[iq3_xxs] base           us: 1932.3 1921.4 1930.9 | med 1930.9 spread 0.57%
+[iq4_xs] base           us: 619.4 618.7 614.4 | med 618.7 spread 0.80%
+[iq4_xs] share          ORACLE BITEXACT
+[iq4_xs] share          us: 519.1 498.0 502.8 | med 502.8 spread 4.18% SPREAD-FAIL
+[iq4_xs] s2r            ORACLE BITEXACT
+[iq4_xs] s2r            us: 529.3 497.0 497.5 | med 497.5 spread 6.48% SPREAD-FAIL
+[iq4_xs] base           ORACLE BITEXACT
+[iq4_xs] base           us: 625.9 627.3 625.4 | med 625.9 spread 0.30%
+[q5_K] base           us: 821.2 821.1 818.4 | med 821.1 spread 0.35%
+[q5_K] share          ORACLE BITEXACT
+[q5_K] share          us: 639.1 643.5 627.9 | med 639.1 spread 2.43% SPREAD-FAIL
+[q5_K] s2r            ORACLE BITEXACT
+[q5_K] s2r            us: 625.6 633.9 641.1 | med 633.9 spread 2.45% SPREAD-FAIL
+[q5_K] base           ORACLE BITEXACT
+[q5_K] base           us: 816.0 815.3 814.6 | med 815.3 spread 0.17%
+[iq3_s-T2] base           us: 501.2 500.6 498.0 | med 500.6 spread 0.63%
+[iq3_s-T2] share          ORACLE BITEXACT
+[iq3_s-T2] share          us: 513.3 503.1 503.4 | med 503.4 spread 2.02% SPREAD-FAIL
+[iq3_s-T2] s2r            ORACLE BITEXACT
+[iq3_s-T2] s2r            us: 496.6 501.7 497.3 | med 497.3 spread 1.01%
+[iq3_s-T2] base           ORACLE BITEXACT
+[iq3_s-T2] base           us: 500.6 498.6 500.7 | med 500.6 spread 0.44%
+[q4_K-T2] base           us: 525.8 512.7 529.6 | med 525.8 spread 3.20% SPREAD-FAIL
+[q4_K-T2] share          ORACLE BITEXACT
+[q4_K-T2] share          us: 460.8 461.2 459.3 | med 460.8 spread 0.42%
+[q4_K-T2] s2r            ORACLE BITEXACT
+[q4_K-T2] s2r            us: 461.7 451.7 452.1 | med 452.1 spread 2.22% SPREAD-FAIL
+[q4_K-T2] base           ORACLE BITEXACT
+[q4_K-T2] base           us: 515.6 518.2 531.3 | med 518.2 spread 3.04% SPREAD-FAIL
+[iq3_xxs-T2] base           us: 483.1 487.6 481.0 | med 483.1 spread 1.37% SPREAD-FAIL
+[iq3_xxs-T2] share          ORACLE BITEXACT
+[iq3_xxs-T2] share          us: 497.8 500.5 497.6 | med 497.8 spread 0.59%
+[iq3_xxs-T2] s2r            ORACLE BITEXACT
+[iq3_xxs-T2] s2r            us: 492.1 489.5 496.1 | med 492.1 spread 1.35% SPREAD-FAIL
+[iq3_xxs-T2] base           ORACLE BITEXACT
+[iq3_xxs-T2] base           us: 480.6 488.5 480.9 | med 480.9 spread 1.65% SPREAD-FAIL
+[iq4_xs-T2] base           us: 291.9 292.2 292.3 | med 292.2 spread 0.13%
+[iq4_xs-T2] share          ORACLE BITEXACT
+[iq4_xs-T2] share          us: 276.6 269.9 276.5 | med 276.5 spread 2.42% SPREAD-FAIL
+[iq4_xs-T2] s2r            ORACLE BITEXACT
+[iq4_xs-T2] s2r            us: 267.5 266.3 273.6 | med 267.5 spread 2.73% SPREAD-FAIL
+[iq4_xs-T2] base           ORACLE BITEXACT
+[iq4_xs-T2] base           us: 295.1 290.4 293.6 | med 293.6 spread 1.63% SPREAD-FAIL
+[q5_K-T2] base           us: 408.6 408.0 408.0 | med 408.0 spread 0.15%
+[q5_K-T2] share          ORACLE BITEXACT
+[q5_K-T2] share          us: 348.1 343.4 344.0 | med 344.0 spread 1.36% SPREAD-FAIL
+[q5_K-T2] s2r            ORACLE BITEXACT
+[q5_K-T2] s2r            us: 350.6 349.8 343.4 | med 349.8 spread 2.03% SPREAD-FAIL
+[q5_K-T2] base           ORACLE BITEXACT
+[q5_K-T2] base           us: 398.8 406.9 403.5 | med 403.5 spread 1.99% SPREAD-FAIL
+[q3_K-T4] base           us: 797.6 788.2 797.1 | med 797.1 spread 1.18% SPREAD-FAIL
+[q3_K-T4] share          ORACLE BITEXACT
+[q3_K-T4] share          us: 801.4 798.2 798.0 | med 798.2 spread 0.43%
+[q3_K-T4] base           ORACLE BITEXACT
+[q3_K-T4] base           us: 797.0 798.1 797.9 | med 797.9 spread 0.14%
+[q6_K-T4] base           us: 5928.0 5890.0 5908.3 | med 5908.3 spread 0.64%
+[q6_K-T4] share          ORACLE BITEXACT
+[q6_K-T4] share          us: 5996.0 5964.3 6007.3 | med 5996.0 spread 0.72%
+[q6_K-T4] base           ORACLE BITEXACT
+[q6_K-T4] base           us: 5940.4 5937.3 5895.8 | med 5937.3 spread 0.75%

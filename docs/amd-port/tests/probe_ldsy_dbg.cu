@@ -1,7 +1,7 @@
 // ldsy defect probe: iq3_s, K=5120, N=2 (one CTA), T=2, tiny vy; runs the
 // share arm and ldsy arms and hex-dumps both dsts for the first mismatches.
 #include "ggml.h"
-#include "/tmp/mmvq_dbg.cu"
+#include "ggml-cuda/mmvq.cu"
 
 #include <cstdio>
 #include <cstdlib>
@@ -90,15 +90,10 @@ int main() {
         }
         HIP_CHECK(hipDeviceSynchronize());
         HIP_CHECK(hipMemcpy(out.data(), dst, out.size()*sizeof(float), hipMemcpyDeviceToHost));
-        printf("%-7s: %d floats\n", names[arm], (int) out.size());
-        if (arm == 0) {
-            ref = out;
-        } else {
-            size_t nmis = 0;
-            for (size_t e = 0; e < out.size(); ++e)
-                if (memcmp(ref.data() + e, out.data() + e, 4) != 0) ++nmis;
-            printf("  mismatches vs share: %zu / %zu\n", nmis, out.size());
-        }
+        char path[128];
+        snprintf(path, sizeof(path), "%s/probe_dst_%s.bin", getenv("DUMPDIR") ? getenv("DUMPDIR") : "/tmp", names[arm]);
+        FILE * f = fopen(path, "wb"); fwrite(out.data(), 4, out.size(), f); fclose(f);
+        printf("%-7s dumped %zu floats to %s\n", names[arm], out.size(), path);
     }
     return 0;
 }

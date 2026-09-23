@@ -8,10 +8,8 @@
 // Arms (per type/T, one process, oracle-gated):
 //   base      share=false, the shipped per-token decode path (default variant)
 //   share     decode-once share apply (the *_SHARE=1 gated path)
-//   s2r       share + row-shared y preload (the *_S2R=1 gated path)
-//   ldsy      share + LDS-y staging (the GGML_CUDA_MMVQ_LDSY=1 gated path)
-//   ldsys2r   share + LDS-y staging + s2r register replay from the records
-//   ldsy:<n>  ldsy with staged runway n kbx slots (default 4)
+//   s2r       share + row-shared y preload (the *_S2R=1 gated path; requires
+//             the s2r switch_type wiring fix this desk landed)
 //
 // ORACLE: the first arm in the list must be base; every later arm's full dst
 // (N rows x T tokens) is device-copied and memcmp'd against it BEFORE any
@@ -67,23 +65,20 @@ static const TypeInfo g_types[] = {
 };
 
 struct ArmSpec {
-    std::string name;   // base | share | s2r | ldsy | ldsys2r | ldsy:<run>
-    int  run = 4;
+    std::string name;   // base | share | s2r
 };
 
-enum ArmKind { ARM_BASE, ARM_SHARE, ARM_S2R, ARM_LDSY, ARM_LDSY_S2R };
+enum ArmKind { ARM_BASE, ARM_SHARE, ARM_S2R };
 
 static ArmKind arm_kind(const ArmSpec & a) {
     if (a.name == "base")     return ARM_BASE;
     if (a.name == "share")    return ARM_SHARE;
-    if (a.name == "s2r")      return ARM_S2R;
-    if (a.name == "ldsys2r")  return ARM_LDSY_S2R;
-    return ARM_LDSY;  // ldsy and ldsy:<run>
+    return ARM_S2R;
 }
 
 // exact launch arguments of ggml_cuda_mul_mat_vec_q for the 2D no-ids case
 // (GCN table: T 2..4 -> nwarps 2, rows_per_cuda_block 2, grid (N/2, 1, 1))
-template <ggml_type type, int T, bool S2R, bool LDSY, int RUN>
+template <ggml_type type, int T, bool S2R>
 static void launch_k(const void * vx, const block_q8_1 * vy, float * dst,
                      const int K, const int stride_row_x, const int stride_col_y,
                      const uint32_t stride_col_dst, const uint32_t stride_channel_y,
@@ -91,7 +86,7 @@ static void launch_k(const void * vx, const block_q8_1 * vy, float * dst,
                      const uint32_t stride_sample_dst, dim3 grid, dim3 block,
                      hipStream_t stream, bool share) {
     const ggml_cuda_mm_fusion_args_device fusion{};
-    mul_mat_vec_q<type, T, false, false, false, S2R, LDSY, RUN>
+    mul_mat_vec_q<type, T, false, false, false, S2R>
         <<<grid, block, 0, stream>>>(
             vx, vy, vy, nullptr, fusion, dst,
             (const uint32_t) K, make_uint3(0, 0, 0), (const uint32_t) stride_row_x,
@@ -102,10 +97,10 @@ static void launch_k(const void * vx, const block_q8_1 * vy, float * dst,
     HIP_CHECK(hipGetLastError());
 }
 
-template <ggml_type type, int T, bool S2R, bool LDSY, int RUN>
+template <ggml_type type, int T, bool S2R>
 static void occ_k(const char * name) {
     hipFuncAttributes attr{};
-    const void * kp = (const void *) &mul_mat_vec_q<type, T, false, false, false, S2R, LDSY, RUN>;
+    const void * kp = (const void *) &mul_mat_vec_q<type, T, false, false, false, S2R>;
     HIP_CHECK(hipFuncGetAttributes(&attr, kp));
     int blocks = 0;
     HIP_CHECK(hipOccupancyMaxActiveBlocksPerMultiprocessor(&blocks, kp, 128, 0));
@@ -121,45 +116,24 @@ static void dispatch_arm(const ArmSpec & a, const void * vx, const block_q8_1 * 
                          const uint32_t stride_sample_dst, dim3 grid, dim3 block,
                          hipStream_t stream, bool occupancy) {
     const ArmKind k = arm_kind(a);
-    // served GCN blocks_per_iter for this (type, T): vdr*nwarps*warp_size/qi
-    constexpr int lr_bpi = get_vdr_mmvq(type) * 2 * 64 / ggml_cuda_type_traits<type>::qi;
     char nm[96];
-    snprintf(nm, sizeof(nm), "%s/%s/T%d/run%d", ggml_type_name(type), a.name.c_str(), T, a.run);
-#define LK(S2R_, LDSY_, RUN_, SHARE_) launch_k<type, T, S2R_, LDSY_, RUN_>(vx, vy, dst, K, \
+    snprintf(nm, sizeof(nm), "%s/%s/T%d", ggml_type_name(type), a.name.c_str(), T);
+#define LK(S2R_, SHARE_) launch_k<type, T, S2R_>(vx, vy, dst, K, \
         stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, \
         stride_channel_dst, stride_sample_dst, grid, block, stream, SHARE_)
-#define OK(S2R_, LDSY_, RUN_) occ_k<type, T, S2R_, LDSY_, RUN_>(nm)
+#define OK(S2R_) occ_k<type, T, S2R_>(nm)
     switch (k) {
         case ARM_BASE:
-            if (occupancy) { OK(false, false, 4); return; }
-            LK(false, false, 4, false);
+            if (occupancy) { OK(false); return; }
+            LK(false, false);
             break;
         case ARM_SHARE:
-            if (occupancy) { OK(false, false, 4); return; }
-            LK(false, false, 4, true);
+            if (occupancy) { OK(false); return; }
+            LK(false, true);
             break;
         case ARM_S2R:
-            if (occupancy) { OK(true, false, 4); return; }
-            LK(true, false, 4, true);
-            break;
-        case ARM_LDSY:
-            if (a.run == 1) { if (occupancy) { OK(false, true, 1); return; } LK(false, true, 1, true); }
-            else if (a.run == 2) { if (occupancy) { OK(false, true, 2); return; } LK(false, true, 2, true); }
-            else if constexpr (lr_bpi >= 16) {
-                if (a.run == 16) { if (occupancy) { OK(false, true, 16); return; } LK(false, true, 16, true); }
-                else if (a.run == 8) { if (occupancy) { OK(false, true, 8); return; } LK(false, true, 8, true); }
-                else { if (occupancy) { OK(false, true, 4); return; } LK(false, true, 4, true); }
-            } else if constexpr (lr_bpi >= 8) {
-                if (a.run == 8) { if (occupancy) { OK(false, true, 8); return; } LK(false, true, 8, true); }
-                else { if (occupancy) { OK(false, true, 4); return; } LK(false, true, 4, true); }
-            } else {
-                if (occupancy) { OK(false, true, 4); return; }
-                LK(false, true, 4, true);
-            }
-            break;
-        case ARM_LDSY_S2R:
-            if (occupancy) { OK(true, true, 4); return; }
-            LK(true, true, 4, true);
+            if (occupancy) { OK(true); return; }
+            LK(true, true);
             break;
     }
 #undef LK
@@ -262,13 +236,7 @@ int main(int argc, char ** argv) {
         char * dup = strdup(argv[4]);
         for (char * tok = strtok(dup, ","); tok; tok = strtok(nullptr, ",")) {
             ArmSpec a;
-            std::string s(tok);
-            const size_t c = s.find(':');
-            if (c != std::string::npos) {
-                a.run = atoi(s.c_str() + c + 1);
-                s = s.substr(0, c);
-            }
-            a.name = s;
+            a.name = std::string(tok);
             arms.push_back(a);
         }
         free(dup);
