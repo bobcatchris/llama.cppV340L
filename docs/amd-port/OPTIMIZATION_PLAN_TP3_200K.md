@@ -3235,3 +3235,21 @@ to Gemini's guard battery, die 3 is the dev cell.
   t/s from 23.26. Standing order (Chris): forward only - no process
   detours; every landing goes merge -> provenance-gated served
   window -> baseline ratchet.
+- E-115 (cont.) REMOTE BACKUP LAW (Chris: "they should push regularly").
+  github rejects any real-history push of the campaign branches (three
+  577 MB census CSVs live in branch HISTORY from 09-21 - trimmed from
+  tips only; history rewriting is BANNED: ledger SHA citations are
+  load-bearing). INSTEAD: /home/chris/push_backups.sh pushes ORPHAN
+  SNAPSHOT branches to origin (bobcatchris/llama.cppV340L - Chris's
+  fork; NEVER duford, NEVER upstream ggml-org): each snapshot = one
+  fresh commit of the branch's current tree (large paths filtered via
+  temp-index), force-pushed to backup/<branch>. First sweep: 34
+  branches OK, 0 failures, backup/v340-port-v2 + backup/mmvq-lds +
+  backup/tp4-bound + backup/tp4-roundmap all on the remote. CADENCE:
+  the coordinator runs push_backups.sh every 30-min cycle and at
+  every desk landing; desks commit WIP to their own branch at every
+  ladder step + append CHECKIN.log lines every ~30 min (owner
+  directive 13:45); agent death must never cost more than one step.
+  Also untracked the three CSVs from the campaign tip (e4d2787d0,
+  files kept on disk, *.kernel_trace.csv gitignored) and trimmed the
+  round-map census CSV per disk hygiene.
