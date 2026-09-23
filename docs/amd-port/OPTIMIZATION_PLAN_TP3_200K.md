@@ -2700,3 +2700,42 @@ to Gemini's guard battery, die 3 is the dev cell.
   Note: tracing inflates absolute times ~2-3x; proportions are the
   signal. Draft/catchup shapes (T=1-3) are only 962 ms combined -
   T=4 is the game.
+- E-103 2026-09-23 MMVQ SHARE EXTENSION DESK CLOSED: ENGAGEMENT FIX + 6
+  TYPES BANKED, ALL BIT-EXACT; THE -43% CLASS WAS A SCHEDULE ARTIFACT.
+  (1) RUNG 0 (propagation hunt catch): the shipped iq3_s share branch
+  required rows_per_cuda_block == 1, but calc_rows_per_block on the GCN
+  table returns 2 for ncols_dst 2-4 -> compile-time dead for every served
+  T=2-4 launch on gfx900. The E-095 served-neutral "structure-bound"
+  attribution is superseded by a simpler cause: the branch never ran.
+  Fixed (decode once per (row, kbx, lane); rows share nothing) and the
+  iq3_s share re-measured on the REAL schedule: -2.8% at T=4 (816.5 ->
+  793.6 us, PASS session), not -43%. The W2 clone ran an rpb=1 schedule
+  that does not exist in the served kernel; its headline does not survive
+  the real one. (2) EXTENSION: new decode/apply split pairs per type
+  (iq3_xxs, q4_K, iq4_xs, q5_K, q6_K, q3_K), each with its own env gate
+  (GGML_CUDA_MMVQ_<TYPE>_SHARE), negative on one type cannot block the
+  others. Instrument bench_mmvq_share_gfx900.cu clones the REAL GCN
+  schedule (rpb=2, nwarps=2), oracle = full-dst device memcmp vs the
+  shipped unshared path + duplicated in-run controls + 1% spread law.
+  ALL SEVEN TYPES BIT-EXACT at T=2/3/4 on real GGUF weight bytes.
+  (3) VERDICTS (T=4, real schedule): q4_K -21.6% (PASS), q3_K -28.4%
+  (PASS), q5_K -21.5%+-1.2 (win; 5-session thermal-ramp caveat, both
+  arms, dup controls identical), q6_K -5.8%+-1.3 (win, lm_head shape),
+  iq3_xxs -3.8% (PASS), iq3_s -2.8% (PASS, rung 0), iq4_xs +5.8% NAMED
+  NEGATIVE (kept OFF; cheapest decode + highest base GB/s of the set -
+  share state costs more than the decode it removes). Wins scale with
+  per-sub-block scale-walk decode (K-quants), not with type weight share.
+  (4) SERVED PROJECTION (static-count, trace shares): -372 ms of 5873 ms
+  MMVQ = -6.3% MMVQ (-7.6% of the T=4 band) -> ~+4-5% decode upper bound
+  IF kernel time translates (now a live candidate, not a dead branch).
+  The E-102 cont. "-25-30% MMVQ" projection is retired as the clone
+  artifact. (5) SERVED-ARM SPEC: GGML_CUDA_MMVQ_IQ3S_SHARE=1 +
+  _IQ3XXS_SHARE=1 + _Q3K_SHARE=1 + _Q4K_SHARE=1 + _Q5K_SHARE=1 +
+  _Q6K_SHARE=1; _IQ4XS_SHARE unset. Byte-exact = zero acceptance risk.
+  Gates: gfx900 hipcc TU + full cmake (ggml-hip) clean; 16 host suites
+  built, 15 PASS + t3_alias documented exit-2 informational. Receipts:
+  results/W3_mmvq_share_ext_2026-09-23.md. Ceiling: after share, the
+  binding term at T=4 is operand traffic on every type (base 45-84 GB/s,
+  3.4-3.9x the weight floor at T=4); decode-ALU was binding only for the
+  K-quant scale walks. Next lever in this cell class is the aln producer
+  relayout (48 B q8_1, banked W2), not more decode restructuring.
