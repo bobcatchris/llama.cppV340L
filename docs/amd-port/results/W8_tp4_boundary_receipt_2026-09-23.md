@@ -270,14 +270,22 @@ levers on this tax are transport-class, not count-class:
 ## 5. A4 - build + byte-identity
 
 - Probe TU: hipcc -O2 -x hip rccl_tp4_boundary_probe.cpp (gfx900,
-  RCCL 2.20.5) - clean, COMPILE-EXIT:0 (P0 log header).
-- Full ggml-hip build, canonical flags: GGML_HIP=ON, Release,
-  GGML_NATIVE=ON, CMAKE_HIP_ARCHITECTURES=gfx900, GGML_HIP_RCCL=ON,
-  LLAMA_CURL=OFF, cmake /home/chris/opt/cmake/bin/cmake.
-  [BUILD-RESULT-PLACEHOLDER]
+  RCCL 2.20.5) - clean, COMPILE-EXIT:0 (both probe logs).
+- Full ggml-hip build, canonical flags (cmake /home/chris/opt/cmake/bin/cmake,
+  -B build-hip, GGML_HIP=ON, Release, GGML_NATIVE=ON,
+  CMAKE_HIP_ARCHITECTURES=gfx900, GGML_HIP_RCCL=ON, LLAMA_CURL=OFF):
+  target ggml-hip BUILD-EXIT:0 with ZERO compiler warnings; full-project
+  build FULL-BUILD-EXIT:0 (the 6 grep hits are configure-time notes:
+  ccache/OpenSSL/httplib/deprecation filenames - no code warnings).
 - Default-path byte-identity: NO runtime code was changed (probe + docs
   only) - the served binary and its bytes are untouched by this desk; the
   env-gated A2 knob was deliberately NOT added (dead code, section 3).
+- Instrument incident for the record: the P0 runner sat behind the
+  campaign lock for ~70 min (mmvq-ldsy P0 anchors); the holder shell
+  (pid in the lock JSON) was verified dead with die 3 idle before the
+  stale lock was cleared (logged in CHECKIN.log 14:20). My first runner
+  task was killed by the same environment cleanup - relaunched, both
+  sessions lock-compliant, released promptly.
 
 ## 6. SERVED-ARM SPEC for the coordinator
 
@@ -310,3 +318,18 @@ window should run to cash the boundary findings:
   d143fbb5a. Ledger E-110..E-115a + round map read. Census phase-split
   done (A1). P0 probe written + queued on the campaign lock (held by
   mmvq-ldsy P0 anchors; single 150 s sleeps).
+- 2026-09-23 14:18 first probe session: guard bug (n > ndev with one
+  visible device) - EXIT 1, no GPU work; guard removed.
+- 2026-09-23 14:20 runner task killed by env cleanup; stale campaign
+  lock (holder pid dead, die idle) cleared with evidence in CHECKIN.log;
+  relaunched.
+- 2026-09-23 14:20 RCCL-refusal session of record (142008.log): n>=2
+  one-device init fails ncclInvalidUsage; n=1 kernel-elided no-op
+  measured; probe redesigned to KLAUNCH + RING1K cooperative-kernel
+  arms (the RCCL single-kernel shape).
+- 2026-09-23 14:26 floors session of record (142626.log): all cells
+  <= 3% halves spread except one marked KLAUNCH 64 KB SPREAD-FAIL
+  (12.3%; neighbors 0.1-1.1%). P0 cost model written into section 1.3.
+- 2026-09-23 15:05 A4: ggml-hip BUILD-EXIT:0 zero warnings; full build
+  FULL-BUILD-EXIT:0. Receipt finalized; ledger E-116a; commits on
+  amd/tp4-bound.

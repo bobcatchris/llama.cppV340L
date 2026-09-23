@@ -3207,3 +3207,56 @@ to Gemini's guard battery, die 3 is the dev cell.
   prompt), U2 -lv 4 TP4 timeline, U3 TP4 boundary micro-probe. Receipt:
   results/TP4_roundmap_2026-09-23.md (census provenance files copied
   in-tree).
+
+- E-116a TP4 BOUNDARY DESK COMPLETE (wt-tp4-bound on amd/tp4-bound,
+  d143fbb5a; P0 die-3 probe + zero-GPU census + A2/A3 verdicts; receipt
+  W8_tp4_boundary_receipt_2026-09-23.md, probe sessions
+  tp4_boundary_probe_d3_20260923_142008/142626.log). (1) CENSUS: the
+  boundary count is 136.0/die/round EXACTLY on all 4 dies (29-round
+  exact window, agent=die mapped via agent_info) = 128 verify + 2
+  catch-up + 6 draft; the round map's 137.2 carried window edges. The
+  128 verify = 2 cuts/layer x 65 layers - out-proj AND ffn_down are
+  both row-parallel by the NAME-KEYED sharding table
+  (llama-model.cpp:444/467/481 AXIS_0) with feature-sharded activations,
+  each a PARTIAL mul_mat (ggml-backend-meta.cpp:592) that forces a
+  subgraph cut (ggml-backend-meta.cpp:2028) and one comm_allreduce
+  (ggml-backend-meta.cpp:2282-2293); cadence confirmed in the timeline
+  (flash-class gap every 8th boundary = attn,delta,delta,delta rhythm).
+  -2 vs the 130 skeleton is a bounded residual (get_i_delayed
+  absorption candidate). (2) THE PREMIUM IS PER-DIE, NOT PER-OP: die
+  medians 128.8/151.9/191.6/210.8 us; the wall pays the SLOWEST die =
+  31.2 ms/round NCCL kernel time (die 1) vs 18.7 (die 3) - the pooled
+  165.6 median under-priced the tax. (3) P0: RCCL 2.20.5 REFUSES
+  multi-rank-on-one-device (ncclInvalidUsage for n>=2) - a single-die
+  RCCL collective does not exist; floors measured instead: enqueue 0.2 us
+  (RCCL-1R, kernel elided), launch ~12 us size-flat (KLAUNCH),
+  transport-free 4-rank ring 69.5 us @ 80 KB (RING1K, one cooperative
+  kernel, gfx900 grid-sync OK). Cost model us_ring(S,4)=24.1+0.573xKB.
+  Served residual T(die) = 59 (die 3) to 141 us (die 1) = transport +
+  peer wait - host software is a no-op class, there is no launch-tax
+  lever; the asymmetry (x2.4 best-to-worst on one machine) is the env/
+  probe lever for U3. (4) A2 CLUSTERING: NEGATIVE, no implementation -
+  boundaries are single-tensor, data-dependent through nonlinear
+  consumers (residual->RMS norm), enqueue already grouped and
+  stream-pipelined; GGML_CUDA_RCCL_CLUSTER would be dead code. (5) A3
+  COUNT REDUCTION: DESIGN ONLY, NOT FEASIBLE-CLEAN - column-parallel
+  flips multiply the #1 ms pool (weight stream); RS/AG sequence-parallel
+  keeps the count, is latency-bound-useless at 80 KB and T-legal only at
+  4/4; folding the two reductions is blocked by the norm between them
+  (E-078 3.2 stands). Count levers CLOSED for the served plan; honest
+  levers left: transport class (RCCL algo/proto/channels at 80 KB,
+  judged PER-DIE) + the nextn 8-boundary slice. (6) TP3 count question:
+  the of-record 24-48/round was never measured; TP3 census copyBuffer
+  math gives ~36/step (4 copies per n=3 butterfly boundary); the sharding
+  table is n-independent, so the triplication mechanism sits in T/n-
+  dependent split-state branches (flash AXIS_2 assert
+  ggml-backend-meta.cpp:748-755, gdn MIRRORED path 769-784). DECISIVE
+  CHEAP INSTRUMENT: one n=3 NCCL boot with the launch timeline (meta
+  prints subs/bounds per graph, ggml-backend-meta.cpp:2321-2324). Left
+  for the coordinator. (7) No runtime change shipped - default path
+  untouched, byte-identity trivial; ggml-hip BUILD-EXIT:0 zero warnings,
+  full build PASS (canonical flags). PROCESS: runner spent ~70 min
+  behind the lock (mmvq-ldsy P0 anchors); stale lock (dead holder pid)
+  cleared with evidence after verification; both probe sessions
+  lock-compliant, released promptly; WIP committed per step +
+  CHECKIN.log per the new law.
