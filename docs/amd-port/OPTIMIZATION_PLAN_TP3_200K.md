@@ -2363,3 +2363,25 @@ to Gemini's guard battery, die 3 is the dev cell.
   named: T=2-4 tiled shapes (never benched; MTP verify band runs
   T>1 in served decode graphs), gfx900 dot-product ISA compile probe,
   q8_1 operand layout. Next: T>1 harness extension.
+- E-094 2026-09-22 MMVQ T-BAND WIN: DECODE-ONCE SHARE -34.1/-46.2/-43.0%
+  KERNEL AT T=2/3/4, BIT-EXACT. The shipped mul_mat_vec_q re-executes the
+  y-independent decode (8 const-LUT lookups + sign chain) once PER TOKEN;
+  share computes the 8 signed quads once per (kbx, lane) and the per-token
+  loop keeps only x-int loads + dp4a in the same order. Session of record
+  (10 configs, 3 interleaved reps x 200 iters, oracle-gated, all PASS
+  <=5.4e-06): t1 418.5; t2 base 753.8 -> share 497.0; t3 1190.7 -> 640.2;
+  t4 1523.0 -> 868.9. share+48B-aligned-y (aln) adds -12.8% at T=4 only
+  (757.7, -50.3% vs base) and needs the q8_1 producer relayout - banked as
+  named lever, not shipped. T-scaling of the shipped kernel: 1.80x/2.85x/
+  3.64x per T-step (floor is T-invariant ~209 us) - the verify band
+  (MTP k=3 -> T=4 every round) was paying 3.6x for 1x of weights.
+  Static-count served projection (N-19: candidate only): 0.77 x -43.0%
+  = -33.1% decode kernel time -> t/s upper bound x1.49 pending served A/B.
+  ISA probe closed arm (b): v_dot2_i32_i16, v_dot2_f32_f16, v_dot4_i32_iu8,
+  v_dot4_i32_i8 all refuse to assemble on gfx900 (rocm-6.2.0) - dp4a
+  emulation is irreducible, consistent with the 09-21 receipt. Oracle-gate
+  defect closed: NaN-blind green (rel >= gate is false for NaN -> all-NaN
+  arm passed); fail condition is now !(rel < gate). Arithmetic derivation
+  of iq3s_grid pre-killed (trained codebook). Next: env-gated share in
+  mmvq.cu, then real-kernel bit-exact gate, then served A/B. Receipt:
+  results/W2_mmvq2_tband_2026-09-22.md.
