@@ -1184,6 +1184,51 @@ static __device__ __forceinline__ float vec_dot_iq3_s_q8_1(
     return d * sumi;
 }
 
+// iq3_s decode-once split for the T>1 MMVQ band: the grid lookups, sign chain
+// and scale do not depend on y, so decode() runs once per (block, lane) and
+// apply() only loads the q8_1 operand + dp4a per token. Bit-exact vs
+// vec_dot_iq3_s_q8_1: same integer sequence per token, same multiply order.
+static __device__ __forceinline__ void vec_dot_iq3_s_q8_1_decode(
+    const void * __restrict__ vbq, const int & kbx, const int & iqs, int * dec, int & scale, float & d) {
+
+    const block_iq3_s * bq3 = (const block_iq3_s *) vbq + kbx;
+
+    const int2      qs_packed = make_int2(get_int_b2(bq3->qs, iqs + 0), get_int_b2(bq3->qs, iqs + 1));
+    const uint8_t * qs        = (const uint8_t *) &qs_packed;
+
+    const int qh = bq3->qh[iqs/2];
+
+    const int       signs_packed_32 = get_int_b2(bq3->signs, iqs/2);
+    const uint8_t * signs_packed_8  = (const uint8_t *) &signs_packed_32;
+
+#pragma unroll
+    for (int l0 = 0; l0 < 8; l0 += 2) {
+        const int g0 = iq3s_grid[qs[l0 + 0] | ((qh << (8 - l0)) & 0x100)];
+        const int g1 = iq3s_grid[qs[l0 + 1] | ((qh << (7 - l0)) & 0x100)];
+
+        const int signs0 = __vcmpne4(((signs_packed_8[l0/2] & 0x03) << 7) | ((signs_packed_8[l0/2] & 0x0C) << 21), 0x00000000);
+        const int signs1 = __vcmpne4(((signs_packed_8[l0/2] & 0x30) << 3) | ((signs_packed_8[l0/2] & 0xC0) << 17), 0x00000000);
+
+        dec[l0 + 0] = __vsub4(g0 ^ signs0, signs0);
+        dec[l0 + 1] = __vsub4(g1 ^ signs1, signs1);
+    }
+
+    scale = 1 + 2*((bq3->scales[iqs/4] >> ((iqs << 1) & 0x04)) & 0x0F);
+    d     = __half2float(bq3->d);
+}
+
+static __device__ __forceinline__ float vec_dot_iq3_s_q8_1_apply(
+    const block_q8_1 * __restrict__ bq8_1, const int & iqs, const int * dec, const int scale, const float d) {
+
+    int sumi = 0;
+#pragma unroll
+    for (int m = 0; m < 8; ++m) {
+        sumi = ggml_cuda_dp4a(dec[m], get_int_b4(bq8_1[iqs/2].qs, m), sumi);
+    }
+    sumi *= scale;
+    return d * __low2float(bq8_1[iqs/2].ds) * sumi;
+}
+
 #define VDR_IQ1_S_Q8_1_MMVQ 1
 #define VDR_IQ1_S_Q8_1_MMQ  1
 

@@ -2385,3 +2385,22 @@ to Gemini's guard battery, die 3 is the dev cell.
   of iq3s_grid pre-killed (trained codebook). Next: env-gated share in
   mmvq.cu, then real-kernel bit-exact gate, then served A/B. Receipt:
   results/W2_mmvq2_tband_2026-09-22.md.
+- E-095 2026-09-22 MMVQ SHARE SHIPPED ENV-GATED + BIT-EXACT GATE + STOP
+  CEILING. (1) vecdotq.cuh: vec_dot_iq3_s_q8_1_decode/apply split pair;
+  mmvq.cu: GGML_CUDA_MMVQ_IQ3S_SHARE=1 (tile-gemm env pattern) wires the
+  share path for IQ3_S, ncols_dst 2..4, rows_per_block 1 (GCN); default
+  OFF, env unset = byte-identical shipped path. (2) GATE: the shipped
+  split pair benched as t2/t3/t4_ship arms is BIT-IDENTICAL to base
+  (memcmp 64 rows x T tokens, all three) and timing-identical to the
+  harness share arm; three consecutive 3-rep interleaved sessions agree
+  within ~1%: base 753.8/1190.7/1523.0 vs share 496-500/635-640/869-873
+  us/call = -33.9/-46.7/-42.8% at T=2/3/4. Served projection (static-
+  count class): at MTP k=3 verify T=4, 0.77 x -42.8% = -33.0% decode
+  kernel time, t/s upper bound x1.49 pending served A/B; with the aln
+  producer relayout (-50.4% total) x1.63. (3) STOP CEILING: T=1 closed
+  at ~91 GB/s (decode chain = divergent const-LUT + emulated dp4a, both
+  ISA-walled on gfx900, no dot instruction assembles); T=2-4 residual
+  after share is 4.2x floor at T=4, next link = aln 48 B q8_1 producer
+  relayout, then the T=1 chain wall. Queue: campaign build + served A/B
+  in the final combined window. Receipts:
+  results/W2_mmvq2_baseline_2026-09-22.md, W2_mmvq2_tband_2026-09-22.md.

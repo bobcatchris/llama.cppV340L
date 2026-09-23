@@ -104,8 +104,10 @@ static __device__ __forceinline__ float vd_shipped(
 }
 
 // kernels --------------------------------------------------------------------
-// ARM 0 = base (shipped j-loop), 1 = share (decode-once), 2 = aln (share +
-// 48B-aligned y). T = 1..4. GCN schedule: NW2, kqs = 2*(tid&7), 16 kbx slots.
+// ARM 0 = base (shipped j-loop), 1 = share (decode-once, harness copy),
+// 2 = aln (share + 48B-aligned y), 3 = shipshare (the EXACT vecdotq.cuh
+// vec_dot_iq3_s_q8_1_decode/apply pair wired into mmvq.cu by the env switch).
+// T = 1..4. GCN schedule: NW2, kqs = 2*(tid&7), 16 kbx slots.
 template <int T, int ARM>
 __global__ __launch_bounds__(128, 1) static void gemv_iq3s_t(
         const block_iq3_s * __restrict__ vx, const void * __restrict__ vy,
@@ -128,6 +130,17 @@ __global__ __launch_bounds__(128, 1) static void gemv_iq3s_t(
     for (int kbx = kbx0; kbx < blocks_per_row; kbx += kstep) {
         const block_iq3_s * b = h + kbx;
         const int kby = kbx*8;                // qk/QK8_1
+        if (ARM == 3) {
+            // exact shipped split functions (the mmvq.cu env-gated path)
+            int dec[8]; int scale; float d;
+            vec_dot_iq3_s_q8_1_decode((const void *)((const block_iq3_s *) vx + (size_t)row * blocks_per_row),
+                                      kbx, kqs, dec, scale, d);
+#pragma unroll
+            for (int j = 0; j < T; ++j) {
+                tmp[j] += vec_dot_iq3_s_q8_1_apply(yb + j*stride_col_y + kby, kqs, dec, scale, d);
+            }
+            continue;
+        }
         if (ARM == 0) {
             for (int j = 0; j < T; ++j) {
                 tmp[j] += vd_shipped(b, yb + j*stride_col_y + kby, kqs);
@@ -357,10 +370,12 @@ int main(int argc, char ** argv) {
         {"t2_base", 2, 0}, {"t3_base", 3, 0}, {"t4_base", 4, 0},
         {"t2_share", 2, 1}, {"t3_share", 3, 1}, {"t4_share", 4, 1},
         {"t2_aln", 2, 2}, {"t3_aln", 3, 2}, {"t4_aln", 4, 2},
+        {"t2_ship", 2, 3}, {"t3_ship", 3, 3}, {"t4_ship", 4, 3},
     };
     const int NC = (int)(sizeof(cfgs)/sizeof(cfgs[0]));
     dim3 grid(N), block(64, 2);
     double med_us[NC] = {0};
+    std::vector<float> base_dump[TMAX+1];   // bit-identity reference per T
 
     // per-rep interleaving: rep-outer, config-inner (order kills era-drift)
     const bool diag = getenv("MMVQ_T_DIAG") != nullptr;   // oracle-only mode
@@ -374,14 +389,17 @@ int main(int argc, char ** argv) {
                     if (ARM == 0) gemv_iq3s_t<2,0><<<grid, block>>>(dw, dy, dd, blocks_per_row, STRIDE_COL_Y);
                     if (ARM == 1) gemv_iq3s_t<2,1><<<grid, block>>>(dw, dy, dd, blocks_per_row, STRIDE_COL_Y);
                     if (ARM == 2) gemv_iq3s_t<2,2><<<grid, block>>>(dw, dya, dd, blocks_per_row, STRIDE_COL_Y);
+                    if (ARM == 3) gemv_iq3s_t<2,3><<<grid, block>>>(dw, dy, dd, blocks_per_row, STRIDE_COL_Y);
                 } else if (T == 3) {
                     if (ARM == 0) gemv_iq3s_t<3,0><<<grid, block>>>(dw, dy, dd, blocks_per_row, STRIDE_COL_Y);
                     if (ARM == 1) gemv_iq3s_t<3,1><<<grid, block>>>(dw, dy, dd, blocks_per_row, STRIDE_COL_Y);
                     if (ARM == 2) gemv_iq3s_t<3,2><<<grid, block>>>(dw, dya, dd, blocks_per_row, STRIDE_COL_Y);
+                    if (ARM == 3) gemv_iq3s_t<3,3><<<grid, block>>>(dw, dy, dd, blocks_per_row, STRIDE_COL_Y);
                 } else {
                     if (ARM == 0) gemv_iq3s_t<4,0><<<grid, block>>>(dw, dy, dd, blocks_per_row, STRIDE_COL_Y);
                     if (ARM == 1) gemv_iq3s_t<4,1><<<grid, block>>>(dw, dy, dd, blocks_per_row, STRIDE_COL_Y);
                     if (ARM == 2) gemv_iq3s_t<4,2><<<grid, block>>>(dw, dya, dd, blocks_per_row, STRIDE_COL_Y);
+                    if (ARM == 3) gemv_iq3s_t<4,3><<<grid, block>>>(dw, dy, dd, blocks_per_row, STRIDE_COL_Y);
                 }
             };
 
@@ -412,6 +430,20 @@ int main(int argc, char ** argv) {
                            (double)dev[worst_j*N + worst_r], ref[worst_j*ORACLE_ROWS + worst_r], max_rel);
                     med_us[ic] = -1.0;
                     continue;
+                }
+                if (ARM == 0) {
+                    base_dump[T] = dev;
+                }
+                if (ARM == 3) {   // shipped split pair must be BIT-identical to base
+                    const std::vector<float> & bd = base_dump[T];
+                    if (bd.size() == dev.size() && memcmp(bd.data(), dev.data(), dev.size()*sizeof(float)) == 0) {
+                        printf("%-10s BITEXACT vs t%d_base (memcmp, %d rows x %d tokens)\n",
+                               cfgs[ic].name, T, ORACLE_ROWS, T);
+                    } else {
+                        printf("%-10s BIT MISMATCH vs t%d_base - REFUSED\n", cfgs[ic].name, T);
+                        med_us[ic] = -1.0;
+                        continue;
+                    }
                 }
             }
             CHECK(hipEventRecord(e0));
