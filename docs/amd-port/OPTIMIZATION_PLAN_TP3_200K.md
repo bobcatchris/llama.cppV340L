@@ -3546,3 +3546,57 @@ to Gemini's guard battery, die 3 is the dev cell.
   propose rebalanced --tensor-split ratios (pure launch flag) or an
   in-code rebalance design; coordinator serves the best ratio.
   Prize if imbalance confirms: up to ~10 ms/round of peer wait.
+
+- E-121c PREFILL DESK COMPLETE (wt-prefill-2 on amd/prefill-2 off 676cbc806;
+  zero-GPU: census phase-split + in-tree path audit + lever enumeration; receipt
+  W13_prefill_receipt_2026-09-23.md, analyzer
+  docs/amd-port/scripts/prefill_phase_split.py + raw dump
+  W13_prefill_phase_split_2026-09-23.txt). (1) P0 PHASE SPLIT OF RECORD: prefill
+  window isolated by Cijk burst = 36.84 s vs server 37.04 s (0.5% agreement);
+  dies 96.6% busy (NO host-slice lever in prefill, unlike decode's 6.5 ms/round);
+  per-die families: Cijk 39.7-44.2%, flash_attn 29.3-29.8%, NCCL 13.2-19.5%
+  (die asymmetry x1.48 EXISTS IN PREFILL - wall pays die 2's 6.94 s; flatten
+  prize ~2.25 s = 6.1%), other 11.6-12.8%; ZERO MMVQ in pure prefill (all GEMMs
+  src1_ncols=512; 13 full ubatches + 268-token tail). Decode window
+  cross-validates the round map (mmvq 53.7/nccl 22.7/flash 11.6, 4.04 s/98 tok).
+  (2) GEMM ROUTE OF RECORD (file:line): gfx900 MMQ is dense-OFF (mmq.cu:368-372
+  `return n_experts > 0`) -> ggml-cuda.cu:2756 -> mul_mat_cublas:1724; the tile
+  route (tile-gemm.cu, env-gated, compiled, default OFF) is tried first at
+  ggml-cuda.cu:1761; served route = use_fp16 branch: per-call dequant-to-f16 +
+  cublasGemmEx CUDA_R_16F/COMPUTE_16F f16-out + f32 convert (ggml-cuda.cu:1801,
+  1838-1861) - ALL Cijk kernels are rocBLAS HALF "HB"/ISA900 (59.54 s total, 4
+  main MT variants: MT32x32x32 64.6% = gate/up-class, MT128x64x16 17.4%,
+  MT64x64x16 12.8%, MT16x16x24 3.6%); bf16 and f32 Sgemm branches NEVER run.
+  Effective GEMM rate ~5.6 TF/s/die at M=512. STAGING: per-call weight dequant
+  5.13 s + src1->f16 1.70 s + f16-out->f32 1.68 s + bf16 boundary compress
+  1.29 s = 9.80 s across dies = 6.9% of prefill busy; convert_unary = 75,034
+  prefill launches; weight f16 residency is VRAM-infeasible wholesale (13+ GB/
+  die) and the in-tree RESIDENT mechanism is tile-gated. Flash pricing: the
+  <256,256,16,2> tile runs 16 full-attn layers x 16 ubatches x 4 dies at 41 ms/
+  launch, sub-1 TF/s utilization - 29.5% of prefill, the biggest single future
+  kernel-desk prize. (3) A1 RANKED: (1) ub1024 prefill arm - launch flag only,
+  +5-10% expected (staging/boundary halving + M=1024 shapes; dust-risk class:
+  possible rocBLAS re-instantiation, determinism protocol decides); (2)
+  NCCL_MIN_NCHANNELS=4 pure env; (3) GGML_CUDA_FORCE_CUBLAS_COMPUTE_32F=1 exists
+  in-tree (ggml-cuda.cu:1705) = deletes the f16-out convert tax (4.7%) but is
+  NUMERICS-CHANGING (f32-acc) + gfx900 packed-f16 perf risk - OWNER FLAG;
+  (4) TILE ROUTE DOWNGRADED BY SERVED CENSUS: served rocBLAS HB ~5.6 TF/s at
+  M=512 vs tile M=512 wall 5.65 (W5_tile_nspan) = parity-to-negative, AND the
+  tile's own bench wins sit on K=17408/6144 weights that are K-sharded under TP4
+  to local K {4352,1536,1280} - NOT in the whitelist trunk-K set {5120,6144,
+  17408} (tile-gemm.cu:624); covering them = whitelist extension + real-kernel
+  bench, owner-gated design. W5's "+21.5% bench gate" was M=128-shape-era and
+  single-GPU-context - never contradicted by this census, but the served
+  expectation is now parity-class; the never-promoted route stays unpromoted.
+  (5) hipBLASLt lever DEAD on gfx900 (no Vega support on ROCm 6.2.0); no
+  supported rocBLAS algo-selection env. (6) A2: NO CODE SHIPPED - all surviving
+  levers are env/flags; the bit-exact code candidate (shipped-route weight
+  residency subset) loses to ub1024 (same saving, zero code); no ggml-cuda file
+  touched, so no A4 build/CI was required. (7) A3 SERVED SPEC for the window:
+  ARM P1 = launch_tp3_200k_ub1024.sh (--batch-size 1024 --ubatch-size 1024,
+  everything else of record; gates: 2-boot within-arm determinism, cross-arm
+  byte protocol - if byte-diff appears it is a dust-class owner call with
+  accept >= 0.63 + needle 3/3 canaries, decode-guard cell MANDATORY, VRAM boot
+  gate); ARM P2 = NCCL_MIN_NCHANNELS=4 (INFO fingerprint REQUIRED in verdict);
+  ARM P3 = FORCE_CUBLAS_COMPUTE_32F ONLY with owner sign-off + a die-2
+  microbench pre-gate. E-101 bf16-compress boundary class NOT reopened.
