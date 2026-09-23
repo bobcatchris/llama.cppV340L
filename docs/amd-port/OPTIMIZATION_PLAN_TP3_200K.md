@@ -3403,3 +3403,39 @@ to Gemini's guard battery, die 3 is the dev cell.
   final tree. PATH: when the LDS desk lands (it is at final commits),
   merge -> rebuild -> served window with a NOW-ACTUALLY-ENGAGING s2r
   arm (engagement lines REQUIRED in the verdict) -> real s2r verdict.
+
+- E-114a MMVQ LDSY DESK: STAGING KILLED (SLOW WHEN EXACT, UNLANDABLE
+  OTHERWISE) + S2R WIRING DEFECT FIXED + REPLICA ANCHORS OVERTURNED. Desk
+  mmvq-ldsy (wt-mmvq-lds, amd/mmvq-lds, base 387805bec). Instrument:
+  tests/bench_mmvq_real.cu - includes ggml/src/ggml-cuda/mmvq.cu verbatim and
+  launches the actual mul_mat_vec_q templates at served GCN geometry on real
+  GGUF bytes; device-oracle (full dst memcmp vs base) before any timing; the
+  E-113 lesson enforced. (1) LDSY (GGML_CUDA_MMVQ_LDSY=1, 5 s2r-class types,
+  T=2..4, W5's LDS-y design) built bit-exact (shared-body consume) and
+  measured: +63..+198% vs base on all five types, T=2 and T=4, runways
+  4/8/16 - NAMED NEGATIVE, killed. Mechanism: y is CTA-shared and already
+  L1-resident; staging re-reads it from global, adds an LDS round trip and
+  barriers, buys nothing. Occupancy budget verified (8704 B = W5's 8.6 KB;
+  regs unchanged-to-lower). (2) NOT LANDABLE EITHER: the gfx900 backend
+  forms the apply-tail FMA differently with an LDS base vs a global one - a
+  separate LDS-pointer consume cannot reproduce served bits (5030 low-bit
+  mismatches; pragma-scoped variant: 694), and the shared-generic-body shape
+  that IS exact shifts address-space inference for the whole kernel (default
+  base-branch bits change; 2 B-aligned types slow up to 2.3x). mmvq.cu
+  REVERTED to pristine 387805bec + one kept fix (below). Do not re-open LDS-y
+  on this schedule/arch. (3) S2R WIRING DEFECT FIXED (kept, 22 lines):
+  mul_mat_vec_q_switch_type hardcoded s2r=false at all 21 type cases
+  (079951eb7, the bw desk's own commit) - every *_S2R=1 gate was a no-op
+  served; E-106/E-109 "served s2r" and E-113's "s2r neutral at 10k" measured
+  the regress arm (10k 23.21 vs 23.21 was bit-identical code). Confirmed on
+  the served build (share+s2r dump == default dump); the fix engages s2r and
+  s2r stays bit-exact on the real path (oracle PASS). (4) REAL-KERNEL ANCHOR
+  TABLE OVERTURNS THE REPLICA SET (final tree, rocprof-cross-checked):
+  T=4 share vs base: iq3_s -62.7%, iq3_xxs -63.3%, q4_K -23.4%, q5_K -22.2%,
+  iq4_xs -18.7%, q3_K +0.1%, q6_K +1.5%. The replica claims (-4..-28%) were
+  clone artifacts; q3_K's served share gate is worth ~0; iq4_xs share is
+  actually a T=4 win (-18.7%, gate OFF served per E-104 - coordinator call).
+  Real s2r increments vs share: -2.4..+0.2% at T=4 (iq3_xxs only), nothing at
+  T=2 - the W5 replica wire set does not hold. REAL-KERNEL TRUTH INSTRUMENT:
+  tests/bench_mmvq_real.cu (kept, base/share/s2r arms). Receipt:
+  results/W7_mmvq_ldsy_receipt_2026-09-23.md + session logs.
