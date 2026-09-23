@@ -3834,3 +3834,18 @@ to Gemini's guard battery, die 3 is the dev cell.
   Unaffected: draft-cache desk (zero-GPU, continues), all committed
   work + snapshots. LESSON: missing-sysfs must fail closed, same
   class as the provenance gate - silent fallbacks cost another hour.
+- E-120 (cont.) ERRATUM + ROOT FIX: the "die-1 wedge" was a
+  MISDIAGNOSIS. The 17:15 event was a full machine REBOOT (uptime
+  -s = 17:18:14), and the reboot REORDERED THE CARD ENUMERATION:
+  the NVIDIA display GPU moved to card1 (0000:15:00.0, vendor
+  0x10de) and the four V340 dies shifted to card0 (05:00) /
+  card2 (08:00) / card3 (0d:00) / card4 (10:00). No die was ever
+  wedged; the gate scripts hardcoded card NUMBERS, so card1's
+  missing AMD sysfs read as a dead die. ROOT FIX:
+  run_combined_window.sh (and all future gate code) now resolves
+  dies BY PCI ADDRESS (05:00/08:00/0d:00/10:00 - stable across
+  reboots) with fail-loud DIE-MISSING/DIE-DOWN. LAW: never key
+  gates or monitoring on card numbers; key on PCI. The interleaved
+  split A/B is RUNNING on the fixed gates (s0 boot in progress,
+  identity block verified). E-120's reboot request is WITHDRAWN -
+  the 17:18 reboot already covered it.
