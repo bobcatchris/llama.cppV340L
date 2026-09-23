@@ -3546,3 +3546,51 @@ to Gemini's guard battery, die 3 is the dev cell.
   propose rebalanced --tensor-split ratios (pure launch flag) or an
   in-code rebalance design; coordinator serves the best ratio.
   Prize if imbalance confirms: up to ~10 ms/round of peer wait.
+- E-121b HOST-SLICE DESK: A1 DECOMPOSITION COMPLETE FROM THE CAPTURED P0
+  TIMELINE (ZERO NEW GPU BOOTS); PREDECESSOR EDITS AUDITED SOUND BUT THEIR
+  HYPOTHESIS REFUTED; 3 LEVERS RANKED, DESIGNS HANDED BACK. Desk
+  wt-host-slice on amd/host-slice (recovery checkpoint 66bf25a23 ->
+  accept-timer commit e9ac7d53b). Instrument of record:
+  W12_hostslice_diag_tl_165820.log (canonical stack + LLAMA_LAUNCH/DECODE/
+  SPEC_TIMELINE at -lv 4; 37 warmup-driven spec rounds, 34 steady; round
+  period med 123.4 ms vs census 130.5/battery 129.0). (1) A1 TABLE
+  (steady medians, full file:line table in
+  results/W12_host_slice_receipt_2026-09-23.md): verify issue 11.836 ms
+  host (build 0.000 + inputs 0.044 + meta host 10.543 = RCCL ar enqueues
+  5.370 [128 x ~42 us] + 516 replay launches ~5.17) - ALL OVERLAPPED by
+  device, exposure only ~0.2 ms at round start; drain 97.6 ms
+  device-bound; SLICE A 2.04 ms (accept loop ~1.7 [row sampler,
+  server-context.cpp:3982-4005] + catchup decode 1.345 [meta 0.327 +
+  sched residual 0.96]); bookkeeping 0.16; draft section 10.6 (3 steps:
+  issue 1.1-2.6 + packed-fetch wait 1.665 + sample 0.053); gap 0.142.
+  Census 6.5 ms idle window reconciled: slice A host 2.04 + launch
+  latency + draft-loop serialization; TOTAL host-exposed pool ~5-8 ms/
+  round - desk prize lands at the LOW band. (2) NEW NAMED MECHANISM: the
+  draft context alternates decode shapes 4 (catchup) -> 1,1,1 (steps)
+  and llama_context's reuse slot is SINGLE (gf_res_prev,
+  llama-context.cpp:1579-1599) -> 2 of 4 draft-ctx decodes per round
+  re-split the sched from scratch (reused=0 issue 2.593 vs reused=1
+  1.108; ~1.5 ms walk paid on an IDLE device) = ~3 ms/round. (3) RANKED
+  LEVERS (receipt section 3): L1 draft-ctx shape cache (byte-exact, M,
+  ~2-3 ms) - handed back; L2 accept greedy fast path at temp 0
+  (set_logits_row builds 2.07 MB/row x4, common/sampling.cpp:164-176;
+  numerics-ADJACENT, needs owner sign-off + oracle, ~1-1.5 ms) - flagged
+  for owner; L3 draft-step pipelining under the packed-fetch drain
+  (byte-exact, M-L, 1.5-2.5 ms) - handed back. NEGATIVES: verify-issue
+  host cost (incl. the 5.4 ms RCCL enqueues) fully overlapped, dead as a
+  wall lever; steady-state meta rebuild/CUDA-graph recapture DOES NOT
+  OCCUR (36/37 replay rounds; capture is one-time boot, 222 ms) - the
+  predecessor's rebuild/warmup-reset logging (backend-meta.cpp:1863,
+  ggml-cuda.cu:5373) is kept as a tripwire but is not a lever. (4) A3:
+  predecessor edits AUDITED SOUND (logging-only, tl_on-gated, correct
+  scope, uint64 uid casts right); completed the instrumentation with the
+  accept-stretch timer ([spec-timeline] accept, server-context.cpp,
+  LLAMA_SPEC_TIMELINE-gated, byte-exact). ggml-hip full build canonical
+  flags BUILD-EXIT:0 zero warnings; premerge CI PASS (13/13 tests; first
+  run failed hygiene only - CHECKIN.log was gitignored-but-tracked in
+  this branch, untracked per the E-116 law). GPU LAW: the one permitted
+  timeline boot went UNUSED; lock found STALE (attn-fa holder pid dead
+  5+ h), removed with evidence, CI's die-3 wiring run lock-compliant.
+  PROVENANCE DEFECT of the recovered P0: the probe server log holds only
+  boot lines while the probe JSON completed - A1 re-ground on the diag
+  tl log (receipt section 0).
