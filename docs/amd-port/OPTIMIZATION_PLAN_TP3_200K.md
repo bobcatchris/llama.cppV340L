@@ -2812,3 +2812,18 @@ to Gemini's guard battery, die 3 is the dev cell.
   type - the instrument that names whether the 91-vs-327 GB/s gap has
   headroom. Both kernel branches merge at landing (keep-both, env
   gates compose).
+- E-106 (cont.) TP4 APPROVED AS SERVING DEFAULT (Chris: "tp4 is good
+  to go, why even ask") - launch_tp3_200k.sh flipped to 4 ranks
+  (HIP 0,1,2,3 + ROCm0-3), full optimization set + share gates
+  unchanged. PER-LAYER 2x QUESTION ANSWERED (Chris: "1 or 2 layers to
+  2x?"): NO - the decode-ALU tax is distributed proportionally to
+  weight bytes across all 65 blocks (every MMVQ kernel runs ~91 GB/s
+  effective vs 184+ HBM); 2 layers = ~3% of bytes = ~3% max. The 2x-
+  class levers are structural only: (a) the W1 rung set (C1 K-split /
+  A1 staging / B1-equiv perm atom / C2 KSC4) applied to the four
+  dominant types - q3's identical disease measured +22% served - DESK
+  DISPATCHED (wt-mmvq-rungs on amd/mmvq-rungs, off the bandwidth
+  desk's tip); (b) weight-bit reduction (owner's bit-exact rule
+  guards); (c) draft acceptance (trained). MMVQ share extension desk
+  separately delivered + landed (6 per-type bit-exact share kernels,
+  E-103) - its served A/B folds into the same window.
