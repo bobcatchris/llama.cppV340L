@@ -2653,3 +2653,20 @@ to Gemini's guard battery, die 3 is the dev cell.
   (3) the driver-decay cadence (~4-6 h heavy booting, E-098 cont) is
   a PLATFORM issue independent of temperature - reboots remain the
   operational mitigation.
+- E-101 2026-09-23 PREFILL NUMERICS CLASS DECIDED BY DATA: REJECT f32,
+  KEEP bf16-compress. Gate window on the fresh cooled boot (full
+  batteries): REF0 (bf16 class, serving config) 5/5 GREEN - prefill
+  161.06, decode 18.61, accept 0.66667, needle 3/3, within-boot
+  determinism sha 793bf51b. EXT (f32 prefill class) x2: prefill
+  148.37/148.04 (-7.9%), decode 16.34/15.42 (-12 to -17%), accept and
+  needle clean, within-class determinism sha e478fdf3 x2 (stable, and
+  differing from bf16's sha as expected for a different numerics
+  class). The probe's "+1% prefill wall" model badly understated the
+  served cost - likely the bf16 branch halves volume across the ENTIRE
+  boundary structure (copies + ADD replays), not just the copy phase;
+  plus run-order thermal cannot be fully excluded (EXT ran after
+  REF0). DECISION: GGML_RCCL_PREFILL stays unset (bf16 class); the
+  gate remains in the tree one env var away if fp32-at-prefill is ever
+  required. Campaign numerics of record: decode boundaries = signed-off
+  fp32 sum-order dust (E-090/E-094); prefill = bf16-compress class
+  (documented in E-097, now owner-acknowledged via this verdict).
