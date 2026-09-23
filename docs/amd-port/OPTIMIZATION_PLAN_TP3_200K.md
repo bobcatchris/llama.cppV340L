@@ -2670,3 +2670,17 @@ to Gemini's guard battery, die 3 is the dev cell.
   required. Campaign numerics of record: decode boundaries = signed-off
   fp32 sum-order dust (E-090/E-094); prefill = bf16-compress class
   (documented in E-097, now owner-acknowledged via this verdict).
+- E-102 2026-09-23 OPTIMIZATIONS IN PLAY - 5/5 GREEN ON THE FULL SET.
+  launch_tp3_200k.sh now exports the complete validated set (RCCL nccl
+  + MMVQ_IQ3S_SHARE + FAST_TOPK + PACKED_GET + LIGHT_SYNC +
+  VERIFY_ROW_SAMPLING + ASYNC_INPUT + PINNED_DEV_COPY) and the served
+  validation on the fresh cooled boot passed every gate: prefill
+  163.06 (+41.5% vs the legacy 115.21 stamp), decode 18.94 (+1.17% vs
+  the 18.72 RCCL gate - the byte-exact stack adds its small positive
+  on top of RCCL), accept 0.66667, determinism byte-identical
+  (sha 793bf51b = the RCCL-era sha, confirming the stack changes
+  nothing vs RCCL-only), needle 3/3. Deliberately still opt-in:
+  PREFIX_CATCHUP (not bit-identical on device) and T3 grouped
+  (neutral). CAMPAIGN HEADLINE OF RECORD: 18.94 t/s decode @ 200k
+  (+27.5% over the 14.86 butterfly era, origin 17.8 beaten at 5x
+  context), prefill 163.06.
