@@ -2827,3 +2827,30 @@ to Gemini's guard battery, die 3 is the dev cell.
   guards); (c) draft acceptance (trained). MMVQ share extension desk
   separately delivered + landed (6 per-type bit-exact share kernels,
   E-103) - its served A/B folds into the same window.
+- E-107 2026-09-23 SESSION STATE OF RECORD (pre-compaction, for the
+  post-compaction restart). SERVING OF RECORD: TP4 (all 4 dies,
+  Chris-approved) + RCCL + the full validated optimization set (6
+  per-type MMVQ share gates + 7 byte-exact fixes) - launch_tp3_200k.sh
+  is the canonical boot. Validated 5/5 GREEN: decode 23.34 @200k /
+  23.23 @10k, prefill 217.71, accept 0.66667, needle 3/3, within-boot
+  determinism. THE JOURNEY: 14.86 butterfly era -> 19.0 (RCCL, E-090/
+  E-094 sign-off) -> 20.01 (per-type share kernels, E-104) -> 23.34
+  (TP4, E-105) = +57%. DECISIONS CLOSED: prefill numerics = bf16-
+  compress stays (f32 measured -7.9/-12-17% and rejected, E-101);
+  v1 draft-device = flag-ready VRAM mode (parity, ~490 MiB/die);
+  efficiency trade = parked (second cooling upgrade removed the
+  constraint, E-100). MEASURED NEUTRAL/OFF: catch-up, hygiene set
+  (shipped byte-exact), T3 grouped, MMVQ share beyond per-type wins,
+  MMVQ aln (named negative, E-106), layer-split (dead, crash + -63%
+  prefill, Chris's early data confirmed). OPERATIONAL LAWS: driver
+  decay ~4-6 h heavy booting -> scheduled reboots; lock settle rule;
+  arm identity law; zombie rule; PID-targeted kills only. ACTIVE:
+  two kernel desks (mmvq-rungs: W1 rung set per type; mmvq-bw:
+  weight-stream A-rungs + pure-consume ceilings) - both zero-GPU in
+  own worktrees, merge keep-both at landing, then one combined served
+  window. THE ROAD TO 40 @10k: effective weight-stream bandwidth
+  (91 vs 327 GB/s measured gap); the only true 2x beyond that is
+  weight-bit reduction (owner's bit-exact rule guards). Note this
+  session's coordinator errors are on the record: E-082 (lock
+  violation), the rocprofv3 self-pkill, the run_mmqab.sh vanish -
+  all remediated, all laws amended.
