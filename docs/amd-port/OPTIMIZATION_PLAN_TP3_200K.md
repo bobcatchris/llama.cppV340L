@@ -3641,3 +3641,17 @@ to Gemini's guard battery, die 3 is the dev cell.
   worktree-local and gitignored; (3) post-kill protocol: find -size 0
   in .git/objects, delete, fsck, reseat refs to last healthy commit,
   checkpoint WIP, relaunch continuations.
+- E-119 (cont.) 17:30 THIRD DESK RESTORED (Chris: "we had 3 agents
+  moving at once before"): PREFILL DESK dispatched (wt-prefill-2 on
+  amd/prefill-2) on the untouched prefill pool - 200-218 t/s served,
+  census shows hipBLAS Cijk GEMMs ~37% of prefill kernel time +
+  convert_unary staging ~3%/75k launches. Ladder: P0 prefill kernel
+  table -> A1 ranked levers (tile-fp16 route never promoted - W5 era
+  passed bench gates; GEMM lib selection; convert caching (schedule-
+  only candidate); prefill ubatch tradeoff) -> A2 schedule-only/bit-
+  exact only (E-101 bf16 class stays; GEMM-numerics changes designed
+  + flagged) -> A3 served spec -> CI law. Die-2 microbench lane.
+  ACTIVE DESKS: 3 (attention-continuation, host-slice-continuation,
+  prefill) + the interleaved split A/B chain on the GPUs. Every
+  desk: WIP-commit + CHECKIN laws, receipts W11/W12/W13, ledger
+  E-121a/b/c.
