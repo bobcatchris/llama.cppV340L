@@ -3517,3 +3517,32 @@ to Gemini's guard battery, die 3 is the dev cell.
   s2r5 (first ENGAGING s2r arm - E-113's was a no-op), channels4
   (NCCL_MIN_NCHANNELS=4). Engagement lines REQUIRED in every s2r
   verdict. Baseline ratchets only on GREEN wins.
+- E-119 2026-09-23 FOUR-ARM WINDOW: NO PROMOTION; SPLIT-BALANCE NAMED
+  AS THE NEXT LEVER. Table (all provenance-stamped, commit dd444072e,
+  binary 938a6999f1d8beb1, config 58092e1943c88fb9):
+  arm | 200k decode | 10k decode | prefill
+  regress | 22.86 | 22.46 | 200.12
+  iq4xs(+IQ4XS_SHARE) | 20.19 | 22.52 | 195.96
+  s2r5x(5xS2R, ENGAGING) | 19.57 | 22.51 | 195.81
+  chan4(NCCL_MIN_NCHANNELS=4) | 20.29 | 21.80 | 195.68
+  VERDICTS: (1) 10k cells (thermally stable) cluster 22.46-22.52 -
+  iq4xs (+0.36 theoretical from the real -18.7% kernel) and s2r5x
+  (+0.3 theoretical, only iq3_xxs increments) are BELOW the
+  instrument noise floor; no decision-grade served win. Default
+  stays OFF for both. (2) The 200k column is a clean soak-law demo:
+  position-1 22.86 -> position-4 20.29 (-11%) on IDENTICAL-code arms
+  - chained windows cannot resolve 200k deltas; interleaved multi-rep
+  designs are mandatory for sub-5% candidates. (3) chan4 -0.66 at the
+  deepest position: consistent with daily drift, NOT evidence against
+  the x3-reproduced probe win; parked as pure-env candidate. (4) ALL
+  correctness gates PASS every arm. SERVING OF RECORD UNCHANGED.
+  (5) NEXT LEVER, NAMED BY TRANSPORT A1: the served-only boundary
+  peer-wait is COMPUTE-BALANCE - die 1 arrives late (per-die medians
+  128.8..210.8 us, isolated wire flat). Hypothesis: per-die weight
+  byte imbalance (GGUF offset-delta law can measure it exactly) makes
+  die 1 finish each layer last and every boundary waits. SPLIT-
+  BALANCE DESK dispatched (wt-split-balance on amd/split-balance,
+  zero-GPU): compute per-die weight bytes + per-layer slice table,
+  propose rebalanced --tensor-split ratios (pure launch flag) or an
+  in-code rebalance design; coordinator serves the best ratio.
+  Prize if imbalance confirms: up to ~10 ms/round of peer wait.
