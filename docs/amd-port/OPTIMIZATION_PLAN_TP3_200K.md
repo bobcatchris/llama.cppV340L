@@ -2773,3 +2773,32 @@ to Gemini's guard battery, die 3 is the dev cell.
   Above 262k requires YaRN rope scaling and memory refuses it anyway
   (800k attempt: compute-graph reserve alone OOM'd at 3986 MiB on
   device 0). TP4 max content length of record: 262,144 tokens.
++- E-106 2026-09-23 MMVQ ALN LAYOUT DESK CLOSED: THE BANKED -50.4% LEVER IS
++  AN SCHEDULE-CLONE ARTIFACT, MEASURED NEGATIVE ON THE SERVED SCHEDULE.
++  The W2 t4_aln arm (-50.4% vs base at T=4) ran on the rpb=1 clone; the W3
++  lesson (clone schedules inflate wins) INVERTED for aln. On the real served
++  GCN schedule (rpb=2, nwarps=2) the 48 B uint4 y-operand consumer REGRESSES
++  every gated type at T=4 vs the shipped share arms: q3_K +372.7%, q4_K
++  +113.2%, q5_K +116.2%, q6_K +99.4%, iq3_xxs +10.4%, iq3_s +9.2% (3 sessions
++  each, PASS + VOID spread mix, all >= 5% unambiguous; bit-exact everywhere).
++  T=2/3 also regress (q4_K +107/+106%) - no shape wins, no gate case left.
++  MECHANISM: gfx900 decomposes dwordx4; per sub-block aln issues 4x the
++  y-operand load instructions to use 1 lane plus extract ALU - the legacy
++  dword loads + wave coalescing are already the operand optimum. Producer
++  pair SHIPPED default-OFF and honest: quantize_q8_1<aln> DUAL-emits legacy
++  36 B at +0 (every type stays readable) + 48 B aln region behind it
++  (+3.0% emit cost = 0.13 us, q81-cache amortized), consumer = exact
++  *_apply_aln twins in vecdotq.cuh behind LLAMA_MMVQ_ALN=1, single gate
++  through both sides, unset = byte-identical. DEVICE ORACLE
++  (test_mmvq_aln_oracle.cu) caught the v1 single-layout defect class
++  (iq4_xs read aln bytes as legacy - the exact producer/consumer mismatch
++  the desk was warned about; one src1 feeds many weight types, so
++  single-layout can never be type-safe) and now proves md5-identical dst
++  across unset / share / share+aln x q81-cache on-off, 7 types, T=1..4.
++  q81 cache key grew a layout field (test_q81_cache_host extended, ALL
++  PASS); 16 host suites: 15 PASS + t3_alias documented exit-2. SERVED SPEC:
++  LLAMA_MMVQ_ALN stays UNSET - enabling it would cost ~+2378 ms of the
++  4911 ms T=4 band. Served projection of the desk: 0 (nothing banked); the
++  20 t/s line stays owned by the E-105 TP4+RCCL stack. Re-evaluate aln only
++  on RDNA4+ class (128-bit loads are single instructions) or a schedule
++  where the y stream is again binding. Receipt: W4_mmvq_aln_2026-09-23.md.
