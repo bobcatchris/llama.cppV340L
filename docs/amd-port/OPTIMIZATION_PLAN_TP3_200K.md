@@ -2802,3 +2802,13 @@ to Gemini's guard battery, die 3 is the dev cell.
 +  20 t/s line stays owned by the E-105 TP4+RCCL stack. Re-evaluate aln only
 +  on RDNA4+ class (128-bit loads are single instructions) or a schedule
 +  where the y stream is again binding. Receipt: W4_mmvq_aln_2026-09-23.md.
+- E-106 (cont.) ALN DESK MERGED (5439aa8df, rebuilt): the named
+  negative + the dual-region producer pair (default OFF, byte-
+  identical unset) + the oracle that caught the single-layout
+  iq4_xs-garbage defect are in the campaign tree. The bandwidth desk
+  (wt-mmvq-bw, amd/mmvq-bw) was forwarded the calibration: the
+  y-operand stream is proven optimal (aln negative); its live rungs
+  are the WEIGHT-stream access pattern + A4 pure-consume ceilings per
+  type - the instrument that names whether the 91-vs-327 GB/s gap has
+  headroom. Both kernel branches merge at landing (keep-both, env
+  gates compose).
