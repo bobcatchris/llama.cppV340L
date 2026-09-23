@@ -3546,3 +3546,22 @@ to Gemini's guard battery, die 3 is the dev cell.
   propose rebalanced --tensor-split ratios (pure launch flag) or an
   in-code rebalance design; coordinator serves the best ratio.
   Prize if imbalance confirms: up to ~10 ms/round of peer wait.
+- E-119 (cont.) PARALLELIZED (Chris: "we only have one agent moving").
+  Two additional desks dispatched on the remaining pools: (1) ATTENTION
+  DESK (wt-attn-fa on amd/attn-fa): the ~16 ms/round attention pool -
+  flash_attn_tile ~12 ms (16 full-attn layers) + gated_delta_net
+  ~3.8 ms (hybrid architecture; verify the split) - P0 path/census
+  decomposition, A1 wave64+q4_0 schedule levers, A2 schedule-only
+  bit-exact implementations (numerics-class levers designed not
+  implemented), A3 real-kernel measurement (W7 bench law), A4
+  build + CI green. (2) HOST-SLICE DESK (wt-host-slice on
+  amd/host-slice): the 6.5 ms all-die-idle host gap - P0 one -lv 4
+  timeline boot on lane 8083 (sanctioned single window), A1
+  sub-item decomposition, A2 ranked levers with bit-exactness
+  classes, A3 top byte-exact lever implemented env-gated if small,
+  CI law applies. Both: WIP-commit + CHECKIN.log laws, receipts
+  W11/W12, ledger E-121a/E-121b. Active desk count: 3 (split-balance,
+  attention, host-slice) covering the 16 ms attention pool, the
+  6.5 ms host slice, and the ~10 ms peer-wait/balance pool
+  respectively - every named ms pool of the round map now has an
+  owner except the owner-guarded weight-bit door.
