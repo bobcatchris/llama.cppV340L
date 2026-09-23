@@ -2854,3 +2854,31 @@ to Gemini's guard battery, die 3 is the dev cell.
   session's coordinator errors are on the record: E-082 (lock
   violation), the rocprofv3 self-pkill, the run_mmqab.sh vanish -
   all remediated, all laws amended.
+- E-108 2026-09-23 POST-COMPACTION CYCLE (desk health + staging).
+  Inbox check: newest Gemini message #1363 (09-22 18:04, ub512 decode
+  A/B GO) is SUPERSEDED - those cells were absorbed by the E-104/E-105
+  measurement chains; no live action items from the comm lane. DESK
+  HEALTH (zombie-rule check): mmvq-bw ALIVE and fast - worktree created
+  08:55, artifacts P0 repro 08:59 / v2 consume-wide 09:24 / v3 s2r
+  09:48, currently running arm dbg_s2r under its own boot lock
+  (desk=mmvq-bw, taken 09:50:46, law-abiding). mmvq-rungs PENDING
+  VERDICT, not yet zombie - worktree created 09:26 today, zero
+  artifacts at 09:51 (25 min, under the 90-min line), consistent with
+  a P0/P1 code-reading phase; relaunch trigger = 90 min silent AND
+  zero artifacts. Note the session task-handle registry lost both
+  agent IDs at compaction (TaskOutput: no task found) while the bw
+  desk's processes demonstrably run - post-compaction, PROCESS-LEVEL
+  evidence (worktree reflog, artifact mtimes, boot lock, ps) is the
+  truth source for desk health, not task handles. STAGING:
+  /home/chris/run_combined_window.sh written + syntax-checked - the
+  TP4-native combined served validation window (200k 5-cell battery +
+  10k decode-only, lane 8081, lock check-and-hold, lock settle rule
+  75 s + per-die <200 MiB, cooldown gate <60 C, arm-identity env/cmdline
+  echo into log head); arms: "regress" (canonical env, post-merge
+  regression guard vs E-105 anchors 23.34/23.23) and arbitrary
+  "<name> EXTRA_ENV" arms for the winning rungs. launch_tp3_200k.sh
+  header stamped with the E-105 TP4 approval + 262144 context ceiling
+  (was still reading as the 3-rank sign-off era). Next: desks run;
+  on landing merge keep-both (rungs then bw, both touch
+  mmvq.cu/vecdotq.cuh), rebuild build-hip, fire combowin regress +
+  winning-rung arms.
