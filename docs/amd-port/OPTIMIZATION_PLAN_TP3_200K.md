@@ -3001,3 +3001,46 @@ to Gemini's guard battery, die 3 is the dev cell.
   schedule-level y staging or format-level decode reduction are the only
   doors; B-rungs reopen only if a future schedule re-enters the
   issue-bound regime.
+- E-110 2026-09-23 RUNGS DESK LANDED (ZERO DELTA BY DESIGN) + DECODE
+  REGRESSION INCIDENT + BASELINE RE-STAMP LAW. (1) RUNGS DESK COMPLETE
+  (amd/mmvq-rungs merged 1d6e7675a; W6 receipt + probes in-tree):
+  C1/C2 K-split killed by geometry, A1 wide-x neutral-to-killed, B1
+  v_perm_b32 atom REFUSED ON DEVICE - gfx900's v_perm_b32 does NOT
+  implement the assumed MSB-replication selector mode (host-exact
+  probe refused by device oracle; closes the "gfx900 has v_perm_b32"
+  shortcut), q4_K derivation-walled. Projected served delta: 0 - the
+  W1 upside was already cashed by E-104 share + s2r. Third
+  independent reproduction of the T=4 anchors (W3/W5/W6). Numbering
+  erratum: the W6 desk's ledger entry and the coordinator's BW-landing
+  entry both say E-109; both retained, W6's reads as E-109b.
+  (2) INCIDENT: the rungs desk's seal session stole the boot lock
+  10:33-10:36 (30 s wait expired) and ran die-3 during the coord
+  regress-200k cell; their session self-VOIDed; my regress-200k
+  decode (18.58) carries the same confound and is VOID for banking -
+  but the UNCONTAMINATED regress-10k cell (18.32, ran 10:39-10:42,
+  after the steal) and the s2r5-200k cell (16.33, 10:42-10:47, FAIL
+  at the old -10% gate) hold the finding: the merged tree decodes
+  -20% below the E-105 TP4 anchors (23.23/23.34). Prefill matches
+  (214-218), outputs byte-identical across arms - correctness clean,
+  decode-path performance regression. s2r gates make it WORSE served
+  (16.33 vs 18.58) on the regressed base: bw's P0 anchors came from
+  their standalone replica harness, not the real kernel, so real-
+  kernel interaction costs (s2r + aln branches) were never measured.
+  (3) ATTRIBUTION (primary hypothesis): the aln-completion code
+  (567c508cd 08:41 + 1f7a6a330 09:11) landed on main AFTER the last
+  served validation (TP4 anchors measured 08:30-08:38 on a pre-aln
+  binary) and adds runtime aln branches per-type inside the MMVQ
+  share hot loop - never served-validated. Decisive test building:
+  pre-aln binary at 69097e3c7 (wt-diag-prealn); if it decodes ~23,
+  the aln code is the tax (fix: compile-time aln dispatch, kernel
+  variant selection); if it decodes ~18, suspect driver decay/thermal
+  (uptime 5.5 h) and reboot first. (4) PROCESS FIX (Chris-directed):
+  the campaign had NO mandatory post-merge served gate and the
+  baseline file was STALE (TP3-era 18.72) - this morning's 18.58
+  printed PASS (-0.73%) against it; against the true anchor it is a
+  -20% FAIL. baseline_tp3_200k.json RE-STAMPED to the TP4 of-record
+  (decode 23.23, prefill 217.71, accept 0.66667, tp=4; ratchets=2) so
+  the battery's -10% FAIL gate bites again; NEW LAW: every merge
+  touching decode paths runs the decode-guard cell vs the baseline
+  BEFORE the landing is done, and the baseline RATCHETS on every
+  validated improvement. Automation prompt updated with the law.
