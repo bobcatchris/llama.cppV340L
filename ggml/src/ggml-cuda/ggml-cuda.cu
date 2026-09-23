@@ -1182,6 +1182,13 @@ struct ggml_backend_cuda_comm_context {
     // handles that call.
     try_allreduce_fn            try_allreduce = nullptr;
 
+    // GGML_RCCL_FP32=1: reduce as FP32 at every size in the nccl path. Above
+    // the small-tensor heuristic this replaces the BF16-compress reduction
+    // (a wider numerics class) with the same sum-order reorder the decode
+    // boundaries already use. Only read by the nccl path; unset keeps the
+    // upstream size heuristic everywhere.
+    bool                        nccl_fp32 = false;
+
     ggml_cuda_ar_pipeline *     ar_pipeline = nullptr;
 
 #ifdef GGML_USE_NCCL
@@ -1220,7 +1227,11 @@ static bool ggml_backend_cuda_comm_allreduce_nccl(
 
     // For small tensors, simply reduce them as FP32.
     // The following heuristic for how "small" a tensor should be is based on RTX 4090s connected via 16x PCIe 4.0.
-    if ((n_backends <= 2 && ne < 32768) || (n_backends == 3 && ne < 131072) || (n_backends >= 4 && ne < 262144)) {
+    // GGML_RCCL_FP32=1 keeps FP32 at every size (rccl-ext bench: 2.4x over the
+    // butterfly at prefill sizes, but ~1.9x slower than BF16-compress there).
+    const bool reduce_fp32 = comm_ctx->nccl_fp32 ||
+        ((n_backends <= 2 && ne < 32768) || (n_backends == 3 && ne < 131072) || (n_backends >= 4 && ne < 262144));
+    if (reduce_fp32) {
         for (size_t i = 0; i < n_backends; ++i) {
             if ((tensors[i]->flags & GGML_TENSOR_FLAG_COMPUTE) == 0) {
                 ggml_backend_cuda_context * cuda_ctx = (ggml_backend_cuda_context *) comm_ctx->backends[i]->context;
@@ -1415,6 +1426,12 @@ static void * ggml_backend_cuda_comm_init(ggml_backend_t * backends, size_t n_ba
     ret->dev_ids.reserve(n_backends);
     for (size_t i = 0; i < n_backends; i++) {
         ret->dev_ids.push_back(static_cast<ggml_backend_cuda_context *>(backends[i]->context)->device);
+    }
+
+    const char * env_fp32 = getenv("GGML_RCCL_FP32");
+    if (env_fp32 != nullptr && atoi(env_fp32) == 1) {
+        ret->nccl_fp32 = true;
+        GGML_LOG_INFO("%s: FP32 reductions at all sizes enabled (GGML_RCCL_FP32=1, nccl path)\n", __func__);
     }
 
     const char * env = getenv("GGML_CUDA_ALLREDUCE");
