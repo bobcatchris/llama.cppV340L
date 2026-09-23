@@ -2425,3 +2425,17 @@ to Gemini's guard battery, die 3 is the dev cell.
   relayout, then the T=1 chain wall. Queue: campaign build + served A/B
   in the final combined window. Receipts:
   results/W2_mmvq2_baseline_2026-09-22.md, W2_mmvq2_tband_2026-09-22.md.
+- E-095 2026-09-22 MMVQ SHARE SERVED A/B VERDICT: t/s-NEUTRAL served
+  (share 18.82 vs ref 18.99, in noise; byte-exact so zero risk; keep
+  merged env-gated OFF). The -43% kernel-time bench win did not
+  translate: the verify round's wall time is structure-bound (boundary
+  tax, replay count, DMA) - kernel math was already only a slice of
+  it. FOURTH independent confirmation of the device-structure
+  attribution. ref2/share2 cells failed client-side (no crash, no
+  segv - dmesg clean); verdict stands on ref1/share1. CAMPAIGN SPEED
+  OUTCOME OF RECORD: RCCL mode = THE win (+25-27%, signed off,
+  serving default, baseline 18.72); all other levers measured neutral
+  or are designed-parked (RCCL deeper integration, on-device
+  sampling). The 20 t/s @10k line needs the next subsystem (on-device
+  sampling or RCCL extension to more transfer classes), not more
+  micro-optimization.
