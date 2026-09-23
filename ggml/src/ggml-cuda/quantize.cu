@@ -1,6 +1,10 @@
 #include "quantize.cuh"
 #include <cstdint>
 
+// aln=true emits the 48-byte block_q8_1_aln layout (GGML_CUDA_MMVQ_ALN):
+// identical q/ds values, only the store addresses change. aln=false is the
+// shipped layout, byte-identical for every existing consumer.
+template <bool aln>
 __launch_bounds__(CUDA_QUANTIZE_BLOCK_SIZE, 1)
 static __global__ void quantize_q8_1(
         const float * x_ptr, void * vy_ptr,
@@ -26,8 +30,6 @@ static __global__ void quantize_q8_1(
 
     const int64_t i_cont = ((i3*ne2.z + i2) * ne1 + i1) * ne0 + i0;
 
-    block_q8_1 * y = (block_q8_1 *) vy;
-
     const int64_t ib  = i_cont / QK8_1; // block index
     const int64_t iqs = i_cont % QK8_1; // quant index
 
@@ -42,13 +44,21 @@ static __global__ void quantize_q8_1(
     const float  d = amax / 127.0f;
     const int8_t q = amax == 0.0f ? 0 : roundf(xi / d);
 
-    y[ib].qs[iqs] = q;
-
-    if (iqs > 0) {
-        return;
+    if constexpr (aln) {
+        block_q8_1_aln * y = (block_q8_1_aln *) vy;
+        y[ib].qs[iqs] = q;
+        if (iqs > 0) {
+            return;
+        }
+        y[ib].ds = make_half2(d, sum);
+    } else {
+        block_q8_1 * y = (block_q8_1 *) vy;
+        y[ib].qs[iqs] = q;
+        if (iqs > 0) {
+            return;
+        }
+        y[ib].ds = make_half2(d, sum);
     }
-
-    y[ib].ds = make_half2(d, sum);
 }
 
 __device__ __forceinline__ uint8_t compute_e8m0_scale(float amax) {
@@ -372,10 +382,10 @@ static __global__ void quantize_mmq_q8_1(
     }
 }
 
-void quantize_row_q8_1_cuda(
+void quantize_row_q8_1_cuda_layout(
         const float * x, const int32_t * ids, void * vy, const ggml_type type_src0,
         const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
-        const int64_t ne0, const int64_t ne1, const int64_t ne2, const int64_t ne3, cudaStream_t stream) {
+        const int64_t ne0, const int64_t ne1, const int64_t ne2, const int64_t ne3, cudaStream_t stream, const bool aln) {
     GGML_ASSERT(!ids);
     GGML_ASSERT(ne0 % QK8_1 == 0);
 
@@ -385,8 +395,19 @@ void quantize_row_q8_1_cuda(
     const dim3 num_blocks(block_num_x, ne1, ne2*ne3);
     const dim3 block_size(CUDA_QUANTIZE_BLOCK_SIZE, 1, 1);
     const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(num_blocks, block_size, 0, stream);
-    ggml_cuda_kernel_launch(quantize_q8_1, launch_params, x, vy, ne00, s01, s02, s03, ne0, ne1, ne2_fastdiv);
+    if (aln) {
+        ggml_cuda_kernel_launch(quantize_q8_1<true>, launch_params, x, vy, ne00, s01, s02, s03, ne0, ne1, ne2_fastdiv);
+    } else {
+        ggml_cuda_kernel_launch(quantize_q8_1<false>, launch_params, x, vy, ne00, s01, s02, s03, ne0, ne1, ne2_fastdiv);
+    }
     GGML_UNUSED(type_src0);
+}
+
+void quantize_row_q8_1_cuda(
+        const float * x, const int32_t * ids, void * vy, const ggml_type type_src0,
+        const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
+        const int64_t ne0, const int64_t ne1, const int64_t ne2, const int64_t ne3, cudaStream_t stream) {
+    quantize_row_q8_1_cuda_layout(x, ids, vy, type_src0, ne00, s01, s02, s03, ne0, ne1, ne2, ne3, stream, /*aln=*/ false);
 }
 
 void quantize_mmq_q8_1_cuda(

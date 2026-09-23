@@ -1695,3 +1695,140 @@ static __device__ __forceinline__ float vec_dot_iq4_xs_q8_1_apply(
     sumi *= scale;
     return d * __low2float(bq8_1[iqs/4].ds) * sumi;
 }
+
+// 48-byte aligned q8_1 y-operand layout (GGML_CUDA_MMVQ_ALN=1): same values
+// as block_q8_1, ds at +0 and qs at +16 so each 32-byte operand group is two
+// uint4 loads instead of eight scalar 4-byte reads. The producer
+// (quantize_q8_1<true>) writes it; only the T=4 MMVQ share arms under the
+// aln gate read it. pad is never written or read.
+struct alignas(16) block_q8_1_aln {
+    ggml_half2 ds;        // @0
+    uint32_t   pad[3];    // @4
+    int8_t     qs[QK8_1]; // @16
+};
+static_assert(sizeof(block_q8_1_aln) == 48, "wrong aln q8_1 block size");
+
+// lane i (0..7) of an aln qs array; one uint4 load covers 4 lanes
+static __device__ __forceinline__ int get_int_aln(const int8_t * qs, const int & i) {
+    const uint4 v = reinterpret_cast<const uint4 *>(qs)[i/4];
+    return i%4 == 0 ? (int) v.x : i%4 == 1 ? (int) v.y : i%4 == 2 ? (int) v.z : (int) v.w;
+}
+
+// aln twins of the T=4 share arms' apply(): identical math and float order,
+// only the q8_1 operand loads go through the 48-byte layout.
+
+static __device__ __forceinline__ float vec_dot_q3_K_q8_1_apply_aln(
+    const block_q8_1_aln * __restrict__ bq8_1, const int & iqs, const int * dec, const int * sc, const float d) {
+
+    const int bq8_offset = QR3_K * (iqs / (QI3_K/2));
+
+    float sumf = 0.0f;
+#pragma unroll
+    for (int i = 0; i < QR3_K; ++i) {
+        const int u    = get_int_aln(bq8_1[bq8_offset + i].qs, iqs % QI8_1);
+        const float d8 = __low2float(bq8_1[bq8_offset + i].ds);
+        sumf += d8 * (ggml_cuda_dp4a(dec[i], u, 0) * sc[i]); // SIMD dot product
+    }
+
+    return d * sumf;
+}
+
+static __device__ __forceinline__ float vec_dot_q4_K_q8_1_apply_aln(
+    const block_q8_1_aln * __restrict__ bq8_1, const int & iqs,
+    const int * dec, const int * sc, const int * m, const ggml_half2 dm) {
+
+    const int bq8_offset = QR4_K * ((iqs/2) / (QI8_1/2));
+
+    float sumf_d = 0.0f;
+    float sumf_m = 0.0f;
+
+#pragma unroll
+    for (int i = 0; i < QR4_K; ++i) {
+        const block_q8_1_aln * bq8i = bq8_1 + bq8_offset + i;
+        const float d8 = __low2float(bq8i->ds);
+
+        const int lane = (iqs/2)%4;
+        const int u0 = get_int_aln(bq8i->qs, lane);
+        const int u1 = get_int_aln(bq8i->qs, lane + 4);
+
+        const int dot1 = ggml_cuda_dp4a(dec[2*i+1], u1, ggml_cuda_dp4a(dec[2*i+0], u0, 0)); // SIMD dot product
+        const int dot2 = ggml_cuda_dp4a(0x01010101, u1, ggml_cuda_dp4a(0x01010101, u0, 0)); // sum of u
+
+        sumf_d += d8 * (dot1 * sc[i]);
+        sumf_m += d8 * (dot2 * m[i]);  // multiply constant part of q4_K with sum of q8_1 values
+    }
+
+    const float2 dm4f = __half22float2(dm);
+
+    return dm4f.x*sumf_d - dm4f.y*sumf_m;
+}
+
+static __device__ __forceinline__ float vec_dot_q5_K_q8_1_apply_aln(
+    const block_q8_1_aln * __restrict__ bq8_1, const int & iqs,
+    const int * dec, const int * sc, const int * m, const ggml_half2 dm) {
+
+    const int bq8_offset = QR5_K * ((iqs/2) / (QI8_1/2));
+
+    float sumf_d = 0.0f;
+    float sumf_m = 0.0f;
+
+#pragma unroll
+    for (int i = 0; i < QR5_K; ++i) {
+        const block_q8_1_aln * bq8i = bq8_1 + bq8_offset + i;
+        const float d8 = __low2float(bq8i->ds);
+
+        const int lane = (iqs/2)%4;
+        const int u0 = get_int_aln(bq8i->qs, lane);
+        const int u1 = get_int_aln(bq8i->qs, lane + 4);
+
+        const int dot1 = ggml_cuda_dp4a(dec[2*i+0], u0, ggml_cuda_dp4a(dec[2*i+1], u1, 0)); // SIMD dot product
+        const int dot2 = ggml_cuda_dp4a(0x01010101, u0, ggml_cuda_dp4a(0x01010101, u1, 0)); // sum of u
+
+        sumf_d += d8 * (dot1 * sc[i]);
+        sumf_m += d8 * (dot2 * m[i]);
+    }
+
+    const float2 dm5f = __half22float2(dm);
+
+    return dm5f.x*sumf_d - dm5f.y*sumf_m;
+}
+
+static __device__ __forceinline__ float vec_dot_q6_K_q8_1_apply_aln(
+    const block_q8_1_aln * __restrict__ bq8_1, const int & iqs, const int * dec, const int * sc, const float d) {
+
+    const int bq8_offset = 2 * QR6_K * (iqs / (QI6_K/2)) + (iqs % (QI6_K/2)) / (QI6_K/4);
+
+    float sumf = 0.0f;
+#pragma unroll
+    for (int i = 0; i < QR6_K; ++i) {
+        const int u    = get_int_aln(bq8_1[bq8_offset + 2*i].qs, iqs % QI8_1);
+        const float d8 = __low2float(bq8_1[bq8_offset + 2*i].ds);
+        sumf += d8 * (ggml_cuda_dp4a(dec[i], u, 0) * sc[i]); // SIMD dot product
+    }
+
+    return d*sumf;
+}
+
+static __device__ __forceinline__ float vec_dot_iq3_xxs_q8_1_apply_aln(
+    const block_q8_1_aln * __restrict__ bq8_1, const int & iqs, const int * dec, const int ls, const float d) {
+
+    int sumi = 0;
+#pragma unroll
+    for (int m = 0; m < 8; ++m) {
+        sumi = ggml_cuda_dp4a(dec[m], get_int_aln(bq8_1[iqs/2].qs, m), sumi);
+    }
+    sumi = (ls*sumi + sumi/2)/2;
+    return d * __low2float(bq8_1[iqs/2].ds) * sumi;
+}
+
+static __device__ __forceinline__ float vec_dot_iq3_s_q8_1_apply_aln(
+    const block_q8_1_aln * __restrict__ bq8_1, const int & iqs, const int * dec, const int scale, const float d) {
+
+    int sumi = 0;
+#pragma unroll
+    for (int m = 0; m < 8; ++m) {
+        sumi = ggml_cuda_dp4a(dec[m], get_int_aln(bq8_1[iqs/2].qs, m), sumi);
+    }
+    sumi *= scale;
+    return d * __low2float(bq8_1[iqs/2].ds) * sumi;
+}
