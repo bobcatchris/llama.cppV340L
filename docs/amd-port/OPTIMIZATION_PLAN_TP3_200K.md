@@ -3819,3 +3819,18 @@ to Gemini's guard battery, die 3 is the dev cell.
   gate); ARM P2 = NCCL_MIN_NCHANNELS=4 (INFO fingerprint REQUIRED in verdict);
   ARM P3 = FORCE_CUBLAS_COMPUTE_32F ONLY with owner sign-off + a die-2
   microbench pre-gate. E-101 bf16-compress boundary class NOT reopened.
+- E-120 2026-09-23 DIE-1 WEDGE DISCOVERED (same 17:15 kill event):
+  card1's sysfs device attributes (mem_info_vram_used, temp) are
+  GONE - the die fell off the bus at the driver level. Effect: the
+  gate functions' missing-file fallbacks (999999999 / 0) turned
+  die_idle into an INFINITE loop (two A/B chain launches wedged
+  pre-boot, zero GPU work since ~17:20). FIX: gate scripts now FAIL
+  LOUD on an unreadable die (DIE-DOWN + exit) instead of spinning.
+  dmesg shows only boot-time init; the wedge predates recovery.
+  NO TP4 boot is possible without die 1 - REBOOT REQUIRED (user-
+  owned action; sysfs resets break HIP enumeration per E-098 law).
+  Post-reboot queue: the interleaved split A/B (s0/s1 x 10k, the
+  ~4.3 ms tensor-split flag verdict), then per-desk served windows.
+  Unaffected: draft-cache desk (zero-GPU, continues), all committed
+  work + snapshots. LESSON: missing-sysfs must fail closed, same
+  class as the provenance gate - silent fallbacks cost another hour.
