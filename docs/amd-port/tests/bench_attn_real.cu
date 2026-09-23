@@ -124,9 +124,11 @@ int main(int argc, char ** argv) {
     int  reps      = argc > 3 ? atoi(argv[3]) : 9;
     bool served    = false;
     bool occupancy = false;
+    bool probe     = false;
     for (int i = 2; i < argc; ++i) {
         if (strcmp(argv[i], "--served-entry") == 0) served = true;
         if (strcmp(argv[i], "--occupancy") == 0)    occupancy = true;
+        if (strcmp(argv[i], "--probe") == 0)        probe = true;
     }
     if (occupancy) {
         occ_arm(ARM_BASE); occ_arm(ARM_MID3); occ_arm(ARM_WIDE6);
@@ -136,7 +138,9 @@ int main(int argc, char ** argv) {
     // backend + device info init (ggml_cuda_info() used by launch_fattn)
     ggml_backend_t bak = ggml_backend_cuda_init(0);
     if (!bak) { printf("ggml_backend_cuda_init failed\n"); return 1; }
-    ggml_backend_cuda_context ctx(0);
+    // heap leak on purpose: this port's ctx dtor (chunk-cache clears) aborts
+    // on hipFree at exit teardown; measurements are complete before we return
+    ggml_backend_cuda_context & ctx = *new ggml_backend_cuda_context(0);
 
     // read KV bytes from the GGUF (token_embd region, offset-delta law) and
     // sanitize the q4_0 block scales to a fixed positive half
@@ -192,6 +196,27 @@ int main(int argc, char ** argv) {
     dst_t->src[0] = q_t; dst_t->src[1] = k_t; dst_t->src[2] = v_t; dst_t->src[3] = m_t; dst_t->src[4] = nullptr;
     dst_t->op = GGML_OP_FLASH_ATTN_EXT; // asserted by get_f16_extra_data
 
+    if (probe) {
+        // per-launch event timing of the same arm back-to-back (no sequence
+        // context): separates intrinsic per-launch cost from the inter-
+        // kernel gap the full deq,deq,FA,comb sequence shows
+        const ArmKind pk = ARM_WIDE6;
+        hipEvent_t pe0, pe1;
+        HIP_CHECK(hipEventCreate(&pe0)); HIP_CHECK(hipEventCreate(&pe1));
+        for (int w = 0; w < 20; ++w) run_arm(pk, ctx, dst_t);
+        HIP_CHECK(hipDeviceSynchronize());
+        for (int i = 0; i < 20; ++i) {
+            HIP_CHECK(hipEventRecord(pe0, ctx.stream()));
+            run_arm(pk, ctx, dst_t);
+            HIP_CHECK(hipEventRecord(pe1, ctx.stream()));
+            HIP_CHECK(hipEventSynchronize(pe1));
+            float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, pe0, pe1));
+            printf("PROBE %s launch %2d: %.1f us\n", arm_name(pk), i, ms * 1000.0f);
+        }
+        ggml_free(gctx);
+        return 0;
+    }
+
     if (served) {
         // full served entry: exercises the fattn.cu TILE selection +
         // launch_fattn_tile_switch_ncols2 (+ GQA_WIDE arm when env is set)
@@ -235,8 +260,13 @@ int main(int argc, char ** argv) {
                mism[a], dst_bytes/4, max_rel);
     }
 
-    // extra warmup (2 full 4-arm passes) so every arm sees ramped clocks
-    for (int w = 0; w < 2; ++w) {
+    // warmup (2500 full 4-arm passes, ~8 s) into the hot-steady DVFS state;
+    // windows after this all run at the same clock (per-rep diagnostic showed
+    // rep-1 boost-state bias and sleep-driven p-state lottery otherwise);
+    // BENCH_WARMUP overrides for kernel-trace runs (rocprof) only
+    int n_warm = 2500;
+    if (const char * wenv = getenv("BENCH_WARMUP")) n_warm = atoi(wenv);
+    for (int w = 0; w < n_warm; ++w) {
         for (size_t a = 0; a < arms.size(); ++a) {
             run_arm(arms[a], ctx, dst_t);
         }
@@ -244,7 +274,8 @@ int main(int argc, char ** argv) {
     HIP_CHECK(hipDeviceSynchronize());
 
     // timing: reps x (niter back-to-back launches, hip events), arms interleaved;
-    // events ride ctx.stream() so they bracket the real launch stream
+    // events ride ctx.stream() so they bracket the real launch stream;
+    // rep window 0 is a measured DVFS warm-in window and is discarded
     std::vector<std::vector<double>> t(arms.size());
     hipEvent_t ev0, ev1;
     HIP_CHECK(hipEventCreate(&ev0)); HIP_CHECK(hipEventCreate(&ev1));
@@ -258,7 +289,7 @@ int main(int argc, char ** argv) {
             HIP_CHECK(hipEventRecord(ev1, st));
             HIP_CHECK(hipEventSynchronize(ev1));
             float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, ev0, ev1));
-            t[a].push_back(ms * 1000.0 / niter);
+            if (r > 0) t[a].push_back(ms * 1000.0 / niter);
         }
     }
     printf("\nper-launch us (niter=%d, reps=%d), served geometry T=%d gqa=6 ne11=%d q4_0 KV:\n",
@@ -272,6 +303,11 @@ int main(int argc, char ** argv) {
                arm_name(arms[a]), med, s.front(), s.back(), spread,
                (med - t[0][t[0].size()/2]) / t[0][t[0].size()/2] * 100.0,
                spread <= 1.05 ? "" : "  SPREAD-FAIL (>1.05%)");
+    }
+    for (size_t a = 0; a < arms.size(); ++a) {
+        printf("REPS %-8s:", arm_name(arms[a]));
+        for (size_t r = 0; r < t[a].size(); ++r) printf(" %.1f", t[a][r]);
+        printf("\n");
     }
     ggml_free(gctx);
     return 0;
