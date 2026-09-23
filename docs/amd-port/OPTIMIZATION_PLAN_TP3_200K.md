@@ -2586,3 +2586,48 @@ to Gemini's guard battery, die 3 is the dev cell.
   arms when their desks land. No GPU resets attempted (last attempt
   broke HIP enumeration - see E-068-era history); no further boots on
   this driver state.
+- E-099 2026-09-22 ONSAMPLE DESK: PER-SHARD ON-DEVICE ARGMAX IMPLEMENTED
+  (wt-onsample amd/onsample, synced onto campaign HEAD 865e52cf1
+  fast-forward; zero-GPU, commits on branch, nothing pushed). The greedy
+  draft top-1 no longer consumes the 517 KB spliced logits row when
+  LLAMA_DRAFT_ONDEVICE_ARGMAX=1: new GGML_OP_ARGMAX_SHARD whose output
+  duplicates the input partition (meta case = handle_generic unary pass ->
+  the E-065 SPLIT_AXIS_UNKNOWN / handle_per_row abort class is structurally
+  avoided; the ratio block recomputes per-die ne = shard_j), each die
+  writing (max logit, shard-local argmax) into elements [0,1] of its own
+  shard slice per row. ggml-backend-meta get_tensor + get_tensor_async gain
+  a single-shard sub-row fetch (byte range inside one shard's slice of one
+  row -> that device's simple tensor with packed-stride offset; row-aligned
+  and cross-shard ranges keep the existing paths, so existing callers are
+  byte-identical) - decode() fetches 24 B per step in 3 tiny per-die DMAs
+  enqueued stream-ordered, instead of the 517 KB splice. New API
+  ggml_backend_meta_tensor_split_offsets exposes the shard bases (one-shot,
+  cached); decode() resolves local->global indices once per decode
+  (generation-guarded); common_shard_argmax_pick merges (strict max, first
+  shard on ties = lowest global index since shard bases ascend and the
+  device kernel pins the lowest local index). Kernels: ggml-cpu + HIP
+  (shard-argmax.cu, lexicographic (val,idx) reduce; note the pre-existing
+  argmax kernels leave exact-tie ids unspecified - this op pins
+  lowest-index). Node added to all 4 graph_mtp builders (qwen35, qwen35moe,
+  step35, cohere2moe) behind cparams.draft_ondevice_argmax; unset = no
+  node, no fetch, no allocation change = byte-identical; target verify rows
+  and the draft h rows stream host-side unchanged. TIE HONESTY: parity with
+  the host argmax is PROVEN for distinct logits (the real-model case); on
+  exact ties the current host paths are themselves unspecified and mutually
+  inconsistent (partial_sort vs heap-select give different tied ids - same
+  documented divergence class as FAST_TOPK in E-054) while the on-device
+  merge is deterministic lowest-index. HOST TESTS ALL PASS
+  (docs/amd-port/tests/test_onsample_argmax_host.cpp, ggml-linked real-op
+  runs over emulated per-die slabs: crafted 3-shard ties, single shard,
+  four uneven 3-way layouts at 129272, within/cross/boundary/all-equal tie
+  patterns, 1-ULP near-ties, staging lifetime + poisoned-tail, fetch
+  mapping incl. cross-shard rejection); test_mtp_sampling_host.cpp
+  regression ALL PASS. gfx900 compile (cmake at /home/chris/opt/cmake/bin,
+  HIP=ON, targets ggml + llama-common + llama + llama-server): ZERO
+  warnings. Mutually exclusive with LLAMA_DRAFT_PACKED_GET (ctor guard +
+  warn). SERVED ARMS QUEUED for the coordinator window: A = campaign HEAD
+  baseline, B = + LLAMA_DRAFT_ONDEVICE_ARGMAX=1, greedy gate = identical
+  drafted-token sequences (accept 0.66667 class), attribution via
+  SPEC/DECODE_TIMELINE (expected effect modest: ms/round class; strategic
+  value = deletes the draft loop's host row round trips, prerequisite for
+  step-batching). Receipt: results/ONSAMPLE_2026-09-22.md.

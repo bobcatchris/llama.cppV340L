@@ -1610,6 +1610,66 @@ void ggml_compute_forward_argmax(
     }
 }
 
+// ggml_compute_forward_argmax_shard
+
+static void ggml_compute_forward_argmax_shard_f32(
+        const ggml_compute_params * params,
+        ggml_tensor * dst) {
+
+    const ggml_tensor * src0 = dst->src[0];
+
+    if (params->ith != 0) {
+        return;
+    }
+
+    assert(src0->nb[0] == sizeof(float));
+    assert(dst->nb[0] == sizeof(float));
+
+    const int64_t ne00 = src0->ne[0];
+    const int64_t ne01 = src0->ne[1];
+
+    const size_t nb01 = src0->nb[1];
+    const size_t nb01d = dst->nb[1];
+
+    // per row: (max, argmax) at the head of the result row; ties keep the
+    // lowest index. elements [2, ne0) of the result row are never written
+    for (int64_t i1 = 0; i1 < ne01; i1++) {
+        const float * src = (const float *) ((const char *) src0->data + i1*nb01);
+        float * dst_ = (float *) ((char *) dst->data + i1*nb01d);
+
+        float maxval = src[0];
+        int64_t argmax = 0;
+        for (int64_t i0 = 1; i0 < ne00; i0++) {
+            const float val = src[i0];
+            if (val > maxval) {
+                maxval = val;
+                argmax = i0;
+            }
+        }
+
+        dst_[0] = maxval;
+        dst_[1] = (float) argmax;
+    }
+}
+
+void ggml_compute_forward_argmax_shard(
+        const ggml_compute_params * params,
+        ggml_tensor * dst) {
+
+    const ggml_tensor * src0 = dst->src[0];
+
+    switch (src0->type) {
+        case GGML_TYPE_F32:
+            {
+                ggml_compute_forward_argmax_shard_f32(params, dst);
+            } break;
+        default:
+            {
+                GGML_ABORT("fatal error");
+            }
+    }
+}
+
 // ggml_compute_forward_count_equal
 
 static void ggml_compute_forward_count_equal_i32(

@@ -777,6 +777,24 @@ llama_token_data_array * common_sampler_sample_row(struct common_sampler * gsmpl
     return &gsmpl->cur_p;
 }
 
+llama_token common_shard_argmax_pick(const float * pairs, int n_pairs, float * logit) {
+    GGML_ASSERT(pairs != nullptr && n_pairs > 0);
+
+    int best = 0;
+    for (int d = 1; d < n_pairs; d++) {
+        // strict comparison keeps the earlier (lower-vocab) shard on ties
+        if (pairs[2*d] > pairs[2*best]) {
+            best = d;
+        }
+    }
+
+    if (logit) {
+        *logit = pairs[2*best];
+    }
+
+    return (llama_token) pairs[2*best + 1];
+}
+
 std::vector<llama_token> common_sampler_sample_and_accept_n(struct common_sampler * gsmpl, struct llama_context * ctx, const std::vector<int> & idxs, const llama_tokens & draft, bool grammar_first) {
     GGML_ASSERT(idxs.size() == draft.size() + 1 && "idxs.size() must be draft.size() + 1");
 

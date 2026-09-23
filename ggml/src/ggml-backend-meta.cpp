@@ -853,6 +853,12 @@ static struct ggml_backend_meta_split_state ggml_backend_meta_get_split_state(
             case GGML_OP_COUNT_EQUAL: {
                 split_state = handle_per_row(src_ss);
             } break;
+            case GGML_OP_ARGMAX_SHARD: {
+                // per-shard argmax: every device computes the op over its own
+                // shard and the output keeps the input partition (unary pass;
+                // the per-shard pairs live at the head of each shard slice)
+                split_state = handle_generic(src_ss, /*scalar_only =*/ false);
+            } break;
             case GGML_OP_REPEAT:
             case GGML_OP_REPEAT_BACK: {
                 split_state = handle_generic(src_ss, /*scalar_only =*/ false);
@@ -1359,11 +1365,65 @@ static void ggml_backend_meta_buffer_set_tensor(ggml_backend_buffer_t buffer, gg
     }
 }
 
+// map a single-row byte range onto the one shard that contains it; returns
+// the shard index, the row and the byte offset inside that row's shard slice
+// (the caller turns them into a simple-tensor offset with the shard's own
+// row stride), or -1 when the range spans shards or the split is not a plain
+// AXIS_0 disjoint one
+static int ggml_backend_meta_subrow_shard(const ggml_tensor * tensor,
+        const ggml_backend_meta_split_state & split_state, size_t n_bufs,
+        size_t offset, size_t size, size_t & row, size_t & row_off) {
+    row     = 0;
+    row_off = 0;
+    if (size == 0 || ggml_blck_size(tensor->type) != 1) {
+        return -1;
+    }
+    if (split_state.n_segments != 1 || split_state.nr[0] != 1 || split_state.axis != GGML_BACKEND_SPLIT_AXIS_0) {
+        return -1;
+    }
+
+    const size_t rstride = tensor->nb[1];
+    if (offset / rstride != (offset + size - 1) / rstride) {
+        return -1;
+    }
+
+    const size_t w0 = offset % rstride;
+    const size_t w1 = (offset + size - 1) % rstride;
+
+    size_t beg = 0;
+    for (size_t j = 0; j < n_bufs; j++) {
+        const size_t nbytes = split_state.ne[j] * tensor->nb[0];
+        if (w0 < beg + nbytes) {
+            if (w1 >= beg + nbytes) {
+                return -1;
+            }
+            row     = offset / rstride;
+            row_off = w0 - beg;
+            return (int) j;
+        }
+        beg += nbytes;
+    }
+    return -1;
+}
+
 static void ggml_backend_meta_buffer_get_tensor(ggml_backend_buffer_t buffer, const ggml_tensor * tensor, void * data, size_t offset, size_t size) {
     const size_t n_bufs = ggml_backend_meta_buffer_n_bufs(buffer);
     GGML_ASSERT(ggml_is_contiguous(tensor));
 
     const ggml_backend_meta_split_state split_state = ggml_backend_meta_get_split_state(tensor, /*assume_sync =*/ false);
+
+    {
+        // byte range fully inside one shard's slice of a single row (the
+        // shard-argmax pair fetch); row-aligned and cross-shard ranges keep
+        // the paths below
+        size_t row = 0, row_off = 0;
+        const int j = ggml_backend_meta_subrow_shard(tensor, split_state, n_bufs, offset, size, row, row_off);
+        if (j >= 0) {
+            const ggml_tensor * simple_tensor = ggml_backend_meta_buffer_simple_tensor(tensor, j);
+            ggml_backend_tensor_get(simple_tensor, data, row * simple_tensor->nb[1] + row_off, size);
+            return;
+        }
+    }
 
     if (split_state.n_segments != 1 || split_state.nr[0] != 1) {
         GGML_ASSERT(split_state.axis >= 0 && split_state.axis < GGML_MAX_DIMS);
@@ -1720,12 +1780,27 @@ static void ggml_backend_meta_set_tensor_async(ggml_backend_t backend, ggml_tens
 
 static void ggml_backend_meta_get_tensor_async(ggml_backend_t backend, const ggml_tensor * tensor, void * data, size_t offset, size_t size) {
     const size_t n_backends = ggml_backend_meta_n_backends(backend);
-    GGML_ASSERT(offset == 0);
     GGML_ASSERT(ggml_is_contiguous(tensor));
 
     const ggml_backend_meta_split_state split_state = ggml_backend_meta_get_split_state(tensor, /*assume_sync =*/ false);
     GGML_ASSERT(split_state.n_segments == 1);
     GGML_ASSERT(split_state.nr[0]      == 1);
+
+    {
+        // single-shard sub-row fetch, enqueued on the owning device's stream
+        // (the shard-argmax pair fetch); see ggml_backend_meta_subrow_shard
+        size_t row = 0, row_off = 0;
+        const int j = ggml_backend_meta_subrow_shard(tensor, split_state, n_backends, offset, size, row, row_off);
+        if (j >= 0) {
+            ggml_backend_t simple_backend = ggml_backend_meta_simple_backend(backend, j);
+            const ggml_tensor * simple_tensor = ggml_backend_meta_buffer_simple_tensor(tensor, j);
+            ggml_backend_tensor_get_async(simple_backend, simple_tensor, data,
+                    row * simple_tensor->nb[1] + row_off, size);
+            return;
+        }
+    }
+
+    GGML_ASSERT(offset == 0);
 
     switch (split_state.axis) {
         case GGML_BACKEND_SPLIT_AXIS_0:
@@ -2289,6 +2364,44 @@ size_t ggml_backend_meta_n_backends(ggml_backend_t meta_backend) {
     GGML_ASSERT(ggml_backend_is_meta(meta_backend));
     const ggml_backend_meta_context * backend_ctx = (const ggml_backend_meta_context *) meta_backend->context;
     return backend_ctx->backend_configs.size();
+}
+
+size_t ggml_backend_meta_tensor_split_offsets(const struct ggml_tensor * tensor, int64_t * offsets, size_t n_max) {
+    if (!ggml_backend_buffer_is_meta(tensor->buffer)) {
+        // unsplit tensor: a single shard at offset 0
+        if (n_max > 0) {
+            offsets[0] = 0;
+            return 1;
+        }
+        return 0;
+    }
+
+    const ggml_backend_meta_split_state split_state = ggml_backend_meta_get_split_state(tensor, /*assume_sync =*/ false);
+    if (split_state.axis == GGML_BACKEND_SPLIT_AXIS_MIRRORED) {
+        // replicated: reads use the first device's copy
+        if (n_max > 0) {
+            offsets[0] = 0;
+            return 1;
+        }
+        return 0;
+    }
+    if (split_state.axis < GGML_BACKEND_SPLIT_AXIS_0 || split_state.axis > GGML_BACKEND_SPLIT_AXIS_3) {
+        return 0;
+    }
+
+    const size_t n_bufs = ggml_backend_meta_buffer_n_bufs(tensor->buffer);
+    if (n_max < n_bufs) {
+        return 0;
+    }
+
+    int64_t off = 0;
+    for (size_t j = 0; j < n_bufs; j++) {
+        offsets[j] = off;
+        for (uint32_t s = 0; s < split_state.n_segments; s++) {
+            off += split_state.ne[s*n_bufs + j] * split_state.nr[s];
+        }
+    }
+    return n_bufs;
 }
 
 ggml_backend_t ggml_backend_meta_simple_backend(ggml_backend_t meta_backend, size_t index) {

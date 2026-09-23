@@ -115,6 +115,14 @@ struct llama_context {
     llama_token * get_sampled_tokens() const;
     llama_token   get_sampled_token_ith(int32_t idx);
 
+    // per-shard argmax pairs row (2*n_shards floats: (max, argmax) per
+    // shard, argmax already resolved to the global vocab index) for the
+    // on-device draft sampling path. the caller must have drained the
+    // context (llama_wait_outputs / llama_synchronize) first; the pointer is
+    // valid until the next decode. returns nullptr when the draft graph has
+    // no shard-argmax node (LLAMA_DRAFT_ONDEVICE_ARGMAX unset)
+    const float * get_shard_argmax_ith(int32_t idx, int32_t * n_shards);
+
     float * get_sampled_logits_ith(int32_t idx);
     size_t  get_sampled_logits_count(int32_t idx);
 
@@ -317,6 +325,15 @@ private:
     // populated only when cparams.embeddings_nextn is enabled and the model graph
     // sets llm_graph_result::t_h_nextn
     buffer_view<float> embd_nextn = {nullptr, 0};
+
+    // per-shard argmax pairs (2-dimensional array: [n_outputs][2*n_shards],
+    // one (max, argmax) float pair per device shard). populated only when the
+    // draft graph sets llm_graph_result::t_shard_argmax
+    // (LLAMA_DRAFT_ONDEVICE_ARGMAX)
+    buffer_view<float> shard_argmax = {nullptr, 0};
+    std::vector<int64_t> shard_argmax_offs; // per-shard vocab offsets, resolved on first fetch
+    uint64_t shard_argmax_gen = 0;          // bumped per decode when the pairs node runs
+    uint64_t shard_argmax_resolved_gen = 0; // last decode whose local indices were resolved to global ones
 
     // host buffers for output layer input embeddings, per layer
     // populated when cparams.output_layer_inp[il] is true

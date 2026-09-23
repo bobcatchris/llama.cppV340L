@@ -46,6 +46,7 @@ struct llama_cparams {
     bool op_offload;
     bool kv_unified;
     bool pipeline_parallel;
+    bool draft_ondevice_argmax; // per-shard argmax node in the MTP draft graph (LLAMA_DRAFT_ONDEVICE_ARGMAX)
 
     std::vector<bool> embeddings_layer_inp; // [n_layer()] extract input embeddings for layer
 

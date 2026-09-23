@@ -87,6 +87,15 @@ llama_token_data_array * common_sampler_sample_topk(struct common_sampler * gsmp
 llama_token_data_array * common_sampler_sample_row(struct common_sampler * gsmpl, const float * logits_row, int n_vocab);
 llama_token_data_array * common_sampler_sample_topk_row(struct common_sampler * gsmpl, const float * logits_row, int n_vocab, int k);
 
+// greedy top-1 from the per-shard argmax pairs handed out by
+// llama_get_shard_argmax_ith (LLAMA_DRAFT_ONDEVICE_ARGMAX): n_pairs of
+// (max logit, global argmax) floats, one pair per device shard. shards are
+// ordered by ascending vocab index and each shard's argmax is already the
+// lowest local index, so keeping the first pair on equal max yields the
+// lowest-index argmax of the spliced logits row. writes the picked max
+// logit when logit is non-null
+llama_token common_shard_argmax_pick(const float * pairs, int n_pairs, float * logit);
+
 // generalized version of common_sampler_sample
 //
 // will cross-reference the sampled tokens with a batch of draft tokens and accept those that match

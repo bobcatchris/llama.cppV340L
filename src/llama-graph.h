@@ -786,6 +786,7 @@ public:
     ggml_tensor * get_embd()        const { return t_embd; }
     ggml_tensor * get_embd_pooled() const { return t_embd_pooled; }
     ggml_tensor * get_h_nextn()     const { return t_h_nextn; }
+    ggml_tensor * get_shard_argmax() const { return t_shard_argmax; }
 
     ggml_tensor * get_layer_inp(int il) const { return t_layer_inp[il]; }
 
@@ -819,6 +820,7 @@ public:
     ggml_tensor * t_embd        = nullptr;
     ggml_tensor * t_embd_pooled = nullptr;
     ggml_tensor * t_h_nextn     = nullptr; // [n_embd, n_outputs] hidden state before final output norm
+    ggml_tensor * t_shard_argmax = nullptr; // [n_vocab, n_outputs] per-shard argmax pairs (LLAMA_DRAFT_ONDEVICE_ARGMAX)
 
     std::vector<ggml_tensor *> t_layer_inp;
 
@@ -1221,6 +1223,12 @@ struct llm_graph_context {
     //
 
     void build_sampling() const;
+
+    //
+    // on-device draft sampling (per-shard argmax pairs)
+    //
+
+    void build_shard_argmax();
 
     //
     // dense (out)

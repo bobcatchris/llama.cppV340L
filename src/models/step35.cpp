@@ -557,4 +557,6 @@ llama_model_step35::graph_mtp::graph_mtp(const llama_model & model, const llm_gr
 
     res->t_logits = cur;
     ggml_build_forward_expand(gf, cur);
+
+    build_shard_argmax();
 }

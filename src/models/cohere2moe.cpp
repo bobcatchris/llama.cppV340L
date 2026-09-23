@@ -444,4 +444,6 @@ llama_model_cohere2moe::graph_mtp::graph_mtp(const llama_model & model, const ll
     res->t_logits = cur;
 
     ggml_build_forward_expand(gf, cur);
+
+    build_shard_argmax();
 }
