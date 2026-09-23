@@ -2684,3 +2684,19 @@ to Gemini's guard battery, die 3 is the dev cell.
   (neutral). CAMPAIGN HEADLINE OF RECORD: 18.94 t/s decode @ 200k
   (+27.5% over the 14.86 butterfly era, origin 17.8 beaten at 5x
   context), prefill 163.06.
+- E-102 (cont.) FIRST SERVED KERNEL PROFILE - THE NEXT TARGET NAMED.
+  rocprofv3 kernel trace of the serving config (RCCL + full
+  optimization set, share ON, 48-token gen): 218218 launches, 9102 ms
+  traced kernel time. mul_mat_vec_q = 5873 ms (64.5%),
+  ncclDevKernel_Generic = 1903 ms (20.9%), everything else < 2.2%
+  each. THE KEY BREAKDOWN: T=4 (verify ubatch) owns 4911 ms = 83.6%
+  of MMVQ time; within T=4: type21/IQ3_S 1528 ms (26%), type18
+  1112 ms (18.9%), type12 837 ms (14.3%), type23 789 ms (13.4%),
+  type13 154, type14 145. The shipped share win covers ONLY IQ3_S -
+  extending it to types 18/12/23 (2739 ms uncovered, 56% of T=4) at
+  the demonstrated -43% class is a projected ~-25-30% MMVQ total =
+  +10-15% served decode. MMVQ SHARE EXTENSION DESK DISPATCHED
+  (wt-mmvq-kernel2, amd/mmvq-kernel2, trace CSV as ground truth).
+  Note: tracing inflates absolute times ~2-3x; proportions are the
+  signal. Draft/catchup shapes (T=1-3) are only 962 ms combined -
+  T=4 is the game.
