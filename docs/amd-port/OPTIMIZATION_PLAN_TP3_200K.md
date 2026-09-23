@@ -2371,3 +2371,57 @@ to Gemini's guard battery, die 3 is the dev cell.
   (first time any config has passed 17.8 at deep context). 20 t/s at
   10k is one lever away (MMVQ kernel arms pending). Byte-exact
   butterfly remains available by unsetting the env.
+- E-093 2026-09-22 MMVQ RELAUNCH: BASELINE REPRODUCED, FIRST DELIVERABLE
+  BANKED. wt-mmvq-kernel2 (amd/mmvq-kernel2 @ 075d1501b) reran the
+  oracle-gated 8-arm bench on die 3 (lock-compliant, 75 s settle):
+  base 421.1 us/call = 91.1 GB/s, -0.24% vs the banked 422.1/90.9
+  (P0 gate +-2% PASS), all 8 arms within +-1.3% of the 09-21 session,
+  oracle PASS 1.7e-06 everywhere. Control rep spread 1.6% noted
+  (median agreement 0.24%; 1% law enforced on future A/B verdict
+  sessions). Receipt: results/W2_mmvq2_baseline_2026-09-22.md.
+  Pre-kill recorded: arithmetic derivation of iq3s_grid is dead (the
+  512-entry grid is a trained codebook, not arithmetic). Live doors
+  named: T=2-4 tiled shapes (never benched; MTP verify band runs
+  T>1 in served decode graphs), gfx900 dot-product ISA compile probe,
+  q8_1 operand layout. Next: T>1 harness extension.
+- E-094 2026-09-22 MMVQ T-BAND WIN: DECODE-ONCE SHARE -34.1/-46.2/-43.0%
+  KERNEL AT T=2/3/4, BIT-EXACT. The shipped mul_mat_vec_q re-executes the
+  y-independent decode (8 const-LUT lookups + sign chain) once PER TOKEN;
+  share computes the 8 signed quads once per (kbx, lane) and the per-token
+  loop keeps only x-int loads + dp4a in the same order. Session of record
+  (10 configs, 3 interleaved reps x 200 iters, oracle-gated, all PASS
+  <=5.4e-06): t1 418.5; t2 base 753.8 -> share 497.0; t3 1190.7 -> 640.2;
+  t4 1523.0 -> 868.9. share+48B-aligned-y (aln) adds -12.8% at T=4 only
+  (757.7, -50.3% vs base) and needs the q8_1 producer relayout - banked as
+  named lever, not shipped. T-scaling of the shipped kernel: 1.80x/2.85x/
+  3.64x per T-step (floor is T-invariant ~209 us) - the verify band
+  (MTP k=3 -> T=4 every round) was paying 3.6x for 1x of weights.
+  Static-count served projection (N-19: candidate only): 0.77 x -43.0%
+  = -33.1% decode kernel time -> t/s upper bound x1.49 pending served A/B.
+  ISA probe closed arm (b): v_dot2_i32_i16, v_dot2_f32_f16, v_dot4_i32_iu8,
+  v_dot4_i32_i8 all refuse to assemble on gfx900 (rocm-6.2.0) - dp4a
+  emulation is irreducible, consistent with the 09-21 receipt. Oracle-gate
+  defect closed: NaN-blind green (rel >= gate is false for NaN -> all-NaN
+  arm passed); fail condition is now !(rel < gate). Arithmetic derivation
+  of iq3s_grid pre-killed (trained codebook). Next: env-gated share in
+  mmvq.cu, then real-kernel bit-exact gate, then served A/B. Receipt:
+  results/W2_mmvq2_tband_2026-09-22.md.
+- E-095 2026-09-22 MMVQ SHARE SHIPPED ENV-GATED + BIT-EXACT GATE + STOP
+  CEILING. (1) vecdotq.cuh: vec_dot_iq3_s_q8_1_decode/apply split pair;
+  mmvq.cu: GGML_CUDA_MMVQ_IQ3S_SHARE=1 (tile-gemm env pattern) wires the
+  share path for IQ3_S, ncols_dst 2..4, rows_per_block 1 (GCN); default
+  OFF, env unset = byte-identical shipped path. (2) GATE: the shipped
+  split pair benched as t2/t3/t4_ship arms is BIT-IDENTICAL to base
+  (memcmp 64 rows x T tokens, all three) and timing-identical to the
+  harness share arm; three consecutive 3-rep interleaved sessions agree
+  within ~1%: base 753.8/1190.7/1523.0 vs share 496-500/635-640/869-873
+  us/call = -33.9/-46.7/-42.8% at T=2/3/4. Served projection (static-
+  count class): at MTP k=3 verify T=4, 0.77 x -42.8% = -33.0% decode
+  kernel time, t/s upper bound x1.49 pending served A/B; with the aln
+  producer relayout (-50.4% total) x1.63. (3) STOP CEILING: T=1 closed
+  at ~91 GB/s (decode chain = divergent const-LUT + emulated dp4a, both
+  ISA-walled on gfx900, no dot instruction assembles); T=2-4 residual
+  after share is 4.2x floor at T=4, next link = aln 48 B q8_1 producer
+  relayout, then the T=1 chain wall. Queue: campaign build + served A/B
+  in the final combined window. Receipts:
+  results/W2_mmvq2_baseline_2026-09-22.md, W2_mmvq2_tband_2026-09-22.md.
