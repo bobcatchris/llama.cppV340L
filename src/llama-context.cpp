@@ -225,6 +225,17 @@ llama_context::llama_context(
         }
     }
 
+    {
+        // 1 = on (2 slots for the catchup/step shape pair), 2-4 = slot count
+        const char * LLAMA_DRAFT_SHAPE_CACHE = getenv("LLAMA_DRAFT_SHAPE_CACHE");
+        const int n_slots = LLAMA_DRAFT_SHAPE_CACHE ? atoi(LLAMA_DRAFT_SHAPE_CACHE) : 0;
+
+        if (n_slots >= 1) {
+            gf_res_shape.resize(std::min(n_slots, 4));
+            LLAMA_LOG_INFO("%s: draft shape cache enabled (%d slots)\n", __func__, (int) gf_res_shape.size());
+        }
+    }
+
     // ref: https://github.com/ggml-org/llama.cpp/pull/17046#discussion_r2503085732
     cparams.n_ctx = GGML_PAD(cparams.n_ctx, 256);
 
@@ -492,6 +503,12 @@ void llama_context::sched_reserve() {
 
     gf_res_prev.reset(new llm_graph_result(max_nodes));
     gf_res_reserve.reset(new llm_graph_result(max_nodes));
+
+    for (auto & res : gf_res_shape) {
+        res.reset(new llm_graph_result(max_nodes));
+    }
+    gf_res_shape_i = 0;
+    gf_res_shape_sched = nullptr;
 
     sched.reset(ggml_backend_sched_new(backend_ptrs.data(), backend_buft.data(), backend_ptrs.size(), max_nodes, cparams.pipeline_parallel, cparams.op_offload));
 
@@ -794,7 +811,7 @@ void llama_context::wait_outputs() {
     // model this is the meta backend (which drains all of its devices); the
     // full synchronize() additionally sweeps every scheduler backend and
     // closes the perf evaluation window - both skipped here
-    if (!sched || !gf_res_prev) {
+    if (!sched || !gf_res_active()) {
         return;
     }
 
@@ -802,7 +819,7 @@ void llama_context::wait_outputs() {
 
     const int64_t t_sync_start = tl_on ? ggml_time_us() : 0;
 
-    auto * res = gf_res_prev.get();
+    auto * res = gf_res_active();
 
     ggml_backend_t synced = nullptr;
     for (ggml_tensor * t : { res->get_logits(), cparams.embeddings_nextn ? res->get_h_nextn() : nullptr }) {
@@ -827,7 +844,7 @@ bool llama_context::fetch_nextn_outputs(int32_t idx, const float ** out_logits, 
     // same tensors, byte counts and pinned destinations, so the bytes that
     // land in the output buffers are identical by construction; the draft
     // loop reads the rows after its drain (synchronize or wait_outputs)
-    if (!gf_res_prev || n_outputs <= 0) {
+    if (!gf_res_active() || n_outputs <= 0) {
         return false;
     }
 
@@ -845,7 +862,7 @@ bool llama_context::fetch_nextn_outputs(int32_t idx, const float ** out_logits, 
         return false;
     }
 
-    auto * res = gf_res_prev.get();
+    auto * res = gf_res_active();
 
     auto * t_logits  = res->get_logits();
     auto * t_h_nextn = cparams.embeddings_nextn ? res->get_h_nextn() : nullptr;
@@ -978,6 +995,10 @@ bool llama_context::memory_update(bool optimize) {
         // TODO: change the mctx->apply() to return information if a graph reserve is needed
         //       reset the graph result only if the memory module did reset the scheduler
         gf_res_prev->reset();
+        for (auto & res : gf_res_shape) {
+            res->reset();
+        }
+        gf_res_shape_sched = nullptr;
 
         if (!mctx->apply()) {
             LLAMA_LOG_ERROR("%s: failed to apply memory update\n", __func__);
@@ -1576,14 +1597,45 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
         return nullptr;
     }
 
-    auto * res = gf_res_prev.get();
-    auto * gf  = res->get_gf();
+    llm_graph_result * res = gf_res_active();
 
     // the new graph parameters
     // in order to correctly reuse a graph, it's full topology has to be uniquely determined by these parameters
-    const auto gparams = graph_params(res, ubatch, mctx, gtype);
+    auto gparams = graph_params(res, ubatch, mctx, gtype);
 
-    if (!graph_reuse_disable && res->can_reuse(gparams)) {
+    bool can_reuse = !graph_reuse_disable && res->can_reuse(gparams);
+
+    if (!gf_res_shape.empty()) {
+        // shape cache: scan the other slots with the same reuse predicate, so
+        // each recurring shape (draft catchup/steps) keeps its own built graph
+        for (size_t i = 0; i < gf_res_shape.size() && !can_reuse; i++) {
+            auto * cand = gf_res_shape[i].get();
+            if (cand == res) {
+                continue;
+            }
+            if (!graph_reuse_disable && cand->can_reuse(gparams)) {
+                gf_res_shape_i = i;
+                res = cand;
+                gparams.res = res;
+                can_reuse = true;
+            }
+        }
+
+        if (!can_reuse) {
+            // full miss: rebuild into the least recently used slot
+            gf_res_shape_i = (gf_res_shape_i + 1) % gf_res_shape.size();
+            res = gf_res_shape[gf_res_shape_i].get();
+            gparams.res = res;
+        }
+    }
+
+    auto * gf  = res->get_gf();
+
+    // with the shape cache the schedule may still hold another shape's graph,
+    // in which case even a reused graph needs a re-split
+    const bool sched_is_res = gf_res_shape.empty() || res == gf_res_shape_sched;
+
+    if (can_reuse && sched_is_res) {
         //LLAMA_LOG_DEBUG("%s: reusing previous graph\n", __func__);
 
         graph_reused = true;
@@ -1596,6 +1648,22 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
         }
 
         n_reused++;
+    } else if (can_reuse) {
+        // shape re-entry: the built graph is kept, only the schedule is
+        // re-split for it; the graph keeps its uid so backend device graphs replay
+        graph_reused = true;
+        n_reused++;
+
+        ggml_backend_sched_reset(sched.get());
+        ggml_backend_sched_set_eval_callback(sched.get(), cparams.cb_eval, cparams.cb_eval_user_data);
+
+        if (!ggml_backend_sched_alloc_graph(sched.get(), gf)) {
+            LLAMA_LOG_ERROR("%s: failed to allocate graph\n", __func__);
+            ret = GGML_STATUS_ALLOC_FAILED;
+            return nullptr;
+        }
+
+        gf_res_shape_sched = res;
     } else {
         res->reset();
 
@@ -1625,6 +1693,8 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
             ret = GGML_STATUS_ALLOC_FAILED;
             return nullptr;
         }
+
+        gf_res_shape_sched = gf_res_shape.empty() ? nullptr : res;
     }
 
     // set the input data for the input tensors
@@ -2690,6 +2760,10 @@ llm_graph_result * llama_context::get_gf_res_reserve() const {
     return static_cast<llm_graph_result *>(gf_res_reserve.get());
 }
 
+llm_graph_result * llama_context::gf_res_active() const {
+    return gf_res_shape.empty() ? gf_res_prev.get() : gf_res_shape[gf_res_shape_i].get();
+}
+
 ggml_cgraph * llama_context::graph_reserve(
         uint32_t n_tokens, uint32_t n_seqs, uint32_t n_outputs, const llama_memory_context_i * mctx, bool split_only, size_t * sizes) {
     LLAMA_LOG_DEBUG("%s: reserving a graph for ubatch with n_tokens = %4u, n_seqs = %2u, n_outputs = %4u\n", __func__, n_tokens, n_seqs, n_outputs);
@@ -2704,6 +2778,10 @@ ggml_cgraph * llama_context::graph_reserve(
 
     // when the scheduler is reset, we cannot reuse the old graph, so we reset the previous graph result to prevent that
     gf_res_prev->reset();
+    for (auto & res : gf_res_shape) {
+        res->reset();
+    }
+    gf_res_shape_sched = nullptr;
 
     // store the n_outputs as it is, and restore it afterwards
     // TODO: not sure if needed, might simplify in the future by removing this
@@ -3702,7 +3780,7 @@ void llama_context::opt_epoch_iter(
                 break;
             }
 
-            auto * res = gf_res_prev.get();
+            auto * res = gf_res_active();
 
             const auto gparams = graph_params(res, ubatch, mctx.get(), ctx_type_to_graph_type(cparams.ctx_type));
 
