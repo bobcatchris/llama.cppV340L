@@ -3985,6 +3985,9 @@ private:
                 // pointers for the whole verify-accept loop instead of the
                 // per-row getter syncs; an empty result means not eligible,
                 // and the regular path runs unchanged
+                static const bool spec_tl = getenv("LLAMA_SPEC_TIMELINE") != nullptr;
+                const int64_t t_accept_us = spec_tl ? ggml_time_us() : 0;
+
                 std::vector<llama_token> accepted;
                 if (verify_row_sampling) {
                     accepted = common_sampler_sample_and_accept_n_rows(slot.smpl.get(), slot.ctx_tgt, slot.spec_i_batch, slot.spec_draft);
@@ -3995,6 +3998,11 @@ private:
                 slot.spec_i_batch.clear();
 
                 GGML_ASSERT(accepted.size() >= 1);
+
+                if (spec_tl) {
+                    SLT_INF(slot, "[spec-timeline] accept: rows = %zu, sample+accept = %.3f ms\n",
+                            n_draft + 1, (ggml_time_us() - t_accept_us)/1e3);
+                }
 
                 const uint32_t n_rollback = slot.spec_draft.size() + 1 - accepted.size();
 

@@ -5370,6 +5370,10 @@ static enum ggml_status ggml_backend_cuda_graph_compute(ggml_backend_t backend, 
                 if (properties_changed) {
                     // Properties changed - reset warmup, execute directly until stable again
                     graph->warmup_complete = false;
+                    if (tl_on) {
+                        GGML_LOG_INFO("[launch-timeline] cuda warmup reset: dev = %d, nodes = %d, uid %llu\n",
+                            (int) cuda_ctx->device, cgraph->n_nodes, (unsigned long long) cgraph->uid);
+                    }
                     GGML_LOG_DEBUG("%s: CUDA graph warmup reset\n", __func__);
                 } else {
                     use_cuda_graph = true;
