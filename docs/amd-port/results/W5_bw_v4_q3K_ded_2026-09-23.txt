@@ -1,0 +1,56 @@
+lock held by mmvq-bw
+== producer emit (quantize_q8_1 clone, K=5120 T=4): 640 blocks, value memcmp IDENTICAL
+   legacy emit 4.23 us | aln emit 4.22 us | delta -0.1%
+== q3_K [K=5120 N=17408 110 B/block] off=10469424416 len=38297600
+  t1_aln     BITEXACT vs q3_K t1_base (memcmp, 17408 rows x 1 tokens)
+  t4_base2   in-run control IDENTICAL (memcmp)
+  t2_share   BITEXACT vs q3_K t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_share   BITEXACT vs q3_K t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_share   BITEXACT vs q3_K t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_share2  BITEXACT vs q3_K t4_base (memcmp, 17408 rows x 4 tokens)
+  t2_aln     BITEXACT vs q3_K t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_aln     BITEXACT vs q3_K t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_aln     BITEXACT vs q3_K t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_aln2    BITEXACT vs q3_K t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_cfull2  in-run control IDENTICAL (determinism memcmp)
+  t2_s2r     BITEXACT vs q3_K t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_s2r     BITEXACT vs q3_K t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_s2r     BITEXACT vs q3_K t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_s2r2    BITEXACT vs q3_K t4_base (memcmp, 17408 rows x 4 tokens)
+  config        T    us/call       GB/s    spread   per-rep us
+  t1_base       1      517.9       74.1     1.52%   [510.8 514.7 518.7 517.9 518.3]
+  t1_aln        1      667.8       57.5     0.10%   [667.8 667.9 667.5 667.8 667.2]
+  t2_base       2      627.5       61.3     0.18%   [627.9 627.5 627.9 627.1 626.8]
+  t3_base       3      854.5       45.1     0.10%   [854.7 854.7 853.8 854.5 854.5]
+  t4_base       4      954.5       40.4     0.68%   [958.2 954.5 953.3 951.7 954.6]
+  t4_base2      4      953.7       40.5     0.70%   [956.3 955.3 953.7 949.7 952.9]
+  t2_share      2      460.4       83.5     0.54%   [459.8 460.4 459.3 461.3 461.8]
+  t3_share      3      584.4       65.9     0.59%   [583.3 583.0 584.4 584.9 586.5]
+  t4_share      4      693.6       55.6     1.67%   [688.4 689.7 693.6 700.0 694.5]
+  t4_share2     4      692.3       55.8     0.59%   [690.6 690.1 692.3 693.8 694.2]
+  t2_aln        2     1129.7       34.0     1.64%   [1122.9 1126.3 1129.7 1131.9 1141.5]
+  t3_aln        3     1644.8       23.4     0.45%   [1638.8 1641.4 1644.8 1645.0 1646.2]
+  t4_aln        4     3281.9       11.8     1.19%   [3271.2 3279.0 3281.9 3299.4 3310.3]
+  t4_aln2       4     3282.4       11.8     1.04%   [3272.2 3280.4 3282.4 3294.4 3306.3]
+  t4_cfull      4      531.8       72.6     2.36%   [526.5 531.3 531.8 535.9 539.1]
+  t4_cfull2     4      532.3       72.5     2.20%   [531.1 531.6 532.3 538.5 542.8]
+  t4_cx         4      426.2       90.6     2.43%   [418.9 426.2 428.0 429.3 423.9]
+  t4_cy         4      298.1      129.5     1.77%   [295.4 298.1 298.8 297.9 300.6]
+  t2_wide       2        0.0        inf     -nan%   [0.0 0.0 0.0 0.0 0.0]
+  t3_wide       3        0.0        inf     -nan%   [0.0 0.0 0.0 0.0 0.0]
+  t4_wide       4        0.0        inf     -nan%   [0.0 0.0 0.0 0.0 0.0]
+  t4_wide2      4        0.0        inf     -nan%   [0.0 0.0 0.0 0.0 0.0]
+  t2_s2r        2      461.0       83.4     0.69%   [458.4 460.9 461.6 461.3 461.0]
+  t3_s2r        3      583.7       66.0     0.48%   [582.7 582.6 583.7 584.0 585.4]
+  t4_s2r        4      691.8       55.8     1.05%   [687.6 691.8 691.2 694.2 694.8]
+  t4_s2r2       4      693.3       55.7     1.08%   [687.7 693.5 693.3 692.2 695.3]
+  q3_K T=4 share verdict: -27.3% vs base
+  q3_K T=4 aln verdict: +243.9% vs base, +373.1% vs share (the served increment)
+  q3_K T=4 consume ceilings: cfull 531.8 us (72.6 GB/s) | cx 426.2 us (90.6 GB/s) | cy 298.1 us (129.5 GB/s)
+  q3_K T=4 decode+dp4a tax: +30.4% (share vs cfull); x-only / y-only load time ratio: 1.43
+  q3_K T=4 s2r verdict: -27.5% vs base, -0.3% vs share (the served increment)
+  q3_K session law: worst per-config spread 2.43% VOID (gate 1%)
+
+control: t4_base2/t4_share2 are the in-run controls (bit + spread);
+base-vs-share deltas at same T are the A/B verdicts; session law 1%.
+session done rc=0, releasing lock
