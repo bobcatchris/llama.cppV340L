@@ -1,5 +1,5 @@
 // probe: exhaustive host validation of the iq3 perm sign atom vs the shipped shim semantics (W6 receipt, B1 rung)
-// build+run: g++ -O2 -I ggml/src -DGGML_COMMON_IMPL_CPP <this file> (host-only, no GPU)
+// build+run: g++ -O2 -x c++ -I ggml/src -DGGML_COMMON_IMPL_CPP <this file> -o probe (host-only, no GPU)
 // NOTE: the candidate atom passes here and FAILS on device - gfx900 v_perm_b32 selector
 // semantics do not match the MSB-replication model; see W6_mmvq_rungs_receipt
 // B1 gfx900 probe: exhaustive host validation + ISA census of iq3 sign-chain
@@ -24,7 +24,7 @@ static uint32_t ref_vsub4(uint32_t a, uint32_t b) {
     uint32_t c = 0;
     for (int i = 0; i < 4; ++i) {
         const int8_t va = (a >> (8*i)) & 0xFF, vb = (b >> (8*i)) & 0xFF;
-        c |= (uint32_t)(int8_t)(va - vb) << (8*i);
+        c |= (uint32_t)(uint8_t)(int8_t)(va - vb) << (8*i);
     }
     return c;
 }
