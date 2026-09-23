@@ -221,6 +221,28 @@ int main() {
     CHECK(cache.find(ggml_cuda_q81_act_cache::make_key(&s1, 0, (cudaStream_t) 0x5678)) == nullptr);
     CHECK(cache.find(ggml_cuda_q81_act_cache::make_key(&s1, 1, st)) == nullptr);
 
+
+
+    // layout sensitivity (GGML_CUDA_MMVQ_ALN), fresh cache: a dual-region aln
+    // buffer must never satisfy a legacy lookup or vice versa - the aln region
+    // only exists behind the legacy one, so a cross-layout hit would read out
+    // of bounds
+    {
+        ggml_cuda_q81_act_cache cache_l;
+        mock_pool pool_l;
+        cache_l.begin_compute(true);
+        const auto key0 = ggml_cuda_q81_act_cache::make_key(&s1, 0, st, 0);
+        const auto k1 = ggml_cuda_q81_act_cache::make_key(&s1, 0, st, 1);
+        CHECK(!(k1 == key0));
+        auto * slot0 = cache_l.insert(key0, nbytes, pool_l);
+        auto * slot1 = cache_l.insert(k1, nbytes + nbytes/2, pool_l);
+        CHECK(slot0 != nullptr && slot1 != nullptr && slot0->buf != slot1->buf);
+        CHECK(cache_l.find(key0) == slot0);
+        CHECK(cache_l.find(k1) == slot1);
+        CHECK(cache_l.find(ggml_cuda_q81_act_cache::make_key(&s1, 0, st)) == slot0);
+        CHECK(pool_l.n_alloc == 2);
+    }
+
     // op filter: synthetic tensors (mul_mat_id scratch slices) are not cacheable
     {
         const int64_t ne_v[4] = {ne10, 1, 1, 1};

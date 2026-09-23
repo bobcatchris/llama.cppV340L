@@ -1406,11 +1406,12 @@ struct ggml_cuda_q81_act_cache {
         int                 device;
         int64_t ne10, ne11, ne12, ne13;
         int64_t s11, s12, s13;      // src1 row strides in elements
+        int     layout = 0;         // q8_1 layout: 0 = block_q8_1, 1 = 48-byte block_q8_1_aln
 
         bool operator==(const key & other) const {
             return node == other.node && data == other.data && stream == other.stream && device == other.device
                 && ne10 == other.ne10 && ne11 == other.ne11 && ne12 == other.ne12 && ne13 == other.ne13
-                && s11 == other.s11 && s12 == other.s12 && s13 == other.s13;
+                && s11 == other.s11 && s12 == other.s12 && s13 == other.s13 && layout == other.layout;
         }
     };
 
@@ -1421,7 +1422,7 @@ struct ggml_cuda_q81_act_cache {
             h = h*31 + (size_t) (uintptr_t) k.stream;
             h = h*31 + (size_t) (k.device
                 + k.ne10*7 + k.ne11*13 + k.ne12*29 + k.ne13*53
-                + k.s11*11 + k.s12*17 + k.s13*23);
+                + k.s11*11 + k.s12*17 + k.s13*23 + k.layout);
             return h;
         }
     };
@@ -1443,12 +1444,12 @@ struct ggml_cuda_q81_act_cache {
 
     std::unordered_map<key, entry, hash> entries;
 
-    static key make_key(const ggml_tensor * src1, int device, cudaStream_t stream) {
+    static key make_key(const ggml_tensor * src1, int device, cudaStream_t stream, int layout = 0) {
         return {src1, src1->data, stream, device,
             src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3],
             (int64_t) (src1->nb[1]/sizeof(float)),
             (int64_t) (src1->nb[2]/sizeof(float)),
-            (int64_t) (src1->nb[3]/sizeof(float))};
+            (int64_t) (src1->nb[3]/sizeof(float)), layout};
     }
 
     static size_t nbytes(const ggml_tensor * src1) {

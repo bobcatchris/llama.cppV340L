@@ -291,11 +291,13 @@ __global__ __launch_bounds__(128, 1) static void gemv_share_t(
 // the served T=4 ffn activation shape (K=5120, MATRIX_ROW_PADDING-padded).
 // VALUE memcmp legacy-vs-aln + per-arm timing: the producer cost delta of the
 // aln emit (same stores, different addresses).
-template <bool ALN>
+// MODE 0 = legacy 36 B only, 1 = aln 48 B only, 2 = DUAL emit (the shipped
+// GGML_CUDA_MMVQ_ALN producer: legacy region at +0, aln region at +aln_off)
+template <int MODE>
 __global__ __launch_bounds__(256, 1) static void quantize_q8_1_clone(
         const float * x_ptr, void * vy_ptr,
         const int64_t ne00, const int64_t s01, const int64_t s02, const int64_t s03,
-        const int64_t ne0, const uint32_t ne1, const uint3 ne2) {
+        const int64_t ne0, const uint32_t ne1, const uint3 ne2, const int64_t aln_off = 0) {
     const float * GGML_CUDA_RESTRICT x  = x_ptr;
     void        * GGML_CUDA_RESTRICT vy = vy_ptr;
     const int64_t i0 = (int64_t)blockDim.x*blockIdx.x + threadIdx.x;
@@ -323,7 +325,17 @@ __global__ __launch_bounds__(256, 1) static void quantize_q8_1_clone(
     const float  d = amax / 127.0f;
     const int8_t q = amax == 0.0f ? 0 : roundf(xi / d);
 
-    if (ALN) {
+    if (MODE == 2) {
+        block_q8_1     * y  = (block_q8_1 *) vy;
+        block_q8_1_aln * ya = (block_q8_1_aln *) ((char *) vy + aln_off);
+        y[ib].qs[iqs]  = q;
+        ya[ib].qs[iqs] = q;
+        if (iqs > 0) {
+            return;
+        }
+        y[ib].ds  = make_half2(d, sum);
+        ya[ib].ds = make_half2(d, sum);
+    } else if (MODE == 1) {
         block_q8_1_aln * y = (block_q8_1_aln *) vy;
         y[ib].qs[iqs] = q;
         if (iqs > 0) {
@@ -346,10 +358,11 @@ static void run_producer_bench(int niter, int reps) {
     const int64_t ne0 = GGML_PAD(K, MATRIX_ROW_PADDING);
     const int64_t nblocks = T * ne0 / QK8_1;
 
-    float * dx; void * dy36; void * dy48;
+    float * dx; void * dy36; void * dydual;
     CHECK(hipMalloc(&dx, (size_t)K*T*sizeof(float)));
     CHECK(hipMalloc(&dy36, (size_t)nblocks*36));
-    CHECK(hipMalloc(&dy48, (size_t)nblocks*48));
+    CHECK(hipMalloc(&dydual, (size_t)nblocks*(36+48)));
+    const int64_t aln_off = (int64_t)nblocks*36;
     {
         std::vector<float> hx((size_t)K*T);
         for (size_t i = 0; i < hx.size(); ++i) {
@@ -362,15 +375,16 @@ static void run_producer_bench(int niter, int reps) {
     dim3 grid((unsigned)block_num_x, T, 1);
     dim3 blk(256, 1, 1);
 
-    // value gate: aln emit must hold identical qs/ds bytes per block
-    CHECK(hipMemset(dy48, 0xAA, nblocks*48));
-    quantize_q8_1_clone<false><<<grid, blk>>>(dx, dy36, K, K, K, K, ne0, T, make_uint3(1,1,1));
-    quantize_q8_1_clone<true ><<<grid, blk>>>(dx, dy48, K, K, K, K, ne0, T, make_uint3(1,1,1));
+    // value gate: the dual-emit aln region must hold identical qs/ds bytes
+    // per block as the legacy region of the same buffer
+    CHECK(hipMemset(dydual, 0xAA, nblocks*(36+48)));
+    quantize_q8_1_clone<0><<<grid, blk>>>(dx, dy36, K, K, K, K, ne0, T, make_uint3(1,1,1));
+    quantize_q8_1_clone<2><<<grid, blk>>>(dx, dydual, K, K, K, K, ne0, T, make_uint3(1,1,1), aln_off);
     CHECK(hipDeviceSynchronize());
     {
         std::vector<uint8_t> a(nblocks*48), b(nblocks*36);
-        CHECK(hipMemcpy(a.data(), dy48, a.size(), hipMemcpyDeviceToHost));
-        CHECK(hipMemcpy(b.data(), dy36, b.size(), hipMemcpyDeviceToHost));
+        CHECK(hipMemcpy(a.data(), (char *) dydual + aln_off, a.size(), hipMemcpyDeviceToHost));
+        CHECK(hipMemcpy(b.data(), dydual, b.size(), hipMemcpyDeviceToHost));
         size_t bad = 0;
         for (int64_t i = 0; i < nblocks; ++i) {
             // compare ds(4 B at +0) and qs(32 B at +16); pad stays unwritten
@@ -380,7 +394,7 @@ static void run_producer_bench(int niter, int reps) {
                 ++bad;
             }
         }
-        printf("== producer emit (quantize_q8_1 clone, K=%d T=%d): %lld blocks, value memcmp %s\n",
+        printf("== producer emit (quantize_q8_1 clone, K=%d T=%d): %lld blocks, dual-region value memcmp %s\n",
                K, T, (long long)nblocks, bad == 0 ? "IDENTICAL" : "MISMATCH - REFUSED");
         if (bad != 0) {
             printf("producer value gate FAILED\n");
@@ -390,19 +404,22 @@ static void run_producer_bench(int niter, int reps) {
 
     hipEvent_t e0, e1;
     CHECK(hipEventCreate(&e0)); CHECK(hipEventCreate(&e1));
-    double med[2] = {0, 0};
-    for (int arm = 0; arm < 2; ++arm) {
+    const char * armname[3] = { "legacy", "aln-only", "dual" };
+    double med[3] = {0, 0, 0};
+    for (int arm = 0; arm < 3; ++arm) {
         for (int w = 0; w < 200; ++w) {
-            if (arm == 0) quantize_q8_1_clone<false><<<grid, blk>>>(dx, dy36, K, K, K, K, ne0, T, make_uint3(1,1,1));
-            else          quantize_q8_1_clone<true ><<<grid, blk>>>(dx, dy48, K, K, K, K, ne0, T, make_uint3(1,1,1));
+            if (arm == 0)      quantize_q8_1_clone<0><<<grid, blk>>>(dx, dy36, K, K, K, K, ne0, T, make_uint3(1,1,1));
+            else if (arm == 1) quantize_q8_1_clone<1><<<grid, blk>>>(dx, (char *) dydual + aln_off, K, K, K, K, ne0, T, make_uint3(1,1,1));
+            else               quantize_q8_1_clone<2><<<grid, blk>>>(dx, dydual, K, K, K, K, ne0, T, make_uint3(1,1,1), aln_off);
         }
         CHECK(hipDeviceSynchronize());
         std::vector<double> us;
         for (int r = 0; r < reps; ++r) {
             CHECK(hipEventRecord(e0));
             for (int i = 0; i < niter; ++i) {
-                if (arm == 0) quantize_q8_1_clone<false><<<grid, blk>>>(dx, dy36, K, K, K, K, ne0, T, make_uint3(1,1,1));
-                else          quantize_q8_1_clone<true ><<<grid, blk>>>(dx, dy48, K, K, K, K, ne0, T, make_uint3(1,1,1));
+                if (arm == 0)      quantize_q8_1_clone<0><<<grid, blk>>>(dx, dy36, K, K, K, K, ne0, T, make_uint3(1,1,1));
+                else if (arm == 1) quantize_q8_1_clone<1><<<grid, blk>>>(dx, (char *) dydual + aln_off, K, K, K, K, ne0, T, make_uint3(1,1,1));
+                else               quantize_q8_1_clone<2><<<grid, blk>>>(dx, dydual, K, K, K, K, ne0, T, make_uint3(1,1,1), aln_off);
             }
             CHECK(hipEventRecord(e1)); CHECK(hipEventSynchronize(e1));
             float ms = 0.0f;
@@ -412,10 +429,10 @@ static void run_producer_bench(int niter, int reps) {
         std::sort(us.begin(), us.end());
         med[arm] = us[us.size()/2];
     }
-    printf("   legacy emit %.2f us | aln emit %.2f us | delta %+.1f%%\n",
-           med[0], med[1], (med[1]/med[0] - 1.0)*100.0);
+    printf("   legacy emit %.2f us | aln-only emit %.2f us (%+.1f%%) | dual emit %.2f us (%+.1f%%)\n",
+           med[0], med[1], (med[1]/med[0] - 1.0)*100.0, med[2], (med[2]/med[0] - 1.0)*100.0);
 
-    CHECK(hipFree(dx)); CHECK(hipFree(dy36)); CHECK(hipFree(dy48));
+    CHECK(hipFree(dx)); CHECK(hipFree(dy36)); CHECK(hipFree(dydual));
     CHECK(hipEventDestroy(e0)); CHECK(hipEventDestroy(e1));
 }
 
