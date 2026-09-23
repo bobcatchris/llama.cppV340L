@@ -2439,3 +2439,47 @@ to Gemini's guard battery, die 3 is the dev cell.
   sampling). The 20 t/s @10k line needs the next subsystem (on-device
   sampling or RCCL extension to more transfer classes), not more
   micro-optimization.
+- E-096 2026-09-22 THE THREE SUBSYSTEM PROJECTS STARTED (Chris: "start
+  on the 3 designed subsystem projects now"). All zero-GPU
+  (design/implement/host-test), fresh worktrees off 3f17b0f28:
+  (1) ON-DEVICE SAMPLING (wt-onsample, amd/onsample): per-shard
+  argmax op for the greedy draft path - 3 tiny (value,index) pairs
+  per step replace the 517 KB row consumption; deterministic
+  tie-break matched to the host argmax, meta-carve-out designed to
+  avoid the E-065 SPLIT_AXIS_UNKNOWN abort; LLAMA_DRAFT_ONDEVICE_
+  ARGMAX=1. Strategic value: prerequisite for step-batching.
+  (2) RCCL COVERAGE EXTENSION (wt-rccl-ext, amd/rccl-ext): prefill-
+  sized reductions (ne >= 131072) currently fall back to butterfly/
+  bf16-compress - bench RCCL vs butterfly at real prefill sizes,
+  gate-extend if it wins; numerics: the owner's sum-order sign-off
+  covers the class globally, but prefill numerics feed KV - served
+  full battery gates required; plus a transfer-class audit table.
+  (3) LAUNCH/REPLAY-PATH (wt-launchpath, amd/launchpath): per-replay
+  and scheduler-sweep cost measurement (LLAMA_LAUNCH_TIMELINE=1
+  counter as first deliverable), TARGET-side sweep audit (draft side
+  already 5-6 -> 1), per-replay overhead attack if measured high,
+  honest ceiling doc for persistent-kernel/mega-graph options.
+  All env-gated, unset = byte-identical; validation arms run in the
+  coordinator's window when the desks land.
+- E-097 2026-09-22 SUBSYSTEM DESKS PAUSED AT USAGE LIMIT (account 5 h
+  limit; resets 2026-09-23 09:56). All three worktrees hold WIP:
+  wt-onsample clean (died in design), wt-launchpath committed its
+  LLAMA_LAUNCH_TIMELINE first deliverable (8a9d287cb) + profiler
+  script, wt-rccl-ext rescued (a2dcaeff2). RELAUNCH PLAN: after
+  reset, resume all three with "continue your predecessor's WIP in
+  worktree X" briefs. THE RCCL-EXT DESK'S PRE-DEATH FINDING NEEDS
+  CHRIS'S EYES (numerics of the CURRENT serving config): today's
+  nccl mode runs BF16-COMPRESS at every PREFILL boundary (ne >=
+  131072) - a MUCH wider numerics class than the "bounded dust" the
+  E-094 sign-off text describes: ~99.998% of elements differ vs fp32
+  reference, max relative error 3.3e4 at cancellation sites (bf16
+  mantissa loss). Decode boundaries (ne < 131072) ARE the signed-off
+  fp32 dust class. The desk's bench (rccl_prefill_probe, 3 clean
+  boots): RCCL-F32 2.26-2.4x faster than butterfly at EVERY size
+  (-7.69 ms/boundary at the 10 MiB prefill size); RCCL-BF16 (today's
+  branch) is 1.9x faster than RCCL-F32 at 10 MiB - so the choice at
+  prefill is precision (+2.61 ms/boundary, ~+1% prefill wall, worst
+  +5.5%) vs today's bf16 class. Served gates passed on the bf16
+  branch, but the sign-off text should not be read as covering it.
+  The desk's gate implementation (WIP) gives Chris the fp32 switch.
+  Decision queued for Chris alongside the reviewer's read.
