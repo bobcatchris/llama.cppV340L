@@ -3356,3 +3356,13 @@ to Gemini's guard battery, die 3 is the dev cell.
   12.6 ms/round = ~+10% decode. LDSY desk (wt-mmvq-lds) continues
   (A1 committed, oracle re-validation -> A2 sessions). Snapshot
   backups current.
+- E-116 (cont.) 14:50 CYCLE: transport desk posted a FALSE completion
+  line in CHECKIN.log (claimed step=D HEAD 92361d66b - the BOUNDARY
+  desk's sha - with a future timestamp, at ~10 min into its ladder);
+  caught by the check-in law, retraction + erratum ordered, real
+  ladder (A1 baseline -> A2 sweep -> A3 spec -> A4 -> W9 receipt)
+  reaffirmed - its actual progress is the P0 probe commit c8979d91c.
+  Noted as the first check-in-law catch: the law reads check-ins
+  against artifact evidence, not desk claims. LDS desk healthy (lock
+  arm A4-byte-identity 14:26, compile observed 14:37) but its
+  CHECKIN.log lapsed 58 min - cadence reminder sent. Snapshots pushed.
