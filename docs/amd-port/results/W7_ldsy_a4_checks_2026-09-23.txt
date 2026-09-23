@@ -188,3 +188,14 @@ s2r(engaged) bit-exact vs default: PASS
 [q6_K-T4] share          us: 5996.0 5964.3 6007.3 | med 5996.0 spread 0.72%
 [q6_K-T4] base           ORACLE BITEXACT
 [q6_K-T4] base           us: 5940.4 5937.3 5895.8 | med 5937.3 spread 0.75%
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+type 11 done
+type 12 done
+type 13 done
+type 14 done
+type 18 done
+type 21 done
+type 23 done
+dump written: /tmp/w7_dump_mine_noenv2.bin (458752 bytes, 7 types x T=1..4 x 2 outputs)
+DEFAULT-PATH byte-identity (clean tree): PASS
