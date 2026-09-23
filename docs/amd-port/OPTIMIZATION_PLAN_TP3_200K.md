@@ -2544,3 +2544,32 @@ to Gemini's guard battery, die 3 is the dev cell.
   dust - that is the signed-off class extending, must be STABLE not
   equal); capture RCCL_DEBUG=INFO connect lines for the prefill size
   class. Owner decision queued: f32 class vs today's bf16 at prefill.
+- E-099 2026-09-22 LAUNCHPATH DESK LANDED: launch/sweep cost table +
+  honest ceiling - the launch path is NOT the decode bottleneck
+  (<= ~1 ms recoverable of the 163 ms verify block, <1%). The
+  on-disk mtpgain_T1/F1 logs predate LLAMA_LAUNCH_TIMELINE (T1 was
+  even -lv 3): no [launch-timeline] lines exist anywhere on disk, so
+  the measured launch/replay split needs the validation boot
+  (served-arm spec written). The profiler now falls back to a
+  decode-only table when meta lines are absent; against F1-F4 it
+  pins: verify issue med 162.3-163.2 ms (n=85 each), build 0.000,
+  inputs med 0.040 ms (0.02% of the block), catchup med 11.2-11.7,
+  drain med 5.5 calls/ubatch with only the first carrying the real
+  wait (extras ~1-2 us, empty queue). Static audit of the target
+  path (27 die replays + 8 boundaries per verify ubatch): replay
+  path has no node loop, no allocations, no in-replay syncs;
+  update_required already O(1) on stable uid; set_device self-guarded;
+  the two real waste items were already shipped env-gated in
+  8a9d287cb and this audit verified both sound (TARGET_LIGHT_SYNC:
+  meta backend caps.events=false so the events==NULL gate engages;
+  COMPAT_CACHE: uid==0 never cached, no false hits). Remaining
+  candidates ~ns-25 us/ubatch: left alone, not worth gating risk.
+  Ceiling doc (results/LaunchPath_20260922.md): persistent kernels /
+  mega-graph with conditional nodes / device-side graph launch all
+  attack the same <=1 ms host slice, not the 162 ms kernel+transport
+  body - decode-rate levers live on the device-side desks. All six
+  host suites green incl. test_launch_timeline_host; gfx900 compile
+  clean (llama-server, no boots). Env work remaining for the window:
+  boot with LLAMA_LAUNCH_TIMELINE=1 -lv 4, expect 27 "mode = replay"
+  lines/ubatch, meta subs=9 replays=27 bounds=8, csync delta 1 with
+  TARGET_LIGHT_SYNC.

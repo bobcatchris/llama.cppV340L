@@ -4,6 +4,7 @@
 #include "ggml-backend-impl.h"
 #include "ggml-alloc.h"
 #include "ggml-cpp.h"
+#include "ggml-launch-timeline.h"
 
 #include <algorithm>
 #include <cassert>
@@ -1774,6 +1775,14 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend, 
     const size_t n_backends = ggml_backend_meta_n_backends(backend);
     ggml_backend_meta_context * backend_ctx = (ggml_backend_meta_context *) backend->context;
 
+    const bool tl_on = ggml_launch_timeline_enabled();
+    const int64_t tl_t0 = tl_on ? ggml_time_us() : 0;
+    uint64_t tl_replays = 0;
+    uint64_t tl_bounds = 0;
+    uint64_t tl_comm = 0;
+    uint64_t tl_fb = 0;
+    uint64_t tl_comm_us = 0;
+
     // If the previous cgraph had a defined UID it can be used to skip rebuilding the subgraphs per simple backend.
     const bool needs_rebuild = (cgraph->uid == 0) || (cgraph->uid != backend_ctx->uid);
 
@@ -2191,6 +2200,9 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend, 
                 return status;
             }
         }
+        if (tl_on) {
+            tl_replays += n_backends;
+        }
 
         if (n_backends > 1 && i < backend_ctx->n_subgraphs - 1) {
             bool backend_allreduce_success = false;
@@ -2202,16 +2214,39 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend, 
                     ggml_cgraph * cgraph_ij = bcj.cgraphs[i].cgraph_main;
                     nodes.push_back(cgraph_ij->nodes[cgraph_ij->n_nodes-1]);
                 }
+                const int64_t tl_ar_t0 = tl_on ? ggml_time_us() : 0;
                 backend_allreduce_success = backend_ctx->comm_allreduce(backend_ctx->comm_ctx, nodes.data());
+                if (tl_on) {
+                    tl_comm_us += ggml_time_us() - tl_ar_t0;
+                    tl_comm++;
+                }
             }
 
             if (!backend_allreduce_success) {
+                if (tl_on) {
+                    tl_fb++;
+                }
                 const ggml_status status = allreduce_fallback(i);
                 if (status != GGML_STATUS_SUCCESS) {
                     return status;
                 }
             }
+            if (tl_on) {
+                tl_bounds++;
+            }
         }
+    }
+
+    if (tl_on) {
+        g_launch_tl.meta_computes++;
+        g_launch_tl.meta_replays += tl_replays;
+        g_launch_tl.meta_boundaries += tl_bounds;
+        g_launch_tl.meta_ar_comm += tl_comm;
+        g_launch_tl.meta_ar_fallback += tl_fb;
+        g_launch_tl.ar_comm_us += tl_comm_us;
+        GGML_LOG_INFO("[launch-timeline] meta nodes = %d, subs = %zu, replays = %zu, bounds = %zu, comm = %zu, fb = %zu, host = %.3f ms, ar = %.3f ms\n",
+            cgraph->n_nodes, backend_ctx->n_subgraphs, tl_replays, tl_bounds, tl_comm, tl_fb,
+            (ggml_time_us() - tl_t0)/1e3, tl_comm_us/1e3);
     }
     return GGML_STATUS_SUCCESS;
 }

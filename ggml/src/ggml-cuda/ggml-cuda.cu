@@ -1,6 +1,7 @@
 #include "ggml-cuda.h"
 #include "ggml-impl.h"
 #include "ggml-backend-impl.h"
+#include "ggml-launch-timeline.h"
 
 #include "ggml-cuda/allreduce.cuh"
 #include "ggml-cuda/common.cuh"
@@ -3419,6 +3420,26 @@ static bool ggml_cuda_graph_check_compability(ggml_cgraph * cgraph) {
     return use_cuda_graph;
 }
 
+// GGML_CUDA_COMPAT_CACHE=1 caches the graph-compatibility verdict per cgraph
+// uid: the scan reads only topology-fixed properties (ops, buffer types,
+// device cc), so for a stable uid the verdict cannot change and the per-call
+// node rescan is skipped
+static bool ggml_cuda_graph_compat_verdict(ggml_cuda_graph * graph, ggml_cgraph * cgraph) {
+    static const bool cache_enabled = [] {
+        const char * e = getenv("GGML_CUDA_COMPAT_CACHE");
+        return e != nullptr && atoi(e) == 1;
+    }();
+    if (cache_enabled && cgraph->uid != 0 && cgraph->uid == graph->compat_uid) {
+        return graph->compat_verdict;
+    }
+    const bool ok = ggml_cuda_graph_check_compability(cgraph);
+    if (cache_enabled) {
+        graph->compat_uid = cgraph->uid;
+        graph->compat_verdict = ok;
+    }
+    return ok;
+}
+
 static const void * ggml_cuda_graph_get_key(ggml_cgraph * cgraph) {
     return cgraph->nodes[0];
 }
@@ -5256,7 +5277,14 @@ static void ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context * cud
             ggml_cuda_graph_update_executable(cuda_ctx, graph_key);
         }
         // Launch graph
-        CUDA_CHECK(cudaGraphLaunch(graph->instance, cuda_ctx->stream()));
+        {
+            const bool tl_on = ggml_launch_timeline_enabled();
+            const int64_t tl_l0 = tl_on ? ggml_time_us() : 0;
+            CUDA_CHECK(cudaGraphLaunch(graph->instance, cuda_ctx->stream()));
+            if (tl_on) {
+                g_launch_tl.cuda_launch_us += ggml_time_us() - tl_l0;
+            }
+        }
 #else
         GGML_UNUSED(graph_key);
         graph_evaluated_or_captured = true;
@@ -5304,6 +5332,11 @@ static enum ggml_status ggml_backend_cuda_graph_compute(ggml_backend_t backend, 
     bool cuda_graph_update_required = false;
     const void * graph_key = nullptr;
 
+    const bool tl_on = ggml_launch_timeline_enabled();
+    const int64_t tl_t0 = tl_on ? ggml_time_us() : 0;
+    int64_t tl_check_us = 0;
+    uint64_t tl_replays = 0, tl_captures = 0, tl_direct = 0;
+
 #ifdef USE_CUDA_GRAPH
     graph_key = ggml_cuda_graph_get_key(cgraph);
 
@@ -5311,7 +5344,11 @@ static enum ggml_status ggml_backend_cuda_graph_compute(ggml_backend_t backend, 
 
     ggml_cuda_graph * graph = cuda_ctx->cuda_graph(graph_key);
     if (graph->is_enabled()) {
-        const bool graph_compatible = ggml_cuda_graph_check_compability(cgraph);
+        const int64_t tl_check_t0 = tl_on ? ggml_time_us() : 0;
+        const bool graph_compatible = ggml_cuda_graph_compat_verdict(graph, cgraph);
+        if (tl_on) {
+            tl_check_us += ggml_time_us() - tl_check_t0;
+        }
         if (graph_compatible) {
             const bool properties_changed = ggml_cuda_graph_update_required(cuda_ctx, cgraph);
 
@@ -5352,6 +5389,29 @@ static enum ggml_status ggml_backend_cuda_graph_compute(ggml_backend_t backend, 
     // the q8_1 activation cache is only valid for direct execution: during CUDA graph
     // capture every quantize must run in-graph, and replays skip the host side
     cuda_ctx->q81_act_cache.begin_compute(ggml_cuda_q81_act_cache_enabled() && !use_cuda_graph);
+
+    if (tl_on) {
+        if (use_cuda_graph) {
+            if (cuda_graph_update_required) {
+                tl_captures++;
+            } else {
+                tl_replays++;
+            }
+        } else {
+            tl_direct++;
+        }
+        g_launch_tl.cuda_computes++;
+        g_launch_tl.cuda_replays += tl_replays;
+        g_launch_tl.cuda_captures += tl_captures;
+        g_launch_tl.cuda_direct += tl_direct;
+        const uint64_t tl_launch_us0 = g_launch_tl.cuda_launch_us;
+        ggml_cuda_graph_evaluate_and_capture(cuda_ctx, cgraph, use_cuda_graph, cuda_graph_update_required, graph_key);
+        GGML_LOG_INFO("[launch-timeline] cuda dev = %d, nodes = %d, mode = %s, host = %.3f ms, check = %.3f ms, launch = %.3f ms\n",
+            (int) cuda_ctx->device, cgraph->n_nodes,
+            use_cuda_graph ? (cuda_graph_update_required ? "capture" : "replay") : "direct",
+            (ggml_time_us() - tl_t0)/1e3, tl_check_us/1e3, (g_launch_tl.cuda_launch_us - tl_launch_us0)/1e3);
+        return GGML_STATUS_SUCCESS;
+    }
 
     ggml_cuda_graph_evaluate_and_capture(cuda_ctx, cgraph, use_cuda_graph, cuda_graph_update_required, graph_key);
 
