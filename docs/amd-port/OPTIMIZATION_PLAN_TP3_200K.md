@@ -3105,3 +3105,35 @@ to Gemini's guard battery, die 3 is the dev cell.
   LESSON OF RECORD: the provenance gate would have caught the
   invalid instrument at first use - binary+config hashes make
   "which build" unambiguous; no more multi-hour backwards looks.
+- E-113 2026-09-23 FIX VALIDATED - OF-RECORD RESTORED WITH PROVENANCE;
+  S2R VERDICT. (1) COMPILE-TIME ALN/S2R DISPATCH VALIDATED SERVED
+  (9be54f82f, binary c691079db528bd72, config 58092e1943c88fb9, tree
+  clean - every number below carries its hashes): regress arm PASS
+  5/5 - decode 23.26 @200k (+0.12% vs baseline) and 23.21 @10k
+  (-0.08%), prefill 217.33 (-0.18%). The runtime aln/s2r branches in
+  the MMVQ share hot loop were the entire -20%; the default kernel
+  variant now carries none of that code, the anchor SASS is restored,
+  and the aln + s2r arms remain reproducible via env (4-way variant
+  selection at launch). Serving of record: UNCHANGED config,
+  launch_tp3_200k.sh as-is on the 9be54f82f build. (2) S2R VERDICT:
+  NOT PROMOTED. At 10k the s2r5 arm is exactly neutral (23.21 vs
+  23.21 - bw's -3.1..-7.7% replica-harness kernel wins do not
+  translate to the served kernel). At 200k the arm read 19.20 in a
+  back-to-back window, but the same window pattern shows 200k decode
+  cells sagging under heat soak (23.26 in cell 1, 19.20 in cell 3,
+  then 23.21 on the light 10k cell) - the 200k s2r delta is buried
+  in thermal noise, so it is recorded as UNMEASURED, not negative.
+  s2r stays default-OFF (now zero-cost when off); any future
+  promotion requires an interleaved multi-rep A/B with cooldown
+  gaps. (3) SESSION LEDGER OF THE DAY (the honest accounting): the
+  -20% regression entered main at 1f7a6a330 (aln completion,
+  09:11) UNVALIDATED; it was caught today only because the baseline
+  re-stamp + post-merge gate law (Chris-directed, E-110) turned the
+  silent loss into loud FAILs; the first attribution was wrong
+  because the coordinator's diagnostic binary was built with
+  GGML_HIP_RCCL=OFF (invalid instrument) - the provenance gate
+  Chris demanded is what exposed it; total cost ~3 h from landing
+  to validated fix. Both holes that allowed this (stale baseline,
+  unattributable binaries) are now structurally closed: the battery
+  refuses unattributable runs, and the baseline ratchets with every
+  validated improvement.
