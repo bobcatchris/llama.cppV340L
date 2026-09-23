@@ -3439,3 +3439,49 @@ to Gemini's guard battery, die 3 is the dev cell.
   T=2 - the W5 replica wire set does not hold. REAL-KERNEL TRUTH INSTRUMENT:
   tests/bench_mmvq_real.cu (kept, base/share/s2r arms). Receipt:
   results/W7_mmvq_ldsy_receipt_2026-09-23.md + session logs.
+
+- E-117a RCCL TRANSPORT DESK COMPLETE (wt-rccl-transport on
+  amd/rccl-transport @ 68766bec1; P0 multi-die probe + A1 residual
+  localization + A2 env sweep + A3 served spec; receipt
+  W9_rccl_transport_receipt_2026-09-23.md, 44 session logs committed,
+  instrument docs/amd-port/tests/rccl_multidie_probe.cu +
+  run_rccl_multidie.sh). (1) THE U3 ANSWER: the served per-die boundary
+  asymmetry (census 128.8-210.8 us, x1.64) DOES NOT REPRODUCE IN
+  ISOLATION - the isolated 4-die 80 KB fp32 allreduce is flat across
+  dies (lockstep medians 124.4/116.1/117.3/124.2, x1.07; burst-pipelined
+  103.2 us dead uniform). W8's T(die) 59-141 us residual splits into a
+  UNIFORM wire component (~34 us over the 69.5 us ring floor) and a
+  served-only INTERLEAVE PEER-WAIT component (kernel-internal wait set
+  by per-die compute arrival jitter) - the flattening prize (~12.6 ms/
+  round) is a COMPUTE-BALANCE lever, not a transport lever; transport
+  tuning moves the uniform ~103 us component only. (2) A2 (27 configs,
+  inproc served-shape, per-die medians + even/odd spread law): ONE knob
+  wins - NCCL_MIN_NCHANNELS=4 (default 2 channels -> 4, INFO fingerprint
+  of record): burst per-op 103.5 -> 91.6-92.2 us (-11.0..-11.5%)
+  REPRODUCED x3 sessions, worst-die lockstep 126.5 -> 113.3-114.4
+  (-9.6..-10.4%), helps the 20 KB draft class too (-13.4% lockstep
+  worst). The >= 15% win bar NOT met - recorded as a PARTIAL: ~11.3 us/
+  op x 136 = ~1.5 ms/round (~1.2% decode) upper bound if the served
+  boundary cashes the same transport share; the wait share may dilute
+  it; the provenance-gated 200k battery decides. REJECTIONS of record:
+  Tree algo strictly worse (burst 150 us) and REINTRODUCES a die
+  gradient (x1.48); >4 channels worse and widens spread to x1.18;
+  NCCL_SHM_DISABLE=1 explodes +85% (191-214 us) = SHM PROVEN as the
+  transport; LL/LL128/Simple/NTHREADS/MSCCL/P2P-off/affinity all
+  neutral. (3) A3 SERVED SPEC: pure env, no code - NCCL_MIN_NCHANNELS=4
+  exactly, same-sha two-boot determinism gate + owner sign-off for any
+  cross-arm byte diff (ring order unchanged per fingerprint, fp-dust
+  class), judge via census diff vs TP4_kernel_census (per-die NCCL
+  medians should drop ~11 us if cashed). Code-level channel/pinning
+  candidate NOT warranted (env achieves it; wrapper inherits NCCL env).
+  (4) DEFECT: multi-PROCESS RCCL init is broken on this stack -
+  ncclCommInitRank world=4 across 4 one-die processes fails
+  ncclUnhandledCudaError(1) in every rank (stagger, clique-ignore,
+  registration-off, lo bootstrap all tried); ncclCommInitAll over 4
+  devices in one process (the served shape) works and is the campaign's
+  U3 form-factor of record; worker mode left in the tool for when the
+  stack is fixed. (5) PROCESS: stale mmvq-ldsy lock (dead holder pid,
+  live desk compiling, dies idle) removed with evidence after a 150 s
+  poll - NOT the pid-dead-desk-dead case; one CHECKIN timestamp error
+  self-caught and fixed; A4 ggml-hip canonical build BUILD-EXIT:0 zero
+  warnings; no runtime code change shipped (served binary untouched).
