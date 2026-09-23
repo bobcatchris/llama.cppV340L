@@ -3737,3 +3737,31 @@ to Gemini's guard battery, die 3 is the dev cell.
   Forward levers: (a) the ~210 us wide-launch start latency (if solved,
   wide6 kernel win becomes ~-18% real), (b) item U1 f16-KV-pool tax / a
   q4_0-direct tile kernel (deletes pool dequant 0.82 ms/round + re-read).
+- E-119 (cont.) 18:05 DESKS CYCLING. (1) ATTENTION DESK COMPLETE -
+  RIGOROUS NEGATIVE (merged 78a4744e5): the A2 wide-GQA arm LOSES at
+  served geometry end-to-end (+7.9/+9.1% slower) despite the main
+  kernel winning -24.4% internally; a constant ~210 us wide-launch
+  start latency (mechanism UNIDENTIFIED - open item) plus +26-51%
+  combine from pb 56 eats the win. Served instance unchanged
+  (fattn-tile <256,256,4,2,false>). Forward levers named: the
+  210 us latency mystery; the f16-KV-pool tax / q4_0-direct tile
+  kernel (0.82 ms/round at 7.1k KV, UNBOUNDED at depth - folds into
+  U1). Real-kernel bench instrument (bench_attn_real.cu) banked +
+  one bench law: real-kernel benches must link THEIR tree's
+  libggml-hip (campaign lib dtor layout differs across branches).
+  (2) HOST-SLICE DESK COMPLETE (merged fdb235c80): 6.5 ms reconciled
+  (slice A host 2.04 + draft serialization); NEW DEFECT NAMED -
+  draft-ctx single reuse slot thrashes across the 4->1,1,1 shape
+  alternation (2 of 4 decodes re-split the sched, ~3 ms/round on an
+  idle device); levers handed back ranked (shape cache byte-exact M;
+  accept greedy fast path numerics-adjacent, owner-flagged; draft
+  pipelining M-L); verify-issue host cost proven fully overlapped
+  (dead lever); predecessor edits audited sound (kept as tripwires).
+  CI PASS 13/13. (3) DRAFT-SHAPE-CACHE IMPLEMENTATION DESK
+  DISPATCHED (wt-draft-cache on amd/draft-cache): implement the
+  shape-keyed cache (env LLAMA_DRAFT_SHAPE_CACHE=1, default OFF,
+  byte-exact), with the CI replicate-test for the defect class
+  (A2), host-side verification only (zero GPU - the A/B window owns
+  the lock), served spec for the coordinator. Prize: up to ~3
+  ms/round. ACTIVE: prefill desk, draft-cache desk + the split A/B
+  chain on the GPUs.
