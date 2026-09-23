@@ -1163,6 +1163,28 @@ static const ggml_backend_buffer_type_i ggml_backend_cuda_split_buffer_type_inte
     /* .is_host          = */ ggml_backend_cuda_split_buffer_type_is_host,
 };
 
+// Size-class gate (GGML_RCCL_PREFILL): reduction class for prefill-sized
+// boundaries.  UNSET keeps the upstream behavior exactly.
+enum ggml_rccl_prefill_class {
+    GGML_RCCL_PREFILL_UNSET = 0,
+    GGML_RCCL_PREFILL_F32,       // nccl fp32 ring (sum-order reorder only)
+    GGML_RCCL_PREFILL_BF16,      // nccl bf16-compress (today's nccl branch)
+    GGML_RCCL_PREFILL_BUTTERFLY, // meta-backend staging (today's unset class)
+};
+
+static const char * ggml_rccl_prefill_class_name(ggml_rccl_prefill_class cls) {
+    switch (cls) {
+        case GGML_RCCL_PREFILL_F32:        return "f32";
+        case GGML_RCCL_PREFILL_BF16:       return "bf16";
+        case GGML_RCCL_PREFILL_BUTTERFLY:  return "butterfly";
+        default:                           return "unset";
+    }
+}
+
+// tensors with ne >= this follow the gate; below it the upstream heuristic
+// runs unchanged (served shapes: decode verify 20480, prefill chunk 2621440)
+static constexpr int64_t GGML_RCCL_PREFILL_NE = 131072;
+
 // Communication context for multi-GPU AllReduce during tensor parallelism.
 //
 // Created once per meta backend instance.  Resources for the selected mode
@@ -1182,12 +1204,11 @@ struct ggml_backend_cuda_comm_context {
     // handles that call.
     try_allreduce_fn            try_allreduce = nullptr;
 
-    // GGML_RCCL_FP32=1: reduce as FP32 at every size in the nccl path. Above
-    // the small-tensor heuristic this replaces the BF16-compress reduction
-    // (a wider numerics class) with the same sum-order reorder the decode
-    // boundaries already use. Only read by the nccl path; unset keeps the
-    // upstream size heuristic everywhere.
-    bool                        nccl_fp32 = false;
+    // Reduction class for prefill-sized boundaries (GGML_RCCL_PREFILL).  The
+    // f32/bf16 classes need the nccl comms; at those sizes the butterfly runs
+    // when they are not up (init failure or mode not nccl).
+    ggml_rccl_prefill_class     prefill_class = GGML_RCCL_PREFILL_UNSET;
+    bool                        nccl_up = false;
 
     ggml_cuda_ar_pipeline *     ar_pipeline = nullptr;
 
@@ -1227,10 +1248,14 @@ static bool ggml_backend_cuda_comm_allreduce_nccl(
 
     // For small tensors, simply reduce them as FP32.
     // The following heuristic for how "small" a tensor should be is based on RTX 4090s connected via 16x PCIe 4.0.
-    // GGML_RCCL_FP32=1 keeps FP32 at every size (rccl-ext bench: 2.4x over the
-    // butterfly at prefill sizes, but ~1.9x slower than BF16-compress there).
-    const bool reduce_fp32 = comm_ctx->nccl_fp32 ||
-        ((n_backends <= 2 && ne < 32768) || (n_backends == 3 && ne < 131072) || (n_backends >= 4 && ne < 262144));
+    // GGML_RCCL_PREFILL overrides the class at the prefill sizes only.
+    bool reduce_fp32;
+    if (comm_ctx->prefill_class != GGML_RCCL_PREFILL_UNSET && ne >= GGML_RCCL_PREFILL_NE) {
+        reduce_fp32 = comm_ctx->prefill_class == GGML_RCCL_PREFILL_F32;
+    } else {
+        reduce_fp32 =
+            (n_backends <= 2 && ne < 32768) || (n_backends == 3 && ne < 131072) || (n_backends >= 4 && ne < 262144);
+    }
     if (reduce_fp32) {
         for (size_t i = 0; i < n_backends; ++i) {
             if ((tensors[i]->flags & GGML_TENSOR_FLAG_COMPUTE) == 0) {
@@ -1393,6 +1418,7 @@ static void ggml_backend_cuda_comm_init_nccl(ggml_backend_cuda_comm_context * re
     ret->comms.resize(n);
     ncclResult_t rc = ncclCommInitAll(ret->comms.data(), (int) n, ret->dev_ids.data());
     if (rc == ncclSuccess) {
+        ret->nccl_up = true;
         ret->try_allreduce = ggml_backend_cuda_comm_try_allreduce_nccl;
         return;
     }
@@ -1428,10 +1454,18 @@ static void * ggml_backend_cuda_comm_init(ggml_backend_t * backends, size_t n_ba
         ret->dev_ids.push_back(static_cast<ggml_backend_cuda_context *>(backends[i]->context)->device);
     }
 
-    const char * env_fp32 = getenv("GGML_RCCL_FP32");
-    if (env_fp32 != nullptr && atoi(env_fp32) == 1) {
-        ret->nccl_fp32 = true;
-        GGML_LOG_INFO("%s: FP32 reductions at all sizes enabled (GGML_RCCL_FP32=1, nccl path)\n", __func__);
+    const char * env_prefill = getenv("GGML_RCCL_PREFILL");
+    if (env_prefill != nullptr) {
+        const std::string cls(env_prefill);
+        if (cls == "f32") {
+            ret->prefill_class = GGML_RCCL_PREFILL_F32;
+        } else if (cls == "bf16") {
+            ret->prefill_class = GGML_RCCL_PREFILL_BF16;
+        } else if (cls == "butterfly") {
+            ret->prefill_class = GGML_RCCL_PREFILL_BUTTERFLY;
+        } else {
+            GGML_LOG_WARN("unknown GGML_RCCL_PREFILL value: %s (want f32 | bf16 | butterfly)\n", env_prefill);
+        }
     }
 
     const char * env = getenv("GGML_CUDA_ALLREDUCE");
@@ -1461,6 +1495,18 @@ static void * ggml_backend_cuda_comm_init(ggml_backend_t * backends, size_t n_ba
         }
     }
 
+    if (ret->prefill_class != GGML_RCCL_PREFILL_UNSET) {
+        if (ret->prefill_class != GGML_RCCL_PREFILL_BUTTERFLY && !ret->nccl_up) {
+            GGML_LOG_WARN("%s: GGML_RCCL_PREFILL=%s needs the nccl path (GGML_CUDA_ALLREDUCE=nccl); "
+                          "prefill boundaries run the butterfly\n",
+                          __func__, env_prefill);
+        } else {
+            GGML_LOG_INFO("%s: prefill size-class gate: %s at ne >= %lld (GGML_RCCL_PREFILL)\n",
+                          __func__, ggml_rccl_prefill_class_name(ret->prefill_class),
+                          (long long) GGML_RCCL_PREFILL_NE);
+        }
+    }
+
     return ret;
 }
 
@@ -1471,6 +1517,16 @@ static bool ggml_backend_cuda_comm_allreduce_tensor(void * comm_ctx_v, struct gg
         return false;
     }
     auto * comm_ctx = static_cast<ggml_backend_cuda_comm_context *>(comm_ctx_v);
+
+    // Size-class gate: prefill-sized boundaries follow GGML_RCCL_PREFILL; the
+    // f32/bf16 classes fall back to the butterfly when the comms are not up.
+    if (comm_ctx->prefill_class != GGML_RCCL_PREFILL_UNSET &&
+            ggml_nelements(tensors[0]) >= GGML_RCCL_PREFILL_NE) {
+        if (comm_ctx->prefill_class == GGML_RCCL_PREFILL_BUTTERFLY || !comm_ctx->nccl_up) {
+            return false;
+        }
+    }
+
     return comm_ctx->try_allreduce(comm_ctx, tensors);
 }
 
