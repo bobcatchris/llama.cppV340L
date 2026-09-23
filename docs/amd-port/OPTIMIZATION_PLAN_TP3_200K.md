@@ -3253,3 +3253,22 @@ to Gemini's guard battery, die 3 is the dev cell.
   Also untracked the three CSVs from the campaign tip (e4d2787d0,
   files kept on disk, *.kernel_trace.csv gitignored) and trimmed the
   round-map census CSV per disk hygiene.
+- E-115 (cont.) DESK CHECK-INS 14:20 (the CHECKIN law working). (1)
+  BOUNDARY DESK A1 CENSUS EXACT: 136.0 boundaries/die/round = 128
+  verify (2 PER LAYER x 65 blocks) + 2 catch-up + 6 draft; per-die
+  medians 128.8-210.8 us; the WALL pays die 1 = 31.2 ms/round (worse
+  than the round map's 22.7-25.6 estimate - that is the TP4 structural
+  price). A2 clustering NEGATIVE (boundaries are single-tensor data-
+  dependent; enqueue already pipelined). A3 count reduction NOT
+  FEASIBLE-CLEAN (sharding table + RMS-norm wall). Remaining live
+  lever: make each boundary FASTER - P0 us(size,n) probe now UNBLOCKED
+  (the desk found the LDS desk's lock STALE - holder pid verified
+  dead, die idle - removed per the pid-field recovery rule; clean
+  lock hygiene on record) and fires immediately; if n=4 @80 KB should
+  cost ~120 us and we pay 165-210, transport tuning (NCCL proto/
+  channels) is worth 6-12 ms. A2/A3 negatives = honest kills, banked.
+  (2) LDS DESK A1: kernel redesigned - verbatim 36B LDS records +
+  original apply() twins (the apply_lds contraction-divergence variant
+  KILLED); TU compiles; WIP committed (4c822b1f1); next oracle re-
+  validation then A2 sessions. (3) Both desks committing WIP per the
+  new law; CHECKIN.log lines flowing; snapshots current on the fork.
