@@ -3485,3 +3485,35 @@ to Gemini's guard battery, die 3 is the dev cell.
   poll - NOT the pid-dead-desk-dead case; one CHECKIN timestamp error
   self-caught and fixed; A4 ggml-hip canonical build BUILD-EXIT:0 zero
   warnings; no runtime code change shipped (served binary untouched).
+- E-118 2026-09-23 PRE-MERGE CI LAW (Chris directive: "a test must
+  replicate the issue and solve it and then be added exclusively to
+  the CI; the CI runs before every merge"). IMPLEMENTED:
+  /home/chris/run_premerge_ci.sh - (1) tree hygiene, (2) 6 host
+  suites, (3) the NEW gate-wiring regression test
+  (test_mmvq_gate_wiring.cu, hipcc + one die, seconds) that
+  REPLICATES the E-117 s2r no-op defect: drives the real host chain
+  (switch_type -> switch_ncols_dst -> switch_fusion) per type with
+  gate envs set and requires every type's engagement line to appear
+  (the short-circuit `s2r && env()` makes the log line the wiring
+  witness - a dropped flag kills the line and fails CI), plus a
+  no-env control asserting log silence. q3_K/q6_K witness via their
+  SHARE gates (no S2R gates by design, W8 wire set). FIRST FULL RUN:
+  CI-VERDICT PASS (7/7 wiring types + 6/6 host suites + clean tree).
+  LAW: run_premerge_ci.sh MUST PASS before every merge to the
+  campaign branch; every future regression fix adds its replicating
+  test here exclusively. NOTE: the served decode-guard cell remains
+  the coordinator-side second gate for decode-path merges.
+  (4) LANDINGS MERGED + BUILT (BUILD-EXIT:0): amd/mmvq-lds (s2r
+  wiring fix + real-kernel instrument + corrected anchors: iq4_xs
+  share -18.7% REAL - E-104 had it OFF on a replica lie; q3_K share
+  +0.1% = served no-op; LDSY +63..+198% named negative, y already
+  L1-resident) and amd/rccl-transport (multi-die probe harness;
+  served per-die asymmetry = compute-arrival jitter NOT transport;
+  NCCL_MIN_NCHANNELS=4 -11%/op reproducible x3 = honest PARTIAL
+  ~1.2% decode upper bound, pure-env arm). (5) SERVED WINDOW FIRED:
+  4 arms x (200k battery + 10k decode), all provenance-gated:
+  regress (post-merge guard, anchors 23.26/23.21), iq4xs
+  (GGML_CUDA_MMVQ_IQ4XS_SHARE=1 - the wrongly-disabled real win),
+  s2r5 (first ENGAGING s2r arm - E-113's was a no-op), channels4
+  (NCCL_MIN_NCHANNELS=4). Engagement lines REQUIRED in every s2r
+  verdict. Baseline ratchets only on GREEN wins.
