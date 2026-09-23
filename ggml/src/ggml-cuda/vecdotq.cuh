@@ -861,6 +861,64 @@ static __device__ __forceinline__ float vec_dot_q3_K_q8_1(
     return vec_dot_q3_K_q8_1_impl_mmvq(vl, vh, u, bq3_K->scales, scale_offset, d, d8);
 }
 
+// q3_K decode-once split for the T>1 MMVQ band: the low/high-bit unpack, the
+// per-sub-block scale unpack and the sign-corrected quads do not depend on y,
+// so decode() runs once per (row, block, lane) and apply() only loads the
+// q8_1 operand + dp4a per token. Bit-exact vs vec_dot_q3_K_q8_1: same
+// integer sequence per token, same multiply order.
+static __device__ __forceinline__ void vec_dot_q3_K_q8_1_decode(
+    const void * __restrict__ vbq, const int & kbx, const int & iqs, int * dec, int * sc, float & d) {
+
+    const block_q3_K * bq3_K = (const block_q3_K *) vbq + kbx;
+
+    const int bq8_offset = QR3_K * (iqs / (QI3_K/2));
+    const int scale_offset = iqs - iqs % QI8_1 + (iqs % QI8_1) / (QI8_1/2);
+
+    const int vl = get_int_b2(bq3_K->qs, iqs);
+
+    // invert the mask with ~ so that a 0/1 results in 4/0 being subtracted
+    const int vh = ~get_int_b2(bq3_K->hmask, iqs % (QI3_K/2)) >> bq8_offset;
+
+#pragma unroll
+    for (int i = 0; i < QR3_K; ++i) {
+        const int isc = scale_offset + 2*i;
+
+        const int isc_low = isc % (QK_K/32);
+        const int sc_shift_low = 4 * (isc / (QK_K/32));
+        const int sc_low  = (bq3_K->scales[isc_low] >> sc_shift_low) & 0xF;
+
+        const int isc_high = isc % (QK_K/64);
+        const int sc_shift_high = 2 * (isc / (QK_K/64));
+        const int sc_high = ((bq3_K->scales[(QK_K/32) + isc_high] >> sc_shift_high) & 3) << 4;
+
+        sc[i] = (sc_low | sc_high) - 32;
+
+        const int vil = (vl >> (2*i)) & 0x03030303;
+
+        const int vih = ((vh >> i) << 2) & 0x04040404;
+
+        dec[i] = __vsubss4(vil, vih);
+    }
+
+    d = bq3_K->d;
+}
+
+static __device__ __forceinline__ float vec_dot_q3_K_q8_1_apply(
+    const block_q8_1 * __restrict__ bq8_1, const int & iqs, const int * dec, const int * sc, const float d) {
+
+    const int bq8_offset = QR3_K * (iqs / (QI3_K/2));
+
+    float sumf = 0.0f;
+#pragma unroll
+    for (int i = 0; i < QR3_K; ++i) {
+        const int u    = get_int_b4(bq8_1[bq8_offset + i].qs, iqs % QI8_1);
+        const float d8 = __low2float(bq8_1[bq8_offset + i].ds);
+        sumf += d8 * (ggml_cuda_dp4a(dec[i], u, 0) * sc[i]); // SIMD dot product
+    }
+
+    return d * sumf;
+}
+
 static __device__ __forceinline__ float vec_dot_q4_K_q8_1(
     const void * __restrict__ vbq, const block_q8_1 * __restrict__ bq8_1, const int & kbx, const int & iqs) {
 
@@ -905,6 +963,83 @@ static __device__ __forceinline__ float vec_dot_q4_K_q8_1(
     }
 
     return vec_dot_q4_K_q8_1_impl_vmmq(v, u, sc, m, bq4_K->dm, d8);
+}
+
+// q4_K decode-once split for the T>1 MMVQ band: the nibble expansion and the
+// scale/min unpack do not depend on y, so decode() runs once per (row, block,
+// lane) and apply() only loads the q8_1 operands + dp4a per token. Bit-exact
+// vs vec_dot_q4_K_q8_1: same integer sequence per token, same multiply order.
+static __device__ __forceinline__ void vec_dot_q4_K_q8_1_decode(
+    const void * __restrict__ vbq, const int & kbx, const int & iqs,
+    int * dec, int * sc, int * m, ggml_half2 & dm) {
+
+    const block_q4_K * bq4_K = (const block_q4_K *) vbq + kbx;
+
+    // iqs is in 0,2..30. bq8_offset = iqs/4 -> bq8_offset = 0, 2, 4, 6
+    const int bq8_offset = QR4_K * ((iqs/2) / (QI8_1/2));
+
+    // iqs = 0....3 -> bq8_offset = 0, want q4_offset = 0, 4, 8, 12
+    // iqs = 4....7 -> bq8_offset = 2, want q4_offset = 32, 36, 40, 44
+    // iqs = 8...11 -> bq8_offset = 4, want q4_offset = 64, 68, 72, 76
+    // iqs = 12..15 -> bq8_offset = 6, want q4_offset = 96, 100, 104, 108
+
+    const int * q4 = (const int *)(bq4_K->qs + 16 * bq8_offset + 4 * ((iqs/2)%4));
+    const int v0 = q4[0];
+    const int v1 = q4[4];
+
+#pragma unroll
+    for (int i = 0; i < QR4_K; ++i) {
+        dec[2*i+0] = (v0 >> (4*i)) & 0x0F0F0F0F;
+        dec[2*i+1] = (v1 >> (4*i)) & 0x0F0F0F0F;
+    }
+
+    const uint16_t * scales = (const uint16_t *)bq4_K->scales;
+    uint16_t aux[2];
+    const int j = bq8_offset/2;
+    if (j < 2) {
+        aux[0] = scales[j+0] & 0x3f3f;
+        aux[1] = scales[j+2] & 0x3f3f;
+    } else {
+        aux[0] = ((scales[j+2] >> 0) & 0x0f0f) | ((scales[j-2] & 0xc0c0) >> 2);
+        aux[1] = ((scales[j+2] >> 4) & 0x0f0f) | ((scales[j-0] & 0xc0c0) >> 2);
+    }
+    const uint8_t * sc8 = (const uint8_t *)aux;
+    sc[0] = sc8[0];
+    sc[1] = sc8[1];
+    m[0]  = sc8[2];
+    m[1]  = sc8[3];
+
+    dm = bq4_K->dm;
+}
+
+static __device__ __forceinline__ float vec_dot_q4_K_q8_1_apply(
+    const block_q8_1 * __restrict__ bq8_1, const int & iqs,
+    const int * dec, const int * sc, const int * m, const ggml_half2 dm) {
+
+    const int bq8_offset = QR4_K * ((iqs/2) / (QI8_1/2));
+
+    float sumf_d = 0.0f;
+    float sumf_m = 0.0f;
+
+#pragma unroll
+    for (int i = 0; i < QR4_K; ++i) {
+        const block_q8_1 * bq8i = bq8_1 + bq8_offset + i;
+        const float d8 = __low2float(bq8i->ds);
+
+        const int * q8 = (const int *)bq8i->qs + ((iqs/2)%4);
+        const int u0 = q8[0];
+        const int u1 = q8[4];
+
+        const int dot1 = ggml_cuda_dp4a(dec[2*i+1], u1, ggml_cuda_dp4a(dec[2*i+0], u0, 0)); // SIMD dot product
+        const int dot2 = ggml_cuda_dp4a(0x01010101, u1, ggml_cuda_dp4a(0x01010101, u0, 0)); // sum of u
+
+        sumf_d += d8 * (dot1 * sc[i]);
+        sumf_m += d8 * (dot2 * m[i]);  // multiply constant part of q4_K with sum of q8_1 values
+    }
+
+    const float2 dm4f = __half22float2(dm);
+
+    return dm4f.x*sumf_d - dm4f.y*sumf_m;
 }
 
 static __device__ __forceinline__ float vec_dot_q5_K_q8_1(
@@ -953,6 +1088,81 @@ static __device__ __forceinline__ float vec_dot_q5_K_q8_1(
     return vec_dot_q5_K_q8_1_impl_vmmq(vl, vh, u, sc, m, bq5_K->dm, d8);
 }
 
+// q5_K decode-once split for the T>1 MMVQ band: the nibble/high-bit combine
+// and the scale/min unpack do not depend on y, so decode() runs once per
+// (row, block, lane) and apply() only loads the q8_1 operands + dp4a per
+// token. Bit-exact vs vec_dot_q5_K_q8_1: same integer sequence per token,
+// same multiply order.
+static __device__ __forceinline__ void vec_dot_q5_K_q8_1_decode(
+    const void * __restrict__ vbq, const int & kbx, const int & iqs,
+    int * dec, int * sc, int * m, ggml_half2 & dm) {
+
+    const block_q5_K * bq5_K = (const block_q5_K *) vbq + kbx;
+
+    const int bq8_offset = QR5_K * ((iqs/2) / (QI8_1/2));
+    const int * ql = (const int *)(bq5_K->qs + 16 * bq8_offset + 4 * ((iqs/2)%4));
+    const int * qh = (const int *)(bq5_K->qh + 4 * ((iqs/2)%4));
+
+    const int vl0 = ql[0];
+    const int vl1 = ql[4];
+    const int vh0 = qh[0] >> bq8_offset;
+    const int vh1 = qh[4] >> bq8_offset;
+
+#pragma unroll
+    for (int i = 0; i < QR5_K; ++i) {
+        dec[2*i+0] = ((vl0 >> (4*i)) & 0x0F0F0F0F) | (((vh0 >> i) << 4) & 0x10101010);
+        dec[2*i+1] = ((vl1 >> (4*i)) & 0x0F0F0F0F) | (((vh1 >> i) << 4) & 0x10101010);
+    }
+
+    const uint16_t * scales = (const uint16_t *)bq5_K->scales;
+    uint16_t aux[2];
+    const int j = bq8_offset/2;
+    if (j < 2) {
+        aux[0] = scales[j+0] & 0x3f3f;
+        aux[1] = scales[j+2] & 0x3f3f;
+    } else {
+        aux[0] = ((scales[j+2] >> 0) & 0x0f0f) | ((scales[j-2] & 0xc0c0) >> 2);
+        aux[1] = ((scales[j+2] >> 4) & 0x0f0f) | ((scales[j-0] & 0xc0c0) >> 2);
+    }
+    const uint8_t * sc8 = (const uint8_t *)aux;
+    sc[0] = sc8[0];
+    sc[1] = sc8[1];
+    m[0]  = sc8[2];
+    m[1]  = sc8[3];
+
+    dm = bq5_K->dm;
+}
+
+static __device__ __forceinline__ float vec_dot_q5_K_q8_1_apply(
+    const block_q8_1 * __restrict__ bq8_1, const int & iqs,
+    const int * dec, const int * sc, const int * m, const ggml_half2 dm) {
+
+    const int bq8_offset = QR5_K * ((iqs/2) / (QI8_1/2));
+
+    float sumf_d = 0.0f;
+    float sumf_m = 0.0f;
+
+#pragma unroll
+    for (int i = 0; i < QR5_K; ++i) {
+        const block_q8_1 * bq8i = bq8_1 + bq8_offset + i;
+        const float d8 = __low2float(bq8i->ds);
+
+        const int * q8 = (const int *)bq8i->qs + ((iqs/2)%4);
+        const int u0 = q8[0];
+        const int u1 = q8[4];
+
+        const int dot1 = ggml_cuda_dp4a(dec[2*i+0], u0, ggml_cuda_dp4a(dec[2*i+1], u1, 0)); // SIMD dot product
+        const int dot2 = ggml_cuda_dp4a(0x01010101, u0, ggml_cuda_dp4a(0x01010101, u1, 0)); // sum of u
+
+        sumf_d += d8 * (dot1 * sc[i]);
+        sumf_m += d8 * (dot2 * m[i]);
+    }
+
+    const float2 dm5f = __half22float2(dm);
+
+    return dm5f.x*sumf_d - dm5f.y*sumf_m;
+}
+
 static __device__ __forceinline__ float vec_dot_q6_K_q8_1(
     const void * __restrict__ vbq, const block_q8_1 * __restrict__ bq8_1, const int & kbx, const int & iqs) {
 
@@ -977,6 +1187,53 @@ static __device__ __forceinline__ float vec_dot_q6_K_q8_1(
     }
 
     return vec_dot_q6_K_q8_1_impl_mmvq(vl, vh, u, scales, bq6_K->d, d8);
+}
+
+// q6_K decode-once split for the T>1 MMVQ band: the 6-bit unpack with the
+// 32-offset and the per-sub-block scale do not depend on y, so decode() runs
+// once per (row, block, lane) and apply() only loads the q8_1 operand + dp4a
+// per token. Bit-exact vs vec_dot_q6_K_q8_1: same integer sequence per
+// token, same multiply order.
+static __device__ __forceinline__ void vec_dot_q6_K_q8_1_decode(
+    const void * __restrict__ vbq, const int & kbx, const int & iqs, int * dec, int * sc, float & d) {
+
+    const block_q6_K * bq6_K = (const block_q6_K *) vbq + kbx;
+
+    const int scale_offset = (QI6_K/4) * (iqs / (QI6_K/2)) + (iqs % (QI6_K/2)) / (QI6_K/8);
+    const int vh_shift = 2 * ((iqs % (QI6_K/2)) / (QI6_K/4));
+
+    const int vl = get_int_b2(bq6_K->ql, iqs);
+    const int vh = get_int_b2(bq6_K->qh, (QI6_K/4) * (iqs / (QI6_K/2)) + iqs % (QI6_K/4)) >> vh_shift;
+
+    const int8_t * scales = bq6_K->scales + scale_offset;
+
+#pragma unroll
+    for (int i = 0; i < QR6_K; ++i) {
+        const int vil = (vl >> (4*i)) & 0x0F0F0F0F;
+
+        const int vih = ((vh >> (4*i)) << 4) & 0x30303030;
+
+        dec[i] = __vsubss4((vil | vih), 0x20202020); // vi = (vil | vih) - 32
+        sc[i]  = scales[4*i];
+    }
+
+    d = bq6_K->d;
+}
+
+static __device__ __forceinline__ float vec_dot_q6_K_q8_1_apply(
+    const block_q8_1 * __restrict__ bq8_1, const int & iqs, const int * dec, const int * sc, const float d) {
+
+    const int bq8_offset = 2 * QR6_K * (iqs / (QI6_K/2)) + (iqs % (QI6_K/2)) / (QI6_K/4);
+
+    float sumf = 0.0f;
+#pragma unroll
+    for (int i = 0; i < QR6_K; ++i) {
+        const int u    = get_int_b4(bq8_1[bq8_offset + 2*i].qs, iqs % QI8_1);
+        const float d8 = __low2float(bq8_1[bq8_offset + 2*i].ds);
+        sumf += d8 * (ggml_cuda_dp4a(dec[i], u, 0) * sc[i]); // SIMD dot product
+    }
+
+    return d*sumf;
 }
 
 #define VDR_IQ2_XXS_Q8_1_MMVQ 2
@@ -1139,6 +1396,49 @@ static __device__ __forceinline__ float vec_dot_iq3_xxs_q8_1(
     sumi = (ls*sumi + sumi/2)/2;
     const float d = __half2float(bq3->d) * __low2float(bq8_1[iqs/2].ds);
     return d * sumi;
+}
+
+// iq3_xxs decode-once split for the T>1 MMVQ band: the grid lookups, sign
+// chain and packed scale do not depend on y, so decode() runs once per
+// (row, block, lane) and apply() only loads the q8_1 operand + dp4a per
+// token. Bit-exact vs vec_dot_iq3_xxs_q8_1: same integer sequence per token,
+// same multiply order.
+static __device__ __forceinline__ void vec_dot_iq3_xxs_q8_1_decode(
+    const void * __restrict__ vbq, const int & kbx, const int & iqs, int * dec, int & ls, float & d) {
+
+    const block_iq3_xxs * bq3 = (const block_iq3_xxs *) vbq + kbx;
+
+    const int2 q3_packed = make_int2(get_int_b2(bq3->qs, iqs), get_int_b2(bq3->qs, iqs+1));
+    const uint8_t * q3 = (const uint8_t *) &q3_packed;
+    const uint32_t aux32 = get_int_b2(bq3->qs, QK_K/16 + iqs/2);
+
+#pragma unroll
+    for (int l0 = 0; l0 < 8; l0 += 2) {
+        const int g0 = iq3xxs_grid[q3[l0 + 0]];
+        const int g1 = iq3xxs_grid[q3[l0 + 1]];
+        const uint32_t signs = unpack_ksigns(aux32 >> (7*l0/2));
+
+        const int signs0 = __vcmpne4(signs & 0x08040201, 0);
+        const int signs1 = __vcmpne4(signs & 0x80402010, 0);
+
+        dec[l0 + 0] = __vsub4(g0 ^ signs0, signs0);
+        dec[l0 + 1] = __vsub4(g1 ^ signs1, signs1);
+    }
+
+    ls = aux32 >> 28;
+    d  = __half2float(bq3->d);
+}
+
+static __device__ __forceinline__ float vec_dot_iq3_xxs_q8_1_apply(
+    const block_q8_1 * __restrict__ bq8_1, const int & iqs, const int * dec, const int ls, const float d) {
+
+    int sumi = 0;
+#pragma unroll
+    for (int m = 0; m < 8; ++m) {
+        sumi = ggml_cuda_dp4a(dec[m], get_int_b4(bq8_1[iqs/2].qs, m), sumi);
+    }
+    sumi = (ls*sumi + sumi/2)/2;
+    return d * __low2float(bq8_1[iqs/2].ds) * sumi;
 }
 
 #define VDR_IQ3_S_Q8_1_MMVQ 2
@@ -1359,4 +1659,39 @@ static __device__ __forceinline__ float vec_dot_iq4_xs_q8_1(
 
     const float d = __half2float(bq4->d) * __low2float(bq8_1[iqs/4].ds);
     return d * sumi;
+}
+
+// iq4_xs decode-once split for the T>1 MMVQ band: the LUT decode and the
+// scale unpack do not depend on y, so decode() runs once per (row, block,
+// lane) and apply() only loads the q8_1 operand + dp4a per token. Bit-exact
+// vs vec_dot_iq4_xs_q8_1: same integer sequence per token, same multiply
+// order.
+static __device__ __forceinline__ void vec_dot_iq4_xs_q8_1_decode(
+    const void * __restrict__ vbq, const int & kbx, const int & iqs, int * dec, int & scale, float & d) {
+
+    const block_iq4_xs * bq4 = (const block_iq4_xs *) vbq + kbx;
+
+#pragma unroll
+    for (int j = 0; j < 4; ++j) {
+        const int aux_q4 = get_int_b4(bq4->qs, iqs + j);
+        const int2 v = get_int_from_table_16(aux_q4, kvalues_iq4nl);
+        dec[j + 0] = v.x;
+        dec[j + 4] = v.y;
+    }
+
+    scale = (((bq4->scales_l[iqs/8] >> (iqs & 0x04)) & 0x0F) | (((bq4->scales_h >> (iqs/2)) & 0x03) << 4)) - 32;
+    d     = __half2float(bq4->d);
+}
+
+static __device__ __forceinline__ float vec_dot_iq4_xs_q8_1_apply(
+    const block_q8_1 * __restrict__ bq8_1, const int & iqs, const int * dec, const int scale, const float d) {
+
+    int sumi = 0;
+#pragma unroll
+    for (int j = 0; j < 4; ++j) {
+        sumi = ggml_cuda_dp4a(dec[j + 0], get_int_b4(bq8_1[iqs/4].qs, j + 0), sumi);
+        sumi = ggml_cuda_dp4a(dec[j + 4], get_int_b4(bq8_1[iqs/4].qs, j + 4), sumi);
+    }
+    sumi *= scale;
+    return d * __low2float(bq8_1[iqs/4].ds) * sumi;
 }

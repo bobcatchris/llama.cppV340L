@@ -481,7 +481,7 @@ static __global__ void mul_mat_vec_q(
         const uint32_t stride_col_dst, const uint3 channel_ratio, const uint32_t stride_channel_x,
         const uint32_t stride_channel_y, const uint32_t stride_channel_dst, const uint3 sample_ratio,
         const uint32_t stride_sample_x, const uint32_t stride_sample_y, const uint32_t stride_sample_dst,
-        const uint32_t ids_stride, const bool iq3s_share) {
+        const uint32_t ids_stride, const bool share) {
     const void    * GGML_CUDA_RESTRICT vx  = vx_ptr;
     const void    * GGML_CUDA_RESTRICT vy  = vy_ptr;
     const int32_t * GGML_CUDA_RESTRICT ids = ids_ptr;
@@ -576,19 +576,129 @@ static __global__ void mul_mat_vec_q(
         // x block quant index when casting the quants to int
         const int kqs = vdr * (tid % (qi/vdr));
 
-        if (iq3s_share && rows_per_cuda_block == 1) {
-            // decode-once share: the y-independent iq3_s decode runs once per
-            // (kbx, lane) instead of once per token (GCN iq3_s, T = 2..4)
-            int dec[8];
-            int scale_share;
-            float d_share;
-            vec_dot_iq3_s_q8_1_decode(vx, kbx_offset + kbx, kqs, dec, scale_share, d_share);
-#pragma unroll
-            for (int j = 0; j < ncols_dst; ++j) {
+        if (share) {
+            // decode-once share: the y-independent decode runs once per (row,
+            // kbx, lane) instead of once per token (GCN, T = 2..4)
+            if constexpr (type == GGML_TYPE_IQ3_S) {
+                int dec[rows_per_cuda_block][8];
+                int scale_share[rows_per_cuda_block];
+                float d_share[rows_per_cuda_block];
 #pragma unroll
                 for (int i = 0; i < rows_per_cuda_block; ++i) {
-                    tmp[j][i] += vec_dot_iq3_s_q8_1_apply(
-                        &y[j*stride_col_y + kby], kqs, dec, scale_share, d_share);
+                    vec_dot_iq3_s_q8_1_decode(vx, kbx_offset + i*stride_row_x + kbx, kqs,
+                        dec[i], scale_share[i], d_share[i]);
+                }
+#pragma unroll
+                for (int j = 0; j < ncols_dst; ++j) {
+#pragma unroll
+                    for (int i = 0; i < rows_per_cuda_block; ++i) {
+                        tmp[j][i] += vec_dot_iq3_s_q8_1_apply(
+                            &y[j*stride_col_y + kby], kqs, dec[i], scale_share[i], d_share[i]);
+                    }
+                }
+            } else if constexpr (type == GGML_TYPE_IQ3_XXS) {
+                int dec[rows_per_cuda_block][8];
+                int ls_share[rows_per_cuda_block];
+                float d_share[rows_per_cuda_block];
+#pragma unroll
+                for (int i = 0; i < rows_per_cuda_block; ++i) {
+                    vec_dot_iq3_xxs_q8_1_decode(vx, kbx_offset + i*stride_row_x + kbx, kqs,
+                        dec[i], ls_share[i], d_share[i]);
+                }
+#pragma unroll
+                for (int j = 0; j < ncols_dst; ++j) {
+#pragma unroll
+                    for (int i = 0; i < rows_per_cuda_block; ++i) {
+                        tmp[j][i] += vec_dot_iq3_xxs_q8_1_apply(
+                            &y[j*stride_col_y + kby], kqs, dec[i], ls_share[i], d_share[i]);
+                    }
+                }
+            } else if constexpr (type == GGML_TYPE_IQ4_XS) {
+                int dec[rows_per_cuda_block][8];
+                int scale_share[rows_per_cuda_block];
+                float d_share[rows_per_cuda_block];
+#pragma unroll
+                for (int i = 0; i < rows_per_cuda_block; ++i) {
+                    vec_dot_iq4_xs_q8_1_decode(vx, kbx_offset + i*stride_row_x + kbx, kqs,
+                        dec[i], scale_share[i], d_share[i]);
+                }
+#pragma unroll
+                for (int j = 0; j < ncols_dst; ++j) {
+#pragma unroll
+                    for (int i = 0; i < rows_per_cuda_block; ++i) {
+                        tmp[j][i] += vec_dot_iq4_xs_q8_1_apply(
+                            &y[j*stride_col_y + kby], kqs, dec[i], scale_share[i], d_share[i]);
+                    }
+                }
+            } else if constexpr (type == GGML_TYPE_Q3_K) {
+                int dec[rows_per_cuda_block][QR3_K];
+                int sc_share[rows_per_cuda_block][QR3_K];
+                float d_share[rows_per_cuda_block];
+#pragma unroll
+                for (int i = 0; i < rows_per_cuda_block; ++i) {
+                    vec_dot_q3_K_q8_1_decode(vx, kbx_offset + i*stride_row_x + kbx, kqs,
+                        dec[i], sc_share[i], d_share[i]);
+                }
+#pragma unroll
+                for (int j = 0; j < ncols_dst; ++j) {
+#pragma unroll
+                    for (int i = 0; i < rows_per_cuda_block; ++i) {
+                        tmp[j][i] += vec_dot_q3_K_q8_1_apply(
+                            &y[j*stride_col_y + kby], kqs, dec[i], sc_share[i], d_share[i]);
+                    }
+                }
+            } else if constexpr (type == GGML_TYPE_Q4_K) {
+                int dec[rows_per_cuda_block][2*QR4_K];
+                int sc_share[rows_per_cuda_block][QR4_K];
+                int m_share[rows_per_cuda_block][QR4_K];
+                ggml_half2 dm_share[rows_per_cuda_block];
+#pragma unroll
+                for (int i = 0; i < rows_per_cuda_block; ++i) {
+                    vec_dot_q4_K_q8_1_decode(vx, kbx_offset + i*stride_row_x + kbx, kqs,
+                        dec[i], sc_share[i], m_share[i], dm_share[i]);
+                }
+#pragma unroll
+                for (int j = 0; j < ncols_dst; ++j) {
+#pragma unroll
+                    for (int i = 0; i < rows_per_cuda_block; ++i) {
+                        tmp[j][i] += vec_dot_q4_K_q8_1_apply(
+                            &y[j*stride_col_y + kby], kqs, dec[i], sc_share[i], m_share[i], dm_share[i]);
+                    }
+                }
+            } else if constexpr (type == GGML_TYPE_Q5_K) {
+                int dec[rows_per_cuda_block][2*QR5_K];
+                int sc_share[rows_per_cuda_block][QR5_K];
+                int m_share[rows_per_cuda_block][QR5_K];
+                ggml_half2 dm_share[rows_per_cuda_block];
+#pragma unroll
+                for (int i = 0; i < rows_per_cuda_block; ++i) {
+                    vec_dot_q5_K_q8_1_decode(vx, kbx_offset + i*stride_row_x + kbx, kqs,
+                        dec[i], sc_share[i], m_share[i], dm_share[i]);
+                }
+#pragma unroll
+                for (int j = 0; j < ncols_dst; ++j) {
+#pragma unroll
+                    for (int i = 0; i < rows_per_cuda_block; ++i) {
+                        tmp[j][i] += vec_dot_q5_K_q8_1_apply(
+                            &y[j*stride_col_y + kby], kqs, dec[i], sc_share[i], m_share[i], dm_share[i]);
+                    }
+                }
+            } else if constexpr (type == GGML_TYPE_Q6_K) {
+                int dec[rows_per_cuda_block][QR6_K];
+                int sc_share[rows_per_cuda_block][QR6_K];
+                float d_share[rows_per_cuda_block];
+#pragma unroll
+                for (int i = 0; i < rows_per_cuda_block; ++i) {
+                    vec_dot_q6_K_q8_1_decode(vx, kbx_offset + i*stride_row_x + kbx, kqs,
+                        dec[i], sc_share[i], d_share[i]);
+                }
+#pragma unroll
+                for (int j = 0; j < ncols_dst; ++j) {
+#pragma unroll
+                    for (int i = 0; i < rows_per_cuda_block; ++i) {
+                        tmp[j][i] += vec_dot_q6_K_q8_1_apply(
+                            &y[j*stride_col_y + kby], kqs, dec[i], sc_share[i], d_share[i]);
+                    }
                 }
             }
         } else {
@@ -872,19 +982,53 @@ static std::pair<dim3, dim3> calc_launch_params(
     return {block_nums, block_dims};
 }
 
-// decode-once share for iq3_s at T = 2..4 (GCN): the shipped kernel re-runs
-// the y-independent decode per token; the share path runs it once per block
-// and lane. Bit-exact (same integer sequence and multiply order per token).
-static bool mmvq_iq3s_share_env_enabled() {
-    static const bool enabled = [] {
-        const char * env = getenv("GGML_CUDA_MMVQ_IQ3S_SHARE");
-        const bool on = env != nullptr && env[0] == '1';
-        if (on) {
-            GGML_LOG_INFO("ggml-cuda: GGML_CUDA_MMVQ_IQ3S_SHARE=1, iq3_s decode-once share enabled for ncols_dst 2-4\n");
+// decode-once share for the T = 2..4 MMVQ band: the shipped kernel re-runs
+// the y-independent decode per token; the share path runs it once per (row,
+// block, lane). Bit-exact (same integer sequence and multiply order per
+// token). Each type has its own env gate so a negative on one type does not
+// block the others.
+static bool mmvq_share_env_flag(const char * name, const char * desc) {
+    const char * env = getenv(name);
+    if (env != nullptr && env[0] == '1') {
+        GGML_LOG_INFO("ggml-cuda: %s=1, %s decode-once share enabled for ncols_dst 2-4\n", name, desc);
+        return true;
+    }
+    return false;
+}
+
+static bool mmvq_share_env_enabled(ggml_type type) {
+    switch (type) {
+        case GGML_TYPE_IQ3_S: {
+            static const bool on = mmvq_share_env_flag("GGML_CUDA_MMVQ_IQ3S_SHARE", "iq3_s");
+            return on;
         }
-        return on;
-    }();
-    return enabled;
+        case GGML_TYPE_IQ3_XXS: {
+            static const bool on = mmvq_share_env_flag("GGML_CUDA_MMVQ_IQ3XXS_SHARE", "iq3_xxs");
+            return on;
+        }
+        case GGML_TYPE_IQ4_XS: {
+            static const bool on = mmvq_share_env_flag("GGML_CUDA_MMVQ_IQ4XS_SHARE", "iq4_xs");
+            return on;
+        }
+        case GGML_TYPE_Q3_K: {
+            static const bool on = mmvq_share_env_flag("GGML_CUDA_MMVQ_Q3K_SHARE", "q3_K");
+            return on;
+        }
+        case GGML_TYPE_Q4_K: {
+            static const bool on = mmvq_share_env_flag("GGML_CUDA_MMVQ_Q4K_SHARE", "q4_K");
+            return on;
+        }
+        case GGML_TYPE_Q5_K: {
+            static const bool on = mmvq_share_env_flag("GGML_CUDA_MMVQ_Q5K_SHARE", "q5_K");
+            return on;
+        }
+        case GGML_TYPE_Q6_K: {
+            static const bool on = mmvq_share_env_flag("GGML_CUDA_MMVQ_Q6K_SHARE", "q6_K");
+            return on;
+        }
+        default:
+            return false;
+    }
 }
 
 template<ggml_type type, int c_ncols_dst, bool small_k = false>
@@ -898,15 +1042,15 @@ static void mul_mat_vec_q_switch_fusion(
         const uint32_t ids_stride, cudaStream_t stream) {
 
     const bool has_fusion = fusion.gate != nullptr || fusion.x_bias != nullptr || fusion.gate_bias != nullptr;
-    const bool iq3s_share = mmvq_iq3s_share_env_enabled()
-        && type == GGML_TYPE_IQ3_S && c_ncols_dst >= 2 && c_ncols_dst <= 4;
+    const bool share = mmvq_share_env_enabled(type)
+        && c_ncols_dst >= 2 && c_ncols_dst <= 4;
     if constexpr (c_ncols_dst == 1) {
         if (has_fusion) {
             const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(block_nums, block_dims, nbytes_shared, stream);
             ggml_cuda_kernel_launch(mul_mat_vec_q<type, c_ncols_dst, true, small_k>, launch_params,
                  vx, vy, ids, fusion, dst, ncols_x, nchannels_y, stride_row_x, stride_col_y, stride_col_dst,
                  channel_ratio, stride_channel_x, stride_channel_y, stride_channel_dst,
-                 sample_ratio, stride_sample_x, stride_sample_y, stride_sample_dst, ids_stride, iq3s_share);
+                 sample_ratio, stride_sample_x, stride_sample_y, stride_sample_dst, ids_stride, share);
             return;
         }
     }
@@ -917,7 +1061,7 @@ static void mul_mat_vec_q_switch_fusion(
     ggml_cuda_kernel_launch(mul_mat_vec_q<type, c_ncols_dst, false, small_k>, launch_params,
         vx, vy, ids, fusion, dst, ncols_x, nchannels_y, stride_row_x, stride_col_y, stride_col_dst,
         channel_ratio, stride_channel_x, stride_channel_y, stride_channel_dst,
-        sample_ratio, stride_sample_x, stride_sample_y, stride_sample_dst, ids_stride, iq3s_share);
+        sample_ratio, stride_sample_x, stride_sample_y, stride_sample_dst, ids_stride, share);
 }
 
 template <ggml_type type>
