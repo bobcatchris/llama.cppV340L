@@ -3546,3 +3546,61 @@ to Gemini's guard battery, die 3 is the dev cell.
   propose rebalanced --tensor-split ratios (pure launch flag) or an
   in-code rebalance design; coordinator serves the best ratio.
   Prize if imbalance confirms: up to ~10 ms/round of peer wait.
+- E-120a SPLIT-BALANCE DESK COMPLETE (wt-split-balance on
+  amd/split-balance @ 3f0eb3fe6 + docs commit; ZERO GPU; receipt
+  W10_split_balance_receipt_2026-09-23.md, instruments
+  gguf_split_balance_audit.py + census_arrival_model.py +
+  split_ratio_search.py + logs in results/). (1) P0 VERDICT: BYTE
+  IMBALANCE IS NOT THE MECHANISM - BY CONSTRUCTION. This tree never
+  assigns layers to dies: every weight tensor is name-keyed sharded
+  across ALL dies along an axis (llama-model.cpp:333-357 patterns,
+  :383-501 axis table, :407 per-layer rotation, :566-645 granularity,
+  :649-683 boundary math; default all-zero --tensor-split = ne_s*
+  (j+1)/n_devices). GGUF offset-delta audit (866 tensors, Qwen3.8
+  27B ASCII P1M): sharded 11,865,968,832 B/4 + mirrored 382,276,352
+  B (token_embd + nextn.eh_proj + norms, full copy per die) =
+  3,348,768,560 B PER DIE ON ALL FOUR, max-min = 0 B (0.0000%),
+  per-block spread 0 on all 65 blocks; every sharded dim divides by 4
+  exactly so the rotation has no remainder. The mission's die-1-bytes
+  hypothesis is refuted at the byte level. (2) A1 VERDICT: the served
+  band 128.8-210.8 us is a PER-DIE COMPUTE-RATE spread at equal
+  bytes. DEFECT: rocprof per-agent timestamps are on different
+  timebases (die 1 +731 us) - naive cross-agent starts falsely say
+  "die 1 last on 100%"; calibrated from collective-END alignment,
+  die 3 is LAST ARRIVER on 58% of boundaries, corrected waits
+  74.0/90.8/37.6/0.0 us (die0/1/2/3), ring estimate uniform
+  114.5-128.9 us (matches W9 isolated x1.07). Identical-kernel
+  medians invert that order exactly: die 3 slowest on EVERY MMVQ
+  class, per-byte time t_d = 0.893/0.846/0.964/1.000, per-boundary
+  compute = t_d x 579.4 us on all dies to 0.1%, order stable across
+  window halves. Mechanism candidate of record: per-die SCLK during
+  serve (idle hwmon: die 3 1085 MHz lowest vs die 1 1249; PCIe
+  EXCLUDED - all live cards 8.0 GT/s x16). Decisive instrument for
+  the coordinator: serve-window hwmon sampling or pin clocks equal
+  (zero-code attribution arm). (3) A2: rebalance = equalize COMPUTE
+  TIME (bytes proportional to 1/t_d), not bytes. Granularity wall
+  found: attention tensors split only in head units (25% steps; q is
+  12-head-PAIRS by the gate doubling), GDN stack 12.5% steps, only
+  FFN fine (1.47%) - plus floor+rotation lumpiness. Best legal flag
+  --tensor-split 1.04,1.04,1.02,1.00 (audit-verified shares
+  26.45/27.90/23.53/22.12%) -> wall compute 579.4 -> 547.6 us/
+  boundary = ~31.8 us x 136 = ~4.3 ms/round (~3.3% decode). In-code
+  env-gated rate split + GDN-granularity relaxation (256->64, legal:
+  AXIS_1 whole-row slices; attention stays head-locked) reaches
+  534.2 us = ~6.1 ms/round; stacked with NCCL_MIN_NCHANNELS=4:
+  ~6.3 (flag) / ~8.1 (in-code) ms/round. E-119's ~10 ms prize is
+  therefore bounded to ~4.3 ms cashable by flag today. (4) A3
+  SERVED SPEC: interleaved A/B (S0 default / S1 +tensor-split
+  1.04,1.04,1.02,1.00 / S2 = S1 + NCCL_MIN_NCHANNELS=4 / optional C0
+  equal-clock attribution arm), device-order witness at boot, VRAM
+  +0.35 GB on die 1, accept 0.66667 / len 3.00, same-sha two-boot,
+  win bar +2% interleaved; numerics class = fp-dust ONLY (row sets
+  move, each row bit-identical, ring order per element unchanged,
+  association of the four rank partials changes) - same class as W9
+  channel change, owner sign-off on cross-arm diffs. CHEAP MECHANISM
+  WITNESS: post-boot census diff - per-die NCCL medians must
+  compress toward ring floor; if not, the rate spread moved
+  (thermal) - re-measure t_d before judging. (5) NOTES: wall pays
+  the LAST ARRIVER's NCCL duration + max compute (W8's "die 1 pays
+  31.2 ms" counted overlapped wait as wall); no runtime code changed
+  by this desk (python + docs only), no build required.
