@@ -31,7 +31,7 @@ def fam(name):
     if "flash_attn" in name: return "flash"
     return "other"
 
-cijk = sorted((s, e) for a, n, s, d in rows if fam(n) == "Cijk")
+cijk = sorted((s, s + d) for a, n, s, d in rows if fam(n) == "Cijk")
 # main prefill burst = after the last >2 s quiet gap in the Cijk timeline
 gap_break = 0
 for i in range(1, len(cijk)):
