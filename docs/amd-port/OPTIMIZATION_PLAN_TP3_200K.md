@@ -2573,3 +2573,16 @@ to Gemini's guard battery, die 3 is the dev cell.
   boot with LLAMA_LAUNCH_TIMELINE=1 -lv 4, expect 27 "mode = replay"
   lines/ubatch, meta subs=9 replays=27 bounds=8, csync delta 1 with
   TARGET_LIGHT_SYNC.
+- E-098 (cont.) RCCL GATE WINDOW VOID - PLATFORM. All three gate-window
+  boots (REF0/EXT/EXT2, 21:34-21:36) segfaulted in libamdhip64 at the
+  same IP (3cf4af) - the established driver-decay signature. Onset was
+  19:45:52 (two crashes on the PRE-merge binary), i.e. after ~25 heavy
+  200k boots since the 12:24 reboot - decay returns on boot-count, not
+  code. The mmqab ref1/share1 cells (18.99/18.82, ~19:3x) predate
+  onset and STAND as the MMVQ share served verdict. Reboot requested
+  from Chris (pending); post-reboot queue: (1) RCCL gate window
+  re-run (REF0 + f32 EXT + EXT2 determinism, script
+  /home/chris/run_rcclgate.sh ready), (2) onsample/launchpath served
+  arms when their desks land. No GPU resets attempted (last attempt
+  broke HIP enumeration - see E-068-era history); no further boots on
+  this driver state.
