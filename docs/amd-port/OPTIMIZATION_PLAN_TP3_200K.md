@@ -2461,3 +2461,25 @@ to Gemini's guard battery, die 3 is the dev cell.
   honest ceiling doc for persistent-kernel/mega-graph options.
   All env-gated, unset = byte-identical; validation arms run in the
   coordinator's window when the desks land.
+- E-097 2026-09-22 SUBSYSTEM DESKS PAUSED AT USAGE LIMIT (account 5 h
+  limit; resets 2026-09-23 09:56). All three worktrees hold WIP:
+  wt-onsample clean (died in design), wt-launchpath committed its
+  LLAMA_LAUNCH_TIMELINE first deliverable (8a9d287cb) + profiler
+  script, wt-rccl-ext rescued (a2dcaeff2). RELAUNCH PLAN: after
+  reset, resume all three with "continue your predecessor's WIP in
+  worktree X" briefs. THE RCCL-EXT DESK'S PRE-DEATH FINDING NEEDS
+  CHRIS'S EYES (numerics of the CURRENT serving config): today's
+  nccl mode runs BF16-COMPRESS at every PREFILL boundary (ne >=
+  131072) - a MUCH wider numerics class than the "bounded dust" the
+  E-094 sign-off text describes: ~99.998% of elements differ vs fp32
+  reference, max relative error 3.3e4 at cancellation sites (bf16
+  mantissa loss). Decode boundaries (ne < 131072) ARE the signed-off
+  fp32 dust class. The desk's bench (rccl_prefill_probe, 3 clean
+  boots): RCCL-F32 2.26-2.4x faster than butterfly at EVERY size
+  (-7.69 ms/boundary at the 10 MiB prefill size); RCCL-BF16 (today's
+  branch) is 1.9x faster than RCCL-F32 at 10 MiB - so the choice at
+  prefill is precision (+2.61 ms/boundary, ~+1% prefill wall, worst
+  +5.5%) vs today's bf16 class. Served gates passed on the bf16
+  branch, but the sign-off text should not be read as covering it.
+  The desk's gate implementation (WIP) gives Chris the fp32 switch.
+  Decision queued for Chris alongside the reviewer's read.
