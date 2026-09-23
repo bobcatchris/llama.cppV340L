@@ -2882,3 +2882,35 @@ to Gemini's guard battery, die 3 is the dev cell.
   on landing merge keep-both (rungs then bw, both touch
   mmvq.cu/vecdotq.cuh), rebuild build-hip, fire combowin regress +
   winning-rung arms.
+- E-106 2026-09-23 MMVQ WEIGHT-STREAM CELL: S2R BANKED (BIT-EXACT, 5-TYPE
+  WIRE SET) + CONSUME CEILINGS NAMED. Desk mmvq-bw (wt-mmvq-bw,
+  amd/mmvq-bw). (1) P0: W3 anchors reproduce (q3_K share verdict -28.4%
+  exact; aln T=4 negative re-confirmed on all types). (2) A4 pure-consume
+  decomposition (new cfull/cx/cy arms, real rpb=2 schedule): the
+  access-pattern ceiling itself is 70-120 GB/s vs the 327 sequential-read
+  figure - the T=2-4 MMVQ kernels are STALL-bound (SASS census: 1446
+  inst/iteration, 61 VGPR, issue demand ~144 us vs ~800 us measured; dp4a
+  emulation = 6 VALU is SASS-optimal per-op); x/y stream mix costs
+  +41-100%; decode+dp4a tax +29-69% on top. (3) A2 wide-x loads (funnel
+  trio for the 2B-aligned IQ3 pair, uint2 for iq4_xs): NOT-MOVEMENT
+  (-0.9..-1.2%) - x-loads are only 12-20% of the stream; named negative,
+  do not re-open. (4) A3 s2r (row-shared y preload; the rpb=2 schedule
+  makes both rows read the same y words and the compiler does not CSE
+  them): BIT-EXACT at T=2/3/4 on all 7 types (device memcmp) and T=4
+  increment vs the served arm: iq3_s -6.6%, q4_K -6.2% (PASS session),
+  q5_K -5.3%, iq3_xxs -3.1%, iq4_xs -7.7% vs its served base (share OFF
+  there); q3_K/q6_K no increment (OFF). Defect of record: ds word is
+  offset 0 in this tree (ds-first block_q8_1); an upstream qs-first
+  assumption produced NaN and was caught by the oracle before any verdict
+  (tree-check every layout assumption). (5) SERVED-ARM SPEC stacked on
+  E-104: GGML_CUDA_MMVQ_{IQ3S,IQ3XXS,Q4K,Q5K}_S2R=1 + GGML_CUDA_MMVQ_IQ4XS_S2R=1
+  (IQ4XS_SHARE stays unset; LLAMA_MMVQ_ALN stays unset - hard-excluded).
+  Static projection: ~-250 ms of 5873 ms MMVQ (-4.3% MMVQ) on top of the
+  E-104 -6.3% -> decode t/s upper bound ~+3% at 10k class. Gates: mmvq.cu
+  gfx900 TU clean + cmake ggml-hip build gate; oracle zero-defect after
+  the ds-offset fix. Receipts: results/W5_mmvq_bw_receipt_2026-09-23.md +
+  W5_bw_*.txt session logs. NEXT LINK (cost class): the cfull 70-120 GB/s
+  wall is schedule-bound (1.25 kbx iterations of runway per lane) - LDS-y
+  staging design banked in the receipt (occupancy-budgeted), C-rung build
+  cell; decode tax is B-rung but dp4a is per-op optimal, only
+  format-level decode reduction helps.

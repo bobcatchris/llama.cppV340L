@@ -1832,3 +1832,132 @@ static __device__ __forceinline__ float vec_dot_iq3_s_q8_1_apply_aln(
     sumi *= scale;
     return d * __low2float(bq8_1[iqs/2].ds) * sumi;
 }
+
+// --- s2r: row-shared y-operand preload for the T = 2..4 MMVQ share arms ----
+// The rpb = 2 GCN schedule makes both rows' apply() read the SAME y words per
+// (token, block, lane); preload() loads them once into registers and
+// apply_u() replays the identical arithmetic per row. Bit-exact: same loaded
+// values, same per-row accumulation order (bench W5 receipts, gfx900).
+// NOTE: block_q8_1 in this tree is ds-first (ds at byte 0, qs at byte 4).
+
+struct mmvq_yw8  { int u[8]; int ds;      };  // iq3_s / iq3_xxs / iq4_xs
+struct mmvq_ywq2 { int u[2][2]; int ds[2];};  // q4_K / q5_K
+struct mmvq_yw2  { int u[2]; int ds[2];   };  // q6_K
+struct mmvq_yw4  { int u[4]; int ds[4];   };  // q3_K
+
+static __device__ __forceinline__ mmvq_yw8 vec_dot_iq3_s_q8_1_preload(
+    const block_q8_1 * __restrict__ bq8_1, const int & iqs) {
+    const block_q8_1 * b = bq8_1 + iqs/2;
+    mmvq_yw8 w;
+#pragma unroll
+    for (int m = 0; m < 8; ++m) w.u[m] = get_int_b4(b->qs, m);
+    w.ds = ((const int *) b)[0];
+    return w;
+}
+static __device__ __forceinline__ float vec_dot_iq3_s_q8_1_apply_u(
+    const mmvq_yw8 & w, const int * dec, const int scale, const float d) {
+    int sumi = 0;
+#pragma unroll
+    for (int m = 0; m < 8; ++m) sumi = ggml_cuda_dp4a(dec[m], w.u[m], sumi);
+    sumi *= scale;
+    return d * __low2float(*reinterpret_cast<const ggml_half2 *>(&w.ds)) * sumi;
+}
+
+static __device__ __forceinline__ mmvq_yw8 vec_dot_iq3_xxs_q8_1_preload(
+    const block_q8_1 * __restrict__ bq8_1, const int & iqs) {
+    const block_q8_1 * b = bq8_1 + iqs/2;
+    mmvq_yw8 w;
+#pragma unroll
+    for (int m = 0; m < 8; ++m) w.u[m] = get_int_b4(b->qs, m);
+    w.ds = ((const int *) b)[0];
+    return w;
+}
+static __device__ __forceinline__ float vec_dot_iq3_xxs_q8_1_apply_u(
+    const mmvq_yw8 & w, const int * dec, const int ls, const float d) {
+    int sumi = 0;
+#pragma unroll
+    for (int m = 0; m < 8; ++m) sumi = ggml_cuda_dp4a(dec[m], w.u[m], sumi);
+    sumi = (ls*sumi + sumi/2)/2;
+    return d * __low2float(*reinterpret_cast<const ggml_half2 *>(&w.ds)) * sumi;
+}
+
+static __device__ __forceinline__ mmvq_yw8 vec_dot_iq4_xs_q8_1_preload(
+    const block_q8_1 * __restrict__ bq8_1, const int & iqs) {
+    const block_q8_1 * b = bq8_1 + iqs/4;
+    mmvq_yw8 w;
+#pragma unroll
+    for (int m = 0; m < 8; ++m) w.u[m] = get_int_b4(b->qs, m);
+    w.ds = ((const int *) b)[0];
+    return w;
+}
+static __device__ __forceinline__ float vec_dot_iq4_xs_q8_1_apply_u(
+    const mmvq_yw8 & w, const int * dec, const int scale, const float d) {
+    int sumi = 0;
+#pragma unroll
+    for (int j = 0; j < 4; ++j) {
+        sumi = ggml_cuda_dp4a(dec[j + 0], w.u[j + 0], sumi);
+        sumi = ggml_cuda_dp4a(dec[j + 4], w.u[j + 4], sumi);
+    }
+    sumi *= scale;
+    return d * __low2float(*reinterpret_cast<const ggml_half2 *>(&w.ds)) * sumi;
+}
+
+static __device__ __forceinline__ mmvq_ywq2 vec_dot_q4_K_q8_1_preload(
+    const block_q8_1 * __restrict__ bq8_1, const int & iqs) {
+    const int bq8_offset = QR4_K * ((iqs/2) / (QI8_1/2));
+    mmvq_ywq2 w;
+#pragma unroll
+    for (int i = 0; i < QR4_K; ++i) {
+        const block_q8_1 * bq8i = bq8_1 + bq8_offset + i;
+        const int * q8 = (const int *)bq8i->qs + ((iqs/2)%4);
+        w.u[i][0] = q8[0];
+        w.u[i][1] = q8[4];
+        w.ds[i]   = ((const int *) bq8i)[0];
+    }
+    return w;
+}
+static __device__ __forceinline__ float vec_dot_q4_K_q8_1_apply_u(
+    const mmvq_ywq2 & w, const int * dec, const int * sc, const int * m, const ggml_half2 dm) {
+    float sumf_d = 0.0f;
+    float sumf_m = 0.0f;
+#pragma unroll
+    for (int i = 0; i < QR4_K; ++i) {
+        const float d8 = __low2float(*reinterpret_cast<const ggml_half2 *>(&w.ds[i]));
+        const int dot1 = ggml_cuda_dp4a(dec[2*i+1], w.u[i][1], ggml_cuda_dp4a(dec[2*i+0], w.u[i][0], 0));
+        const int dot2 = ggml_cuda_dp4a(0x01010101, w.u[i][1], ggml_cuda_dp4a(0x01010101, w.u[i][0], 0));
+        sumf_d += d8 * (dot1 * sc[i]);
+        sumf_m += d8 * (dot2 * m[i]);
+    }
+    const float2 dm4f = __half22float2(dm);
+    return dm4f.x*sumf_d - dm4f.y*sumf_m;
+}
+
+static __device__ __forceinline__ mmvq_ywq2 vec_dot_q5_K_q8_1_preload(
+    const block_q8_1 * __restrict__ bq8_1, const int & iqs) {
+    const int bq8_offset = QR5_K * ((iqs/2) / (QI8_1/2));
+    mmvq_ywq2 w;
+#pragma unroll
+    for (int i = 0; i < QR5_K; ++i) {
+        const block_q8_1 * bq8i = bq8_1 + bq8_offset + i;
+        const int * q8 = (const int *)bq8i->qs + ((iqs/2)%4);
+        w.u[i][0] = q8[0];
+        w.u[i][1] = q8[4];
+        w.ds[i]   = ((const int *) bq8i)[0];
+    }
+    return w;
+}
+static __device__ __forceinline__ float vec_dot_q5_K_q8_1_apply_u(
+    const mmvq_ywq2 & w, const int * dec, const int * sc, const int * m, const ggml_half2 dm) {
+    float sumf_d = 0.0f;
+    float sumf_m = 0.0f;
+#pragma unroll
+    for (int i = 0; i < QR5_K; ++i) {
+        const float d8 = __low2float(*reinterpret_cast<const ggml_half2 *>(&w.ds[i]));
+        const int dot1 = ggml_cuda_dp4a(dec[2*i+0], w.u[i][0], ggml_cuda_dp4a(dec[2*i+1], w.u[i][1], 0));
+        const int dot2 = ggml_cuda_dp4a(0x01010101, w.u[i][0], ggml_cuda_dp4a(0x01010101, w.u[i][1], 0));
+        sumf_d += d8 * (dot1 * sc[i]);
+        sumf_m += d8 * (dot2 * m[i]);
+    }
+    const float2 dm5f = __half22float2(dm);
+    return dm5f.x*sumf_d - dm5f.y*sumf_m;
+}
