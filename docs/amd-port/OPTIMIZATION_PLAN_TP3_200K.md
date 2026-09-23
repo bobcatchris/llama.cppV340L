@@ -3207,3 +3207,31 @@ to Gemini's guard battery, die 3 is the dev cell.
   prompt), U2 -lv 4 TP4 timeline, U3 TP4 boundary micro-probe. Receipt:
   results/TP4_roundmap_2026-09-23.md (census provenance files copied
   in-tree).
+- E-115 2026-09-23 COORDINATOR: ROUND MAP ACCEPTED, BOUNDARY DESK
+  DISPATCHED. (1) The TP4 round map (E-115a, merged d143fbb5a) NAMES
+  the ~23 ms gap: 137.2 RCCL boundaries per die per round at median
+  165.6 us = 22.7-25.6 ms (count tripled at n=4: ~1 cut point/layer x
+  2 passes vs TP3's ~24/pass; per-boundary 1.3-1.8x the stale 94 us
+  @32 KB/n=3 probe). Decomposition of record: verify T=4 pass ~108 ms
+  wall (MMVQ 56.0 @54.7 GB/s eff, boundaries 21.4-24.1, flash_attn
+  ~12, small kernels ~10), host slice 6.5 (all 4 dies idle
+  simultaneously - host, not skew), catch-up 3.5 (neutral CONFIRMED
+  with mechanism), draft loop 8.9, microgaps ~4. ROUND IS CONTEXT-
+  INSENSITIVE (130.5 ms @32k vs 129.0 @200k) - deep-context decode
+  costs nothing extra to first order; U1 deep census still wanted
+  before any beyond-8k attention claim. (2) TOP-3 ACCEPTED: T1 TP4
+  BOUNDARY DESK dispatched (wt-tp4-bound on amd/tp4-bound off
+  d143fbb5a; ladder: P0 us(size,n) cost model on die 3 -> A1
+  why-137 census with file:line -> A2 same-tensor clustering
+  (sum-order preserving only; numerics-class changes flagged for
+  owner) -> A3 cut-elimination design-only -> served-arm spec; prize
+  5-17 ms = +4-13% decode). T2 = the running LDSY desk covers the
+  MMVQ 56 ms pool. T3 host-slice desk (3-5 ms) queued. (3) DESK
+  HEALTH 13:20: LDSY desk ~45 min in, ALREADY through P0 into A2
+  (bench_mmvq_real.cu built per the real-kernel law, LDSY in
+  mmvq.cu/vecdotq.cuh, W7_ldsy_a2 results file, boot lock held
+  13:07 for P0 anchors). Boundary desk 10 min in, reading phase.
+  (4) Stack projection if both land: 129 -> ~100-108 ms = 28-30
+  t/s from 23.26. Standing order (Chris): forward only - no process
+  detours; every landing goes merge -> provenance-gated served
+  window -> baseline ratchet.
