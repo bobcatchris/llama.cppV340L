@@ -15,11 +15,11 @@ Foundation: TP4_roundmap_2026-09-23.md, ledger E-110..E-115a.
    191.6 / 210.8 us. The round map's pooled 165.6 us median is a mixture.
    The WALL pays the SLOWEST die: 31.2 ms/round of NCCL kernel time on
    die 1 vs 18.7 on die 3.
-3. Best-die per-boundary latency (128.8 us) is AT the n=3 probe floor
-   (126.5 us @ 80 KB, RCCL_EXT table) - there is no general per-op
-   software premium to remove; the premium is die-specific spin-wait
-   (arrival skew + SHM transport asymmetry), and it is worth up to
-   ~12.6 ms/round on the critical die.
+3. P0 cost model: enqueue floor 0.2 us (RCCL-1R, kernel elided), launch
+   floor ~12 us (size-flat), transport-free 4-rank ring floor 69.5 us at
+   80 KB (RING1K single cooperative kernel). The served boundary is
+   ring floor + T(die) with T = 59 us (die 3) to 141 us (die 1) - host
+   software is a no-op class; the levers are transport and die asymmetry.
 4. A2 clustering: NEGATIVE - no legal clustering candidate exists in the
    served graph (boundaries are data-dependent, one tensor each, separated
    by nonlinear consumers; enqueue is already stream-pipelined).
@@ -28,14 +28,70 @@ Foundation: TP4_roundmap_2026-09-23.md, ledger E-110..E-115a.
    legal alternative either multiplies weight streaming (the #1 ms pool)
    or keeps the count. Design + anchors below; do not implement.
 
-## 1. P0 - single-die RCCL micro-probe (die 3, n=4 ranks, fp32)
+## 1. P0 - single-die RCCL micro-probe (die 3, fp32, 16-128 KB)
 
 Instrument: docs/amd-port/probes/rccl_tp4_boundary_probe.cpp
 (runner run_tp4_boundary_probe.sh: check-and-hold /tmp/campaign_gpu_boot.lock,
-cool-die gate < 60 C, HIP_VISIBLE_DEVICES=3, no server/ports).
-Session of record: results/tp4_boundary_probe_d3_*.log (P0-PLACEHOLDER)
+cool-die gate < 60 C (max 31.0 C at run), HIP_VISIBLE_DEVICES=3, no server,
+no ports; die idle, solo on the machine). Sessions of record:
+results/tp4_boundary_probe_d3_20260923_142008.log (RCCL refusal) and
+results/tp4_boundary_probe_d3_20260923_142626.log (floors of record).
 
-[P0-RESULTS-TO-BE-FILLED]
+### 1.1 HARD INSTRUMENT FINDING: RCCL refuses single-die multi-rank
+
+ncclCommInitAll with n >= 2 ranks on the one visible device returns
+rc=5 ncclInvalidUsage immediately (the "Duplicate GPU detected" class -
+RCCL 2.20.5 enforces one rank per GPU inside a communicator). A
+single-die RCCL collective DOES NOT EXIST on this stack, so the mission's
+"n=4 ranks on one die through RCCL" is impossible as specified; the
+per-op cost curve is measured as floors + model (1.2/1.3), and the
+cross-die transport term remains the coordinator's U3 probe.
+
+### 1.2 Measured floors (die 3, 2000 iters, halves spread; the 3% law)
+
+| arm | meaning | 16 KB | 32 KB | 64 KB | 80 KB | 96 KB | 128 KB |
+|-----|---------|-------|-------|-------|-------|-------|--------|
+| RCCL-1R | single-rank ncclAllReduce (kernel elided) = enqueue floor | 0.26 | 0.18 | 0.18 | 0.18 | 0.18 | 0.18 us |
+| KLAUNCH n=4 | one kernel + sync = launch floor | 12.0 | 11.4 | 12.4* | 11.6 | 11.7 | 12.0 us |
+| RING1K n=4 | one cooperative kernel, 4-rank ring in-device = transport-free algorithm floor | 33.3 | 42.6 | 60.4 | 69.5 | 78.7 | 97.5 us |
+| RING1K n=2 | same, 2 ranks | 27.1 | 33.1 | 45.4 | 51.4 | 57.5 | 69.7 us |
+
+*the n=4 64 KB KLAUNCH cell tripped the 3% spread law (12.32%) - reported
+as-is, marked FAIL; every other cell passed (worst 2.59%), and the size-flat
+KLAUNCH class is confirmed by its neighbors at 0.1-1.1%.
+
+Cooperative launch support: present on gfx900 (grid sync across the
+4 rank-blocks; the RCCL kernel shape - ONE launch per collective).
+
+### 1.3 The per-op cost model us(size, n)
+
+  us_enqueue      ~ 0.2 us (RCCL-1R: the host API enqueue is a NO-OP class;
+                    even x4 ranks the group enqueue is < 1 us)
+  us_launch       ~ 11.5-12 us, size-flat over 16-128 KB (KLAUNCH)
+  us_ring(S, n)   = a(n) + b(n) x KB   (RING1K least-squares, r > 0.999)
+                    a(4) = 24.1 us, b(4) = 0.573 us/KB   (80 KB: 69.5 us)
+                    a(2) = 21.0 us, b(2) = 0.380 us/KB   (80 KB: 51.4 us)
+  us_served(die)  = us_ring(80, 4) + T(die)   -> the transport+wait residual:
+                    die 3: 128.8 - 69.5 =  59.3 us   die 2: 151.9 - 69.5 = 82.4 us
+                    die 0: 191.6 - 69.5 = 122.1 us   die 1: 210.8 - 69.5 = 141.3 us
+  draft boundary (20 KB, n=4): ring floor 35.5 us; served median 89.9 us ->
+  T ~ 54 us - consistent with the 80 KB residual on the best die.
+
+Reading:
+1. Host software cost is ZERO-class: enqueue 0.2 us, launch 12 us - the
+   served 128.8-210.8 us per boundary is ~85-95% ring-algorithm +
+   cross-die transport + peer wait. There is no launch-tax lever.
+2. Even with PERFECT (zero-cost) transport, a 4-rank ring at 80 KB pays
+   ~70 us of pure on-device algorithm time on gfx900 - the "boundary tax
+   at probe parity" fantasy floor is ~70 us, not the 12 us launch class.
+3. The dominant residual T(die) spans 59-141 us across dies on the SAME
+   machine and topology - the asymmetry is the lever, not the mean. Any
+   RCCL env win (algo/proto/channels) must be judged per-die: the wall
+   pays die 1's 210.8 us median, not the pooled 165.6.
+4. RING1K is an emulation bound (in-device traffic, no SHM wire, 6 grid
+   syncs vs RCCL's pipelined 2-channel kernel) - treat 69.5 us as the
+   transport-free FLOOR, not as RCCL behavior; U3 multi-die pins the
+   real transport curve.
 
 ## 2. A1 - boundary census (zero-GPU, TP4_kernel_census_2026-09-23)
 
@@ -161,9 +217,9 @@ same-tensor boundaries) or be flagged numerics-class-changing.
    (ggml-backend-meta.cpp:2270-2293). The census gaps between NCCL
    kernels (0.5-0.7 ms) are layer compute on the device, not launch
    overhead.
-4. Pricing for the record (P0 GROUP16/PIPE16 arms): the only thing
-   clustering could ever recover is the per-launch fixed cost of the
-   collective kernel. [P0-CLUSTERING-PLACEHOLDER]
+4. Pricing for the record (P0): the enqueue floor is 0.2 us per op
+   (RCCL-1R, section 1.2) - host-side per-op cost is a no-op class;
+   there is nothing to cluster away on the enqueue path either.
 
 Conclusion: GGML_CUDA_RCCL_CLUSTER is not implemented - there is no legal
 candidate in the served graph to cluster. The env knob would be dead code.

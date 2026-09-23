@@ -1,28 +1,34 @@
 // TP4 boundary micro-probe for the V340L boundary desk (P0).
 //
-// Isolates the per-op RCCL allreduce cost from cross-die transport: n ranks
-// on ONE die (HIP_VISIBLE_DEVICES=<die> makes it the only visible device),
-// fp32 in-place allreduce at the served decode boundary sizes. The served
-// boundary tensor is the hidden state (n_embd 5120): T=4 verify/catch-up =
-// ne 20480 (80 KB fp32), T=1 draft = ne 5120 (20 KB).
+// Isolates the per-op allreduce cost from cross-die transport, on ONE die
+// (HIP_VISIBLE_DEVICES=<die>).
 //
-// Arms, all faithful to the ggml integration shapes:
-//   SYNC    one boundary per iteration: ncclGroupStart, one ncclAllReduce per
-//           rank, ncclGroupEnd, stream sync (exactly
-//           ggml_backend_cuda_comm_allreduce_nccl per call, no host sync inside)
-//   PIPE16  16 boundaries back-to-back on the streams, one sync at the end
-//           (prices enqueue/sync amortization = the clustering ceiling)
-//   GROUP16 one ncclGroup containing 16 x per-rank ncclAllReduce, one sync
-//           (what an env-gated GGML_CUDA_RCCL_CLUSTER=1 would enqueue)
+// FINDING OF RECORD: RCCL 2.20.5 REFUSES multi-rank-on-one-device
+// communicators (ncclCommInitAll -> ncclInvalidUsage, "Duplicate GPU
+// detected" class, for every n >= 2). A single-die RCCL collective does
+// not exist, so the per-op cost curve is measured as three arms:
+//   RCCL-1R  single-rank ncclAllReduce (RCCL elides the kernel entirely)
+//            = the API/enqueue floor
+//   KLAUNCH  one add kernel over the op's bytes + sync
+//            = the single-launch floor at the op's byte class
+//   RING1K   ONE cooperative kernel emulating the n-rank ring allreduce
+//            in-device (reduce-scatter + all-gather, grid-synced, the
+//            RCCL kernel shape, traffic 3(n-1)/n*S element accesses)
+//            = the transport-free algorithm floor
+// Served model: us(size, n) = launch floor + ring floor + transport(n,
+// topology). The transport share is the coordinator's U3 multi-die probe.
+// Served boundary tensors (n_embd 5120): T=4 verify/catch-up = ne 20480
+// (80 KB fp32), T=1 draft = ne 5120 (20 KB).
 //
-// Verdict cells report two half-averages; the desk law requires their spread
-// <= 3% for a cell to count.
+// Verdict cells report two half-averages; the desk law requires their
+// spread <= 3% for a cell to count.
 //
 // Build: hipcc -O2 -x hip rccl_tp4_boundary_probe.cpp -o rccl_tp4_boundary_probe -lrccl
-// Run:   HIP_VISIBLE_DEVICES=3 ./rccl_tp4_boundary_probe [--ranks 4] [--iters 2000]
-//            [--sizes 4096,8192,16384,20480,24576,32768] [--nsweep 4,3,2,1] [--pipe 16]
+// Run:   HIP_VISIBLE_DEVICES=3 ./rccl_tp4_boundary_probe [--iters 2000]
+//            [--sizes 4096,8192,16384,20480,24576,32768] [--nsweep 4,2]
 
 #include <hip/hip_runtime_api.h>
+#include <hip/hip_cooperative_groups.h>
 #include <rccl/rccl.h>
 
 #include <algorithm>
@@ -54,6 +60,8 @@
         }                                                                           \
     } while (0)
 
+namespace cg = cooperative_groups;
+
 struct rank_res {
     hipStream_t stream = nullptr;
     float     * buf    = nullptr;
@@ -64,12 +72,43 @@ static double now_us() {
     return duration_cast<duration<double, std::micro>>(steady_clock::now().time_since_epoch()).count();
 }
 
-static void one_boundary(std::vector<ncclComm_t> & comms, std::vector<rank_res> & r, int ne) {
-    NCCL_CHECK(ncclGroupStart());
-    for (size_t i = 0; i < r.size(); i++) {
-        NCCL_CHECK(ncclAllReduce(r[i].buf, r[i].buf, ne, ncclFloat, ncclSum, comms[i], r[i].stream));
+__global__ void add_kernel(float * dst, const float * src, int n) {
+    const int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        dst[i] += src[i];
     }
-    NCCL_CHECK(ncclGroupEnd());
+}
+
+// one-block-per-rank ring allreduce, fully in-device, grid-synced:
+// reduce-scatter: at step s rank r folds its chunk (r-s)%n with the same
+// chunk of rank (r+1)%n; after n-1 steps rank r holds the full sum of
+// chunk (r+1)%n. all-gather: n-1 propagation steps. Memory accesses per
+// element = 3(n-1)/n (read src + read dst + write dst per fold; copy for
+// gather) - the ring's traffic without the transport.
+__global__ void ring_kernel(float ** bufs, int ne, int n) {
+    cg::grid_group g = cg::this_grid();
+    const int rank = blockIdx.x;
+    const int chunk = ne / n;
+    float * buf = bufs[rank];
+    for (int s = 0; s < n - 1; s++) {
+        const int c = ((rank - s) % n + n) % n;
+        const float * src = bufs[(rank + 1) % n] + (size_t) c * chunk;
+        float * dst = buf + (size_t) c * chunk;
+        for (int i = threadIdx.x; i < chunk; i += blockDim.x) {
+            dst[i] += src[i];
+        }
+        g.sync();
+    }
+    const int mine = (rank + 1) % n;
+    for (int s = 0; s < n - 1; s++) {
+        const int c = ((mine - s) % n + n) % n;
+        const float * src = bufs[(rank + 1) % n] + (size_t) c * chunk;
+        float * dst = buf + (size_t) c * chunk;
+        for (int i = threadIdx.x; i < chunk; i += blockDim.x) {
+            dst[i] = src[i];
+        }
+        g.sync();
+    }
 }
 
 static void sync_all(std::vector<rank_res> & r) {
@@ -93,20 +132,27 @@ static bench_stat summarize(std::vector<double> & v) {
     return s;
 }
 
+static void report(const char * arm, int n, double kb, int iters, std::vector<double> & t) {
+    std::vector<double> h1(t.begin(), t.begin() + t.size() / 2);
+    std::vector<double> h2(t.begin() + t.size() / 2, t.end());
+    bench_stat st = summarize(t), s1 = summarize(h1), s2 = summarize(h2);
+    const double spread = 100.0 * fabs(s1.avg - s2.avg) / std::min(s1.avg, s2.avg);
+    printf("%-8s n=%d %6.0f KB x%4d: avg %7.2f us  med %7.2f  min %7.2f  halves %7.2f/%7.2f spread %.2f%%%s\n",
+           arm, n, kb, iters, st.avg, st.med, st.mn, s1.avg, s2.avg, spread,
+           spread <= 3.0 ? "" : "  [SPREAD-FAIL]");
+    fflush(stdout);
+}
+
 int main(int argc, char ** argv) {
-    int    nrank   = 4;
     int    iters   = 2000;
-    int    pipe_k  = 16;
-    int    timeout = 240;
+    int    timeout = 300;
     std::vector<int> sizes  = {4096, 8192, 16384, 20480, 24576, 32768}; // 16..128 KB fp32
-    std::vector<int> nsweep = {4};
+    std::vector<int> nsweep = {4, 2};
 
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
         auto next = [&]() -> const char * { return argv[++i]; };
-        if      (a == "--ranks")  { nrank = atoi(next()); }
-        else if (a == "--iters")  { iters = atoi(next()); }
-        else if (a == "--pipe")   { pipe_k = atoi(next()); }
+        if      (a == "--iters")  { iters = atoi(next()); }
         else if (a == "--sizes")  { sizes.clear(); char * s = strdup(next()); for (char * t = strtok(s, ","); t; t = strtok(nullptr, ",")) sizes.push_back(atoi(t)); free(s); }
         else if (a == "--nsweep") { nsweep.clear(); char * s = strdup(next()); for (char * t = strtok(s, ","); t; t = strtok(nullptr, ",")) nsweep.push_back(atoi(t)); free(s); }
         else if (a == "--timeout"){ timeout = atoi(next()); }
@@ -120,40 +166,66 @@ int main(int argc, char ** argv) {
     HIP_CHECK(hipInit(0));
     HIP_CHECK(hipGetDeviceCount(&ndev));
     printf("rccl_tp4_boundary_probe: single-die isolation, visible devices = %d\n", ndev);
-    for (int n : nsweep) {
-        if (n > ndev) { fprintf(stderr, "nsweep %d > visible devices %d\n", n, ndev); return 1; }
-    }
+    if (ndev < 1) { fprintf(stderr, "no visible devices\n"); return 1; }
+
+    int coop = 0;
+    HIP_CHECK(hipDeviceGetAttribute(&coop, hipDeviceAttributeCooperativeLaunch, 0));
+    printf("cooperative launch support: %d\n", coop);
 
     const size_t max_ne = *std::max_element(sizes.begin(), sizes.end());
 
+    // ---- RCCL-1R: single-rank ncclAllReduce (enqueue floor) ----
+    {
+        printf("\n==== RCCL-1R (single-rank ncclAllReduce, kernel elided) ====\n");
+        rank_res r;
+        HIP_CHECK(hipSetDevice(0));
+        HIP_CHECK(hipStreamCreate(&r.stream));
+        HIP_CHECK(hipMalloc(&r.buf, max_ne * sizeof(float)));
+        std::vector<float> h(max_ne, 0.5f);
+        HIP_CHECK(hipMemcpy(r.buf, h.data(), max_ne * sizeof(float), hipMemcpyHostToDevice));
+        ncclComm_t comm;
+        const double t0 = now_us();
+        int dev0 = 0;
+        ncclResult_t irc = ncclCommInitAll(&comm, 1, &dev0);
+        printf("INIT: %s in %.0f ms\n", irc == ncclSuccess ? "OK" : "FAILED", now_us() - t0);
+        if (irc == ncclSuccess) {
+            for (int ne : sizes) {
+                const double kb = ne * sizeof(float) / 1024.0;
+                for (int k = 0; k < 200; k++) {
+                    NCCL_CHECK(ncclAllReduce(r.buf, r.buf, ne, ncclFloat, ncclSum, comm, r.stream));
+                }
+                HIP_CHECK(hipStreamSynchronize(r.stream));
+                std::vector<double> t; t.reserve(iters);
+                for (int k = 0; k < iters; k++) {
+                    double s = now_us();
+                    NCCL_CHECK(ncclAllReduce(r.buf, r.buf, ne, ncclFloat, ncclSum, comm, r.stream));
+                    HIP_CHECK(hipStreamSynchronize(r.stream));
+                    t.push_back(now_us() - s);
+                }
+                report("RCCL-1R", 1, kb, iters, t);
+            }
+            ncclCommDestroy(comm);
+        }
+        HIP_CHECK(hipFree(r.buf));
+        HIP_CHECK(hipStreamDestroy(r.stream));
+    }
+
+    // ---- KLAUNCH + RING1K arms per n ----
     for (int n : nsweep) {
-        printf("\n==== n=%d ranks on one die ====\n", n);
+        printf("\n==== n=%d ranks on one die (in-device emulation) ====\n", n);
         std::vector<rank_res> r(n);
+        std::vector<float *> bufs(n, nullptr);
         for (int i = 0; i < n; i++) {
             HIP_CHECK(hipSetDevice(0));
             HIP_CHECK(hipStreamCreate(&r[i].stream));
             HIP_CHECK(hipMalloc(&r[i].buf, max_ne * sizeof(float)));
+            bufs[i] = r[i].buf;
             std::vector<float> h(max_ne, 0.5f + 0.25f * i);
             HIP_CHECK(hipMemcpy(r[i].buf, h.data(), max_ne * sizeof(float), hipMemcpyHostToDevice));
         }
-        std::vector<int> devlist(n, 0); // all ranks on the single visible device
-
-        std::vector<ncclComm_t> comms(n);
-        const double t0 = now_us();
-        ncclResult_t irc = ncclCommInitAll(comms.data(), n, devlist.data());
-        const double init_ms = (now_us() - t0) / 1000.0;
-        if (irc != ncclSuccess) {
-            // some RCCL builds refuse duplicate GPUs within one communicator;
-            // report and move on with the rest of the n-sweep
-            printf("INIT: FAILED rc=%d (%s) after %.0f ms (n=%d on one device)\n",
-                   (int) irc, ncclGetErrorString(irc), init_ms, n);
-            for (int i = 0; i < n; i++) {
-                HIP_CHECK(hipFree(r[i].buf));
-                HIP_CHECK(hipStreamDestroy(r[i].stream));
-            }
-            continue;
-        }
-        printf("INIT: OK in %.0f ms (n=%d, one device)\n", init_ms, n);
+        float ** dbufs = nullptr;
+        HIP_CHECK(hipMalloc(&dbufs, n * sizeof(float *)));
+        HIP_CHECK(hipMemcpy(dbufs, bufs.data(), n * sizeof(float *), hipMemcpyHostToDevice));
 
         for (int ne : sizes) {
             const double kb = ne * sizeof(float) / 1024.0;
@@ -162,82 +234,44 @@ int main(int argc, char ** argv) {
                 std::vector<float> h(ne, 0.5f + 0.25f * i);
                 HIP_CHECK(hipMemcpy(r[i].buf, h.data(), ne * sizeof(float), hipMemcpyHostToDevice));
             }
+            const int warm = 300;
 
-            // ---- SYNC arm ----
-            const int warm = std::min(400, std::max(50, iters / 4));
-            for (int k = 0; k < warm; k++) { one_boundary(comms, r, ne); }
+            // KLAUNCH: one add kernel over the op's bytes (rank 0's stream)
+            for (int k = 0; k < warm; k++) {
+                add_kernel<<<(ne + 255) / 256, 256, 0, r[0].stream>>>(r[0].buf, r[0].buf, ne);
+            }
             sync_all(r);
             std::vector<double> t; t.reserve(iters);
             for (int k = 0; k < iters; k++) {
-                double s = now_us(); one_boundary(comms, r, ne); sync_all(r); t.push_back(now_us() - s);
-            }
-            std::vector<double> h1(t.begin(), t.begin() + t.size() / 2);
-            std::vector<double> h2(t.begin() + t.size() / 2, t.end());
-            bench_stat st = summarize(t), s1 = summarize(h1), s2 = summarize(h2);
-            const double spread = 100.0 * fabs(s1.avg - s2.avg) / std::min(s1.avg, s2.avg);
-            printf("SYNC    n=%d %6.0f KB x%4d: avg %7.1f us  med %7.1f  min %7.1f  halves %7.1f/%7.1f spread %.2f%%%s\n",
-                   n, kb, iters, st.avg, st.med, st.mn, s1.avg, s2.avg, spread,
-                   spread <= 3.0 ? "" : "  [SPREAD-FAIL]");
-            fflush(stdout);
-
-            // ---- PIPE16 arm (k boundaries, one sync) ----
-            if (pipe_k > 1) {
-                for (int k = 0; k < warm / 2; k++) { for (int q = 0; q < pipe_k; q++) { one_boundary(comms, r, ne); } }
+                double s = now_us();
+                add_kernel<<<(ne + 255) / 256, 256, 0, r[0].stream>>>(r[0].buf, r[0].buf, ne);
                 sync_all(r);
-                t.clear();
-                const int reps = std::max(20, iters / pipe_k);
-                for (int k = 0; k < reps; k++) {
-                    double s = now_us();
-                    for (int q = 0; q < pipe_k; q++) { one_boundary(comms, r, ne); }
-                    sync_all(r);
-                    t.push_back((now_us() - s) / pipe_k);
-                }
-                std::vector<double> p1(t.begin(), t.begin() + t.size() / 2);
-                std::vector<double> p2(t.begin() + t.size() / 2, t.end());
-                st = summarize(t); s1 = summarize(p1); s2 = summarize(p2);
-                const double spr2 = 100.0 * fabs(s1.avg - s2.avg) / std::min(s1.avg, s2.avg);
-                printf("PIPE%-3d n=%d %6.0f KB x%4d: avg %7.1f us/op  med %7.1f  halves %7.1f/%7.1f spread %.2f%%%s\n",
-                       pipe_k, n, kb, (int) t.size(), st.avg, st.med, s1.avg, s2.avg, spr2,
-                       spr2 <= 3.0 ? "" : "  [SPREAD-FAIL]");
-                fflush(stdout);
-
-                // ---- GROUP16 arm (one ncclGroup with k boundaries) ----
-                for (int k = 0; k < warm / 2; k++) {
-                    NCCL_CHECK(ncclGroupStart());
-                    for (int q = 0; q < pipe_k; q++) {
-                        for (int i = 0; i < n; i++) {
-                            NCCL_CHECK(ncclAllReduce(r[i].buf, r[i].buf, ne, ncclFloat, ncclSum, comms[i], r[i].stream));
-                        }
-                    }
-                    NCCL_CHECK(ncclGroupEnd());
-                }
-                sync_all(r);
-                t.clear();
-                for (int k = 0; k < reps; k++) {
-                    double s = now_us();
-                    NCCL_CHECK(ncclGroupStart());
-                    for (int q = 0; q < pipe_k; q++) {
-                        for (int i = 0; i < n; i++) {
-                            NCCL_CHECK(ncclAllReduce(r[i].buf, r[i].buf, ne, ncclFloat, ncclSum, comms[i], r[i].stream));
-                        }
-                    }
-                    NCCL_CHECK(ncclGroupEnd());
-                    sync_all(r);
-                    t.push_back((now_us() - s) / pipe_k);
-                }
-                std::vector<double> g1(t.begin(), t.begin() + t.size() / 2);
-                std::vector<double> g2(t.begin() + t.size() / 2, t.end());
-                st = summarize(t); s1 = summarize(g1); s2 = summarize(g2);
-                const double spr3 = 100.0 * fabs(s1.avg - s2.avg) / std::min(s1.avg, s2.avg);
-                printf("GROUP%-2d n=%d %6.0f KB x%4d: avg %7.1f us/op  med %7.1f  halves %7.1f/%7.1f spread %.2f%%%s\n",
-                       pipe_k, n, kb, (int) t.size(), st.avg, st.med, s1.avg, s2.avg, spr3,
-                       spr3 <= 3.0 ? "" : "  [SPREAD-FAIL]");
-                fflush(stdout);
+                t.push_back(now_us() - s);
             }
+            report("KLAUNCH", n, kb, iters, t);
+
+            // RING1K: one cooperative kernel, n blocks, grid-synced ring
+            if (!coop) continue;
+            int grid = n, block = 256;
+            void * args[] = { &dbufs, &ne, &n };
+            for (int k = 0; k < warm; k++) {
+                HIP_CHECK(hipLaunchCooperativeKernel((void *) ring_kernel, dim3(grid), dim3(block),
+                                                     args, 0, r[0].stream));
+            }
+            sync_all(r);
+            t.clear();
+            for (int k = 0; k < iters; k++) {
+                double s = now_us();
+                HIP_CHECK(hipLaunchCooperativeKernel((void *) ring_kernel, dim3(grid), dim3(block),
+                                                     args, 0, r[0].stream));
+                sync_all(r);
+                t.push_back(now_us() - s);
+            }
+            report("RING1K", n, kb, iters, t);
         }
 
+        HIP_CHECK(hipFree(dbufs));
         for (int i = 0; i < n; i++) {
-            ncclCommDestroy(comms[i]);
             HIP_CHECK(hipFree(r[i].buf));
             HIP_CHECK(hipStreamDestroy(r[i].stream));
         }

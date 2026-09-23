@@ -41,9 +41,9 @@ hipcc -O2 -x hip rccl_tp4_boundary_probe.cpp -o rccl_tp4_boundary_probe -lrccl 2
 echo "COMPILE-EXIT:$?"
 [ -x rccl_tp4_boundary_probe ] || { echo "no binary; abort"; exit 6; }
 
-./rccl_tp4_boundary_probe --ranks 4 --iters 2000 --pipe 16 \
+./rccl_tp4_boundary_probe --iters 2000 \
     --sizes 4096,8192,16384,20480,24576,32768 \
-    --nsweep 4,3,2,1 --timeout 500 2>&1 | tee "$OUT"
+    --nsweep 4,2 --timeout 400 2>&1 | tee "$OUT"
 echo "PROBE-EXIT:${PIPESTATUS[0]}"
 
 release_lock
