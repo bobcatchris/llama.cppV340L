@@ -2483,3 +2483,15 @@ to Gemini's guard battery, die 3 is the dev cell.
   branch, but the sign-off text should not be read as covering it.
   The desk's gate implementation (WIP) gives Chris the fp32 switch.
   Decision queued for Chris alongside the reviewer's read.
+- E-098 2026-09-22 SUBSYSTEM DESKS RELAUNCHED (Chris: "we got a early
+  reset, you can run agents"). All three resumed with sync-onto-HEAD
+  + resume-WIP briefs: RCCL-EXT (agent d22a9b55) finishes the
+  size-class gate (fp32/bf16/butterfly selectable, default = today's
+  behavior; the owner's prefill-class decision stays open), the
+  transfer-class audit table, and the gate host tests; LAUNCHPATH
+  (agent 6ee2a401) runs the predecessor's profiler offline, produces
+  the launch/sweep cost table, then target-side sweep + per-replay
+  fixes (env-gated) + ceiling doc; ONSAMPLE (agent d3c0455a) restarts
+  the per-shard argmax implementation (predecessor died in design,
+  zero WIP). All zero-GPU, env-gated unset = byte-identical, 90-min
+  zombie rule armed.
