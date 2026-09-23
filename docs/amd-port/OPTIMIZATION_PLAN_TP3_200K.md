@@ -2956,3 +2956,48 @@ to Gemini's guard battery, die 3 is the dev cell.
   unset), each arm = 200k 5-cell battery + 10k decode-only, lane
   8081, lock-honoring; engagement proof = per-flag INFO lines in the
   server logs. Verdict + promotion decision lands next cycle.
+
+- E-109 2026-09-23 MMVQ ALL-LAYER RUNG CELL: W1 LADDER RE-DERIVED PER
+  SERVED TYPE - ALL RUNGS LAND AS DERIVATIONS OR NAMED NEGATIVES. Desk
+  mmvq-rungs (wt-mmvq-rungs, amd/mmvq-rungs from amd/mmvq-bw 567c508cd,
+  merged v340-port-v2 36b1fe72f at landing). Instrument:
+  tests/bench_mmvq_rungs_gfx900.cu (W3 share harness + rung arms),
+  offsets verified against the GGUF header pre-card. (1) P0: W3 T=4 share
+  verdicts reproduce (iq3_xxs -4.1 / q4_K -21.5 exact / iq4_xs +5.3
+  negative stands / iq3_s -4.4; the bw desk's independent -4.7 concurs -
+  delta vs W3's -2.8 is the E-098/E-100 thermal class). (2) C1/C2 K-SPLIT
+  KILLED BY GEOMETRY on all four types: K=5120 -> blocks_per_row = 20,
+  every type covers its kbx slots in ONE iteration (iq3_s 16 slots x 8
+  lanes; the others 32 slots, 80/128 lanes active) and the grid is
+  many-wave (8704 CTAs / 64 CUs) - W1's many-wave negative class; filling
+  the idle lanes re-maps the fp32 reduction order (not bit-exact). (3) A1
+  STAGING: alignment-law derivation (110/98/136 B block strides make the
+  wide merges illegal; 36 B y stride = the W4 aln negative) + one
+  measurement: iq4_xs qs uint2 merge BITEXACT +0.1% vs share =
+  NOT-MOVEMENT, concurring the W5 A2 wide-x negative. (4) B1 PERM DECODE
+  ATOM REFUSED ON DEVICE: the atom is exhaustively exact on host
+  (256 grid entries x 256 sign bytes, both mask idioms) and the ISA census
+  is favorable (28-30 VALU per sign pair shipped vs 8-19 candidate), but
+  gfx900 v_perm_b32 does not implement the assumed MSB-replication mode
+  (selector probes fit no nibble-wise model; dbg_perm*.cu) - the device
+  oracle refused both perm arms in two sessions. Physics cap on top: W3's
+  full decode removal wins only -2.8/-3.8% on these types and W5 measures
+  issue slack ~5.5x = stall-bound, so corrected-atom upside <= ~1%.
+  Do not re-open without an issue-bound schedule. (5) q4_K: derivation-only
+  (cheap nibble decode + ISA-walled dp4a + x/y mix traffic). (6) SESSION
+  HYGIENE DISCLOSURE: the post-merge seal session was VOID - the desk
+  overwrote a live coord-combowin lock after a 30 s wait expired and ran
+  concurrently (spreads 11-33%, timings discarded; timing-independent
+  oracle verdicts stand); lock restored with disclosure note. The coord
+  200k window may carry a contaminated die-3 slice 10:33-10:36 - re-check
+  before banking. PROTOCOL FIX: lock wait loops poll until FREE, never
+  steal on timeout. (7) COMPOSITION: nothing composes into the served
+  spec; the W5 spec (six *_SHARE gates + five *_S2R gates) stands
+  unchanged. Projected served delta from this desk: 0 (all negatives, by
+  design of the re-derivation - the upside was pre-cashed by E-104/E-106).
+  Receipts: results/W6_mmvq_rungs_receipt_2026-09-23.md +
+  W6_rungs_p0_repro/s1/s2_seal logs. NEXT LINK (cost class): unchanged
+  from E-106 - the 70-120 GB/s schedule-bound access-pattern ceiling;
+  schedule-level y staging or format-level decode reduction are the only
+  doors; B-rungs reopen only if a future schedule re-enters the
+  issue-bound regime.
