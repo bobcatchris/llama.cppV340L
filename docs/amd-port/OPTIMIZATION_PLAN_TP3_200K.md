@@ -2350,3 +2350,12 @@ to Gemini's guard battery, die 3 is the dev cell.
   amd/mmvq-kernel2 with a 60-minute first-deliverable milestone and
   an end-turn-on-blocker requirement; zombie check (>90 min silent,
   zero artifacts) added to the automation.
+- E-093 2026-09-22 T3 GROUPED DECODE 3-REP A/B VERDICT: t/s-NEUTRAL.
+  Interleaved 3 reps at 200k, decode cells, accept 0.66667 everywhere:
+  ref 15.05/14.97/15.05 (mean 15.02) vs GROUP=1 15.00/14.96/14.89
+  (mean 14.95) = -0.5%, inside the 0.94% noise floor. The launch-count
+  saving does not move decode (consistent with the drain budget:
+  device math per step is small vs structure). The copy-back size fix
+  itself stays merged (removes the abort AND a silent eager tail
+  corruption); grouped decode stays env-gated OFF by default, not in
+  the stack-up. Receipts t3ab_*.jsonl.
