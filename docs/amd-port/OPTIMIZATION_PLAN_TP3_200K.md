@@ -2914,3 +2914,45 @@ to Gemini's guard battery, die 3 is the dev cell.
   staging design banked in the receipt (occupancy-budgeted), C-rung build
   cell; decode tax is B-rung but dp4a is per-op optimal, only
   format-level decode reduction helps.
+- E-109 2026-09-23 MMVQ BW DESK LANDED, MERGED, SERVED WINDOW
+  DISPATCHED. DESK RESULTS (amd/mmvq-bw, 079951eb7 + e7e03fbd9,
+  receipt W5_mmvq_bw_receipt_2026-09-23.md): (1) A4 pure-consume
+  ceilings name the physics - the served rpb=2 schedule is STALL-
+  BOUND: zero-compute versions of the exact schedule ceiling at
+  70-120 GB/s vs 327 sequential; SASS 1446 inst/iter, 61 VGPR, issue
+  demand ~144us vs ~800us measured; dp4a emulation (6 VALU) is per-op
+  optimal; x/y stream-mix tax +41-100%, decode+dp4a tax +29-69%.
+  (2) A2 wide-x loads = named negative (-0.9..-1.2%; x is only
+  12-20% of the stream). (3) A3 s2r row-shared y preload BIT-EXACT
+  T=2/3/4 all 7 types; wire set vs served bases: iq3_s -6.6%, q4_K
+  -6.2%, q5_K -5.3%, iq3_xxs -3.1%, iq4_xs -7.7%; q3_K/q6_K no
+  increment (OFF). Defect of record: block_q8_1 is ds-FIRST in this
+  tree; an upstream qs-first assumption NaN'd and the oracle caught
+  it pre-verdict. Static projection: -250 ms of 5873 ms MMVQ
+  (-4.3%) stacked on E-104's -6.3%; decode upper bound ~+3% at 10k
+  class. MERGE (36b1fe72f + fixup 26d7ffee4): bw branched from
+  567c508cd but main had additionally landed the aln completion
+  1f7a6a330 (common.cuh 4-arg make_key layout key), so bw's make_key
+  revert did not apply - HEAD call sites kept; 12-hunk mmvq.cu union:
+  kernel signature (share, aln, s2r) + HEAD's vy_aln locals; call
+  sites take s2r; host gate keeps the dual-region legacy-nbytes block
+  and adds mmvq_s2r = !mmvq_aln && ids==nullptr && 2<=ne11<=4 (aln
+  and s2r mutually exclusive by construction); repack call keeps
+  vy_aln threading with /*s2r=*/ false; aln oracle host test block
+  preserved. build-hip rebuilt PASS (10:31). PROCESS NOTES: first
+  rebuild was a FALSE PASS - `cmake | tail` masked cmake-not-found;
+  cmake lives at /home/chris/opt/cmake/bin/cmake (not on the
+  coordinator shell PATH); BUILD-EXIT echoed explicitly from now on.
+  Rungs-desk zombie check resolved ALIVE via full agent handle
+  (short ids fail post-compaction; SendMessage to the short id
+  bounces, full id routes): it was in a long working turn, and took
+  the boot lock 10:14 for baseline-repro+session1 - process evidence
+  (lock, artifacts) > task-registry lookups. SERVED WINDOW IN
+  FLIGHT: detached chain (survives the 10-min background-task cap;
+  DONE marker /home/chris/combowin_ALLDONE), arm "regress" (canonical
+  env, regression guard vs E-105 anchors 23.34 @200k / 23.23 @10k)
+  then arm "s2r5" (GGML_CUDA_MMVQ_{IQ3S,IQ3XXS,Q4K,Q5K,IQ4XS}_S2R=1
+  stacked on the six *_SHARE gates; IQ4XS_SHARE + LLAMA_MMVQ_ALN stay
+  unset), each arm = 200k 5-cell battery + 10k decode-only, lane
+  8081, lock-honoring; engagement proof = per-flag INFO lines in the
+  server logs. Verdict + promotion decision lands next cycle.
