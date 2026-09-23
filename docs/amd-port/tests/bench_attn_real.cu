@@ -121,7 +121,7 @@ int main(int argc, char ** argv) {
     }
     const char * gguf_path = argv[1];
     int  niter     = argc > 2 ? atoi(argv[2]) : 30;
-    int  reps      = argc > 3 ? atoi(argv[3]) : 5;
+    int  reps      = argc > 3 ? atoi(argv[3]) : 9;
     bool served    = false;
     bool occupancy = false;
     for (int i = 2; i < argc; ++i) {
@@ -234,6 +234,14 @@ int main(int argc, char ** argv) {
                arm_name(arms[a]), mism[a] == 0 ? "BIT-EXACT" : "DUST",
                mism[a], dst_bytes/4, max_rel);
     }
+
+    // extra warmup (2 full 4-arm passes) so every arm sees ramped clocks
+    for (int w = 0; w < 2; ++w) {
+        for (size_t a = 0; a < arms.size(); ++a) {
+            run_arm(arms[a], ctx, dst_t);
+        }
+    }
+    HIP_CHECK(hipDeviceSynchronize());
 
     // timing: reps x (niter back-to-back launches, hip events), arms interleaved;
     // events ride ctx.stream() so they bracket the real launch stream
