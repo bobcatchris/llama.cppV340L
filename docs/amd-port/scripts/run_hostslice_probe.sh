@@ -97,7 +97,7 @@ for i in $(seq 1 50); do
   sleep 15
   curl -s -m 5 "http://127.0.0.1:$PORT/health" 2>/dev/null | grep -q '"status":"ok"' && { OK=1; break; }
   kill -0 "$SRV" 2>/dev/null || break
-  echo "BOOT: waiting ($(($(i)*15)) s)"
+  echo "BOOT: waiting $((i * 15)) s"
 done
 if [ "$OK" != 1 ]; then
   echo "BOOT FAILED - see $LOG"; tail -30 "$LOG"

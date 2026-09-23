@@ -1860,6 +1860,13 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend, 
 
     // If the previous cgraph had a defined UID it can be used to skip rebuilding the subgraphs per simple backend.
     const bool needs_rebuild = (cgraph->uid == 0) || (cgraph->uid != backend_ctx->uid);
+    if (tl_on && needs_rebuild && backend_ctx->uid != 0) {
+        // a mid-serving rebuild flips the simple-tensor double buffer, which
+        // changes every device pointer and resets the die graphs' warmup -
+        // name the trigger so the re-capture cost can be attributed
+        GGML_LOG_INFO("[launch-timeline] meta rebuild: nodes = %d, uid %llu -> %llu\n",
+            cgraph->n_nodes, (unsigned long long) backend_ctx->uid, (unsigned long long) cgraph->uid);
+    }
 
     bool max_nnodes_raised = false;
     if (cgraph->n_nodes > backend_ctx->max_nnodes) {
