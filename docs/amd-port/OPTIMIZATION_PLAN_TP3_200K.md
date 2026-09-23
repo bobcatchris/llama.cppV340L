@@ -3137,3 +3137,29 @@ to Gemini's guard battery, die 3 is the dev cell.
   unattributable binaries) are now structurally closed: the battery
   refuses unattributable runs, and the baseline ratchets with every
   validated improvement.
+- E-114 2026-09-23 SPEED OFFENSIVE DISPATCHED (Chris: "work on
+  something productive, we need more optimizations, more speed").
+  (1) INFRA: the workspace disk hit 100% (worktree build trees); 29
+  completed desk worktrees removed (ALL branches preserved - the
+  v1-flag reference build wt-v1flag kept); 56 GB freed. LAW: a desk
+  worktree is disposable the day its branch merges - remove it at
+  landing, not at disk-full. (2) DESK 1 - MMVQ LDS-Y STAGING
+  (wt-mmvq-lds, amd/mmvq-lds off 387805bec): implement the W5
+  receipt's banked LDS-y design (staged y words for the rpb=2 row
+  group) for the 5 s2r-class types, env-gated GGML_CUDA_MMVQ_LDSY=1,
+  bit-exact oracle, occupancy budget vs the 61-VGPR/64KB-LDS envelope.
+  INSTRUMENT LAW (W5 lesson): verdict numbers only from the REAL
+  mmvq.cu kernel path - replica-harness numbers are inadmissible.
+  Win bar: >=5% real-kernel on >=2 types. (3) DESK 2 - TP4 ROUND MAP
+  (wt-tp4-round, amd/tp4-roundmap, zero-GPU): decompose the ~129 ms
+  TP4 round (23.26 t/s = 83% of the 28 t/s floor) and rank the next
+  levers by ms/round with a top-3 next-desks recommendation.
+  (4) COORDINATOR: fresh TP4 kernel census in flight (real serving
+  path, 32k ctx, 384 decode tokens, rocprofv3 kernel trace, lane
+  8083) - feeds desk 2 the components it cannot bound from receipts.
+  TARGET of the offensive: the three known ms pools are (a) MMVQ
+  stall-bound headroom (64.5% of kernel time at ~91 GB/s effective
+  vs 327 available - desk 1 attacks), (b) the ~23 ms unnamed TP4
+  sync/structure gap (desk 2 names it), (c) draft-loop/host slices
+  (~11 + ~6 ms, parked subsystems). Weight-bit reduction stays
+  owner-guarded and out of scope until Chris says otherwise.
