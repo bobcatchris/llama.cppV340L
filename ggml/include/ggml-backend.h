@@ -402,6 +402,13 @@ extern "C" {
     GGML_API ggml_backend_dev_t ggml_backend_meta_device(
         ggml_backend_dev_t * devs, size_t n_devs, ggml_backend_meta_get_split_state_t get_split_state, void * get_split_state_ud);
 
+    // element offsets of a tensor's per-device slices along its split axis
+    // (AXIS_0/1/2/3 splits; a replicated or unsplit tensor reports one shard
+    // with offset 0). returns the number of shards written, 0 if the split
+    // state does not expose per-device slices
+    GGML_API size_t ggml_backend_meta_tensor_split_offsets(
+            const struct ggml_tensor * tensor, int64_t * offsets, size_t n_max);
+
     //
     // Utils
     //

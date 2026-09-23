@@ -110,6 +110,19 @@ LLAMA_API void llama_set_packed_fetch(struct llama_context * ctx, bool value);
 LLAMA_API bool llama_fetch_nextn_outputs(struct llama_context * ctx, int32_t idx,
         const float ** out_logits, const float ** out_h);
 
+// Per-shard argmax pairs (LLAMA_DRAFT_ONDEVICE_ARGMAX): with the flag set, the
+// MTP draft graph carries a shard-argmax node and decode() skips the raw-logits
+// row fetch; each draft step yields 2*n_shards floats per output row instead of
+// the full n_vocab row - one (max logit, argmax) pair per device shard, the
+// argmax already resolved to the global vocab index. Merging the pairs by max
+// (first pair on equal max) reproduces the greedy top-1 of the spliced row.
+// Does not synchronize; the caller drains (llama_wait_outputs or
+// llama_synchronize) before calling. Returns nullptr (and *n_shards = 0) when
+// the draft graph has no shard-argmax node. The pointer is valid until the
+// next decode.
+LLAMA_API const float * llama_get_shard_argmax_ith(struct llama_context * ctx, int32_t idx,
+        int32_t * n_shards);
+
 // Light drain (LLAMA_DRAFT_LIGHT_SYNC): synchronize only the backends that own
 // the fetched output tensors. Requires the packed fetch above.
 LLAMA_API void llama_wait_outputs(struct llama_context * ctx);

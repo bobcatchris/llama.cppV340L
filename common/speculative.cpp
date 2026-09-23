@@ -1219,6 +1219,11 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
     bool packed_get = false;
     bool light_sync = false;
 
+    // on-device per-shard argmax (LLAMA_DRAFT_ONDEVICE_ARGMAX): the draft
+    // loop merges the tiny (max, idx) pairs instead of consuming the spliced
+    // logits rows
+    bool ondev_argmax = false;
+
     // accepted-prefix catch-up (LLAMA_DRAFT_PREFIX_CATCHUP): process() stages
     // the catch-up batch instead of decoding it, and catchup() decodes only
     // rows 0..n_accepted per seq once the accept loop has run. the rejected
@@ -1312,22 +1317,27 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
         // the packed fetch hands out raw host rows, so it must not run when a
         // backend sampler is attached (its token would bypass the host rows)
         // or when the draft shares the target context (gating decode() would
-        // hide the target's own outputs)
+        // hide the target's own outputs). the on-device per-shard argmax
+        // replaces the logits row consumption entirely, so the two levers
+        // are mutually exclusive
         static const bool packed_get_env = getenv("LLAMA_DRAFT_PACKED_GET") != nullptr;
         static const bool light_sync_env = getenv("LLAMA_DRAFT_LIGHT_SYNC") != nullptr;
+        static const bool ondev_argmax_env = getenv("LLAMA_DRAFT_ONDEVICE_ARGMAX") != nullptr;
 
         bool has_backend_sampling = false;
         for (auto * chain : backend_chains) {
             has_backend_sampling |= (chain != nullptr);
         }
 
-        packed_get = packed_get_env && !has_backend_sampling && !is_mem_shared;
+        packed_get = packed_get_env && !has_backend_sampling && !is_mem_shared && !ondev_argmax_env;
         if (packed_get_env && !packed_get) {
-            SPC_WRN("%s", "LLAMA_DRAFT_PACKED_GET ignored (backend sampling active or shared draft context)\n");
+            SPC_WRN("%s", "LLAMA_DRAFT_PACKED_GET ignored (backend sampling active, shared draft context or LLAMA_DRAFT_ONDEVICE_ARGMAX)\n");
         }
 
         // the light drain replaces the sync of the packed path only
         light_sync = light_sync_env && packed_get;
+
+        ondev_argmax = ondev_argmax_env;
 
         if (packed_get) {
             llama_set_packed_fetch(ctx_dft, true);
@@ -1746,6 +1756,13 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
                 }
             }
 
+            // the per-shard argmax pairs are read directly below and need a
+            // drained context (the packed fetch and the regular sampler
+            // paths have their own sync points)
+            if (ondev_argmax) {
+                llama_wait_outputs(ctx_dft);
+            }
+
             const int64_t t_sample_start = tl_on ? ggml_time_us() : 0;
 
             // rebuild the batch for the next step: the growing-KV paths re-add only the
@@ -1761,6 +1778,28 @@ struct common_speculative_impl_draft_mtp : public common_speculative_impl {
                 auto * smpl = smpls[seq_id].get();
 
                 llama_token_data_array * cur_p = nullptr;
+
+                // on-device per-shard argmax (LLAMA_DRAFT_ONDEVICE_ARGMAX):
+                // merge the tiny (max, idx) pairs into the greedy top-1; the
+                // raw logits fetch was skipped, so a missing pair row is a
+                // hard error rather than a fallback to stale rows
+                llama_token_data       ondev_cur[1];
+                llama_token_data_array ondev_p   = { ondev_cur, 1, -1, true };
+                if (ondev_argmax) {
+                    int32_t n_shards = 0;
+                    const float * pairs = llama_get_shard_argmax_ith(ctx_dft, i_last[seq_id], &n_shards);
+                    if (pairs == nullptr) {
+                        SPC_ERR("shard argmax fetch failed at step %d; stopping the draft round\n", i);
+                        drafting[seq_id] = false;
+                        n_drafting--;
+
+                        continue;
+                    }
+
+                    float logit = 0.0f;
+                    ondev_cur[0] = { common_shard_argmax_pick(pairs, n_shards, &logit), logit, 0.0f };
+                    cur_p = &ondev_p;
+                }
 
                 // the packed rows of this step (seq0 was resolved by the
                 // fetch; the rare other seqs read the already-drained ctx

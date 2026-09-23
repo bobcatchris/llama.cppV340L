@@ -584,6 +584,8 @@ extern "C" {
 
         GGML_OP_GLU,
 
+        GGML_OP_ARGMAX_SHARD,
+
         GGML_OP_COUNT,
     };
 
@@ -1049,6 +1051,15 @@ extern "C" {
 
     // argmax along rows
     GGML_API struct ggml_tensor * ggml_argmax(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * a);
+
+    // per-shard argmax: same shape and type as a. for each row i1, elements
+    // [0, 1] of the result row hold the maximum of that row and the argmax
+    // index (as float); elements [2, ne[0]) are never written. when the
+    // tensor is split across devices, each device computes the op over its
+    // own shard, so the pair holds that shard's (max, local argmax)
+    GGML_API struct ggml_tensor * ggml_argmax_shard(
             struct ggml_context * ctx,
             struct ggml_tensor  * a);
 

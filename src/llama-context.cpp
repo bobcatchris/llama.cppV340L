@@ -71,6 +71,7 @@ llama_context::llama_context(
     cparams.offload_kqv             = params.offload_kqv;
     cparams.no_perf                 = params.no_perf;
     cparams.warmup                  = false;
+    cparams.draft_ondevice_argmax   = getenv("LLAMA_DRAFT_ONDEVICE_ARGMAX") != nullptr;
 
     cparams.embeddings_layer_inp.resize(hparams.n_layer(), false);
     embd_layer_inp.resize(hparams.n_layer());
@@ -1180,6 +1181,48 @@ llama_token llama_context::get_sampled_token_ith(int32_t idx) {
     }
 }
 
+const float * llama_context::get_shard_argmax_ith(int32_t idx, int32_t * n_shards) {
+    if (n_shards) {
+        *n_shards = 0;
+    }
+
+    if (!shard_argmax.has_data() || shard_argmax_offs.empty()) {
+        return nullptr;
+    }
+
+    if (shard_argmax_resolved_gen != shard_argmax_gen) {
+        // resolve the raw per-shard argmax indices to global vocab indices,
+        // exactly once per decode (the devices write shard-local indices)
+        const size_t ns = shard_argmax_offs.size();
+        for (int64_t r = 0; r < n_outputs; r++) {
+            float * row = shard_argmax.data + (size_t) r*2*ns;
+            for (size_t j = 0; j < ns; j++) {
+                row[2*j + 1] += (float) shard_argmax_offs[j];
+            }
+        }
+        shard_argmax_resolved_gen = shard_argmax_gen;
+    }
+
+    if (!output_swaps.empty()) {
+        // the raw staging is in compute order and the draft batches are
+        // always sorted; unsorted outputs are not supported here
+        LLAMA_LOG_WARN("%s: unsorted outputs are not supported by the shard argmax fetch\n", __func__);
+        return nullptr;
+    }
+
+    try {
+        const int64_t row = output_resolve_row(idx);
+        GGML_ASSERT((size_t)(row*2*shard_argmax_offs.size() + 2*shard_argmax_offs.size()) <= shard_argmax.size);
+        if (n_shards) {
+            *n_shards = (int32_t) shard_argmax_offs.size();
+        }
+        return shard_argmax.data + (size_t) row*2*shard_argmax_offs.size();
+    } catch (const std::exception & err) {
+        LLAMA_LOG_ERROR("%s: invalid shard argmax row %d, reason: %s\n", __func__, idx, err.what());
+        return nullptr;
+    }
+}
+
 float * llama_context::get_sampled_probs_ith(int32_t idx) {
     output_reorder();
 
@@ -2138,7 +2181,9 @@ int llama_context::decode(const llama_batch & batch_inp) {
         const int64_t t_outputs_start = tl_on ? ggml_time_us() : 0;
 
         // extract logits
-        if (logits.data && t_logits && n_outputs > 0 && needs_raw_logits(ubatch, sampling.samplers) && !packed_fetch) {
+        // skipped when the graph carries a shard-argmax node: the draft loop
+        // merges the tiny per-shard pairs instead of consuming the full row
+        if (logits.data && t_logits && n_outputs > 0 && needs_raw_logits(ubatch, sampling.samplers) && !packed_fetch && !res->get_shard_argmax()) {
             ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(sched.get(), t_logits);
             GGML_ASSERT(backend_res != nullptr);
             GGML_ASSERT(logits.data != nullptr);
@@ -2150,6 +2195,44 @@ int llama_context::decode(const llama_batch & batch_inp) {
                 GGML_ASSERT((n_outputs_prev + n_outputs)*n_vocab <= (int64_t) logits.size);
                 ggml_backend_tensor_get_async(backend_res, t_logits, logits_out, 0, n_outputs*n_vocab*sizeof(float));
             }
+        }
+
+        // extract per-shard argmax pairs (LLAMA_DRAFT_ONDEVICE_ARGMAX): two
+        // floats per device shard and row, spliced per shard from the head of
+        // each device's slice
+        if (auto * t_shard_argmax = res->get_shard_argmax()) {
+            if (n_outputs > 0) {
+                if (shard_argmax_offs.empty()) {
+                    shard_argmax_offs.resize(backends.size() + 1);
+                    const size_t n = ggml_backend_meta_tensor_split_offsets(t_shard_argmax,
+                            shard_argmax_offs.data(), shard_argmax_offs.size());
+                    if (n == 0) {
+                        LLAMA_LOG_ERROR("%s: failed to resolve shard argmax split offsets\n", __func__);
+                        shard_argmax_offs.clear();
+                    } else {
+                        shard_argmax_offs.resize(n);
+                    }
+                }
+
+                if (!shard_argmax_offs.empty()) {
+                    ggml_backend_t backend_res = ggml_backend_sched_get_tensor_backend(sched.get(), t_shard_argmax);
+                    GGML_ASSERT(backend_res != nullptr);
+
+                    const size_t n_shards = shard_argmax_offs.size();
+                    GGML_ASSERT(2*n_shards*n_outputs_all <= shard_argmax.size);
+
+                    for (int64_t r = 0; r < n_outputs; r++) {
+                        float * row = shard_argmax.data + (size_t) (n_outputs_prev + r)*2*n_shards;
+                        for (size_t j = 0; j < n_shards; j++) {
+                            ggml_backend_tensor_get_async(backend_res, t_shard_argmax, row + 2*j,
+                                    ((size_t)(n_outputs_prev + r)*n_vocab + (size_t) shard_argmax_offs[j])*sizeof(float),
+                                    2*sizeof(float));
+                        }
+                    }
+                }
+            }
+
+            shard_argmax_gen++;
         }
 
         // extract embeddings
@@ -2341,6 +2424,12 @@ uint32_t llama_context::output_reserve(int32_t n_outputs) {
     size_t backend_token_count = 0;
     size_t embd_layer_inp_float_count = 0;
 
+    // per-shard argmax pairs: 2 floats per device shard and output row; the
+    // shard count is only known once the graph is built, so size by the
+    // backend count (upper bound)
+    const size_t n_shards_max = cparams.draft_ondevice_argmax ? backends.size() + 1 : 0;
+    const size_t shard_argmax_float_count = 2*n_shards_max*n_outputs_max;
+
     logits.size     = has_logits     ? n_vocab*n_outputs_max     : 0;
     embd.size       = has_embd       ? n_embd_out*n_outputs_max  : 0;
     embd_nextn.size = has_embd_nextn ? n_embd_out*n_outputs_max  : 0;
@@ -2371,7 +2460,7 @@ uint32_t llama_context::output_reserve(int32_t n_outputs) {
 
     const size_t prev_size = buf_output ? ggml_backend_buffer_get_size(buf_output.get()) : 0;
     const size_t new_size  =
-        (logits.size + embd.size + embd_nextn.size + embd_layer_inp_float_count + backend_float_count) * sizeof(float) +
+        (logits.size + embd.size + embd_nextn.size + embd_layer_inp_float_count + backend_float_count + shard_argmax_float_count) * sizeof(float) +
         (                                                                         backend_token_count) * sizeof(llama_token);
 
     // alloc only when more than the current capacity is required
@@ -2389,6 +2478,8 @@ uint32_t llama_context::output_reserve(int32_t n_outputs) {
             logits.data = nullptr;
             embd.data = nullptr;
             embd_nextn.data = nullptr;
+            shard_argmax.data = nullptr;
+            shard_argmax_offs.clear();
             for (auto & layer_inp : embd_layer_inp) {
                 layer_inp = {nullptr, 0};
             }
@@ -2422,6 +2513,9 @@ uint32_t llama_context::output_reserve(int32_t n_outputs) {
 
     embd_nextn = has_embd_nextn ? buffer_view<float>{(float *) (base + offset), embd_nextn.size} : buffer_view<float>{nullptr, 0};
     offset += embd_nextn.size * sizeof(float);
+
+    shard_argmax = n_shards_max > 0 ? buffer_view<float>{(float *) (base + offset), shard_argmax_float_count} : buffer_view<float>{nullptr, 0};
+    offset += shard_argmax.size * sizeof(float);
 
     for (uint32_t il = 0; il < embd_layer_inp.size(); ++il) {
         if (cparams.embeddings_layer_inp[il]) {
@@ -3975,6 +4069,12 @@ void llama_set_nextn_layer_offset(llama_context * ctx, int32_t offset) {
 
 void llama_set_packed_fetch(llama_context * ctx, bool value) {
     ctx->set_packed_fetch(value);
+}
+
+const float * llama_get_shard_argmax_ith(llama_context * ctx, int32_t idx, int32_t * n_shards) {
+    // no synchronization here: the caller drains the context (llama_wait_outputs
+    // or llama_synchronize) before reading the pairs, like the packed fetch
+    return ctx->get_shard_argmax_ith(idx, n_shards);
 }
 
 bool llama_fetch_nextn_outputs(llama_context * ctx, int32_t idx, const float ** out_logits, const float ** out_h) {

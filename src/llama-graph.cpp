@@ -1309,6 +1309,7 @@ void llm_graph_result::reset() {
     t_embd        = nullptr;
     t_embd_pooled = nullptr;
     t_h_nextn     = nullptr;
+    t_shard_argmax = nullptr;
 
     t_layer_inp.resize(LLAMA_MAX_LAYERS);
     std::fill(t_layer_inp.begin(), t_layer_inp.end(), nullptr);
@@ -1357,6 +1358,9 @@ void llm_graph_result::set_outputs(const llm_graph_params & params) {
     }
     if (t_h_nextn != nullptr) {
         ggml_set_output(t_h_nextn);
+    }
+    if (t_shard_argmax != nullptr) {
+        ggml_set_output(t_shard_argmax);
     }
     {
         const auto & embeddings_layer_inp = params.cparams.embeddings_layer_inp;
@@ -3594,6 +3598,18 @@ void llm_graph_context::build_sampling() const {
         }
     }
     */
+}
+
+void llm_graph_context::build_shard_argmax() {
+    if (!cparams.draft_ondevice_argmax || !res->t_logits) {
+        return;
+    }
+
+    ggml_tensor * cur = ggml_argmax_shard(ctx0, res->t_logits);
+    cb(cur, "shard_argmax", -1);
+    res->t_shard_argmax = cur;
+
+    ggml_build_forward_expand(gf, cur);
 }
 
 int32_t llama_relative_position_bucket(llama_pos x, llama_pos y, uint64_t n_buckets, bool bidirectional) {
