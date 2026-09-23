@@ -2752,3 +2752,18 @@ to Gemini's guard battery, die 3 is the dev cell.
   (48 B aligned uint4 y-operands) requiring the quantize-side
   producer change, shape-aware gate for the T=2/3 regression, served
   projection ~20+ @ 10k if the T=4 win holds served.
+- E-105 2026-09-23 TP4 + RCCL + OPTIMIZATION SET: 5/5 GREEN, THE
+  NEW SERVING RECOMMENDATION PENDING OWNER CONFIRMATION. 200k full
+  battery: decode 23.34 (+24.7% vs 18.72 gate; +17% over the 3-die
+  20.01), prefill 217.71 (+35% over 161.64), accept 0.66667, needle
+  3/3. 10k: 23.23 - THE 20 t/s LINE CROSSED AT BOTH CONTEXTS (Chris's
+  stated goal). MECHANISM: the early-project TP4 loss (15.2-15.5 vs
+  17.8, butterfly era) was the boundary tax scaling with rank count -
+  RCCL's 2.2-2.6x cheaper boundaries flipped the result exactly as the
+  bandwidth math predicted (4-rank floor ~106 ms/token-pass -> ~28
+  theoretical; 23.34 = 83% of ceiling). TRADEOFFS of record: MTP runs
+  in-split across serving ranks (acceptance held 0.66667); no spare
+  die (v1 draft-device mode unavailable at TP4); numerics sha
+  e478fdf3 = 4-rank reduce order, signed-off dust class, replica-
+  consistent, boot-deterministic. The full journey: 14.86 butterfly
+  era -> 23.34 = +57%.
