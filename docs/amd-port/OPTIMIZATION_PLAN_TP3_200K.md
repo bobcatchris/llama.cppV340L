@@ -2767,3 +2767,9 @@ to Gemini's guard battery, die 3 is the dev cell.
   e478fdf3 = 4-rank reduce order, signed-off dust class, replica-
   consistent, boot-deterministic. The full journey: 14.86 butterfly
   era -> 23.34 = +57%.
+- E-105 (cont.) TP4 CONTEXT CEILING MEASURED: CTX=262144 (the model's
+  full trained context) boots and serves at TP4 q4_0 - max-die 6926 of
+  8176 MiB (1.2 GB headroom), live gen http 200; 245760 also confirmed.
+  Above 262k requires YaRN rope scaling and memory refuses it anyway
+  (800k attempt: compute-graph reserve alone OOM'd at 3986 MiB on
+  device 0). TP4 max content length of record: 262,144 tokens.
