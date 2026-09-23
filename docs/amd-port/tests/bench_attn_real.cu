@@ -34,7 +34,7 @@
 //   HIP_VISIBLE_DEVICES=3 /tmp/bench_attn_real <gguf> [niter=30] [reps=5] [--served-entry] [--occupancy]
 #include "ggml.h"
 #include "ggml-cuda.h"
-#include "ggml/src/ggml-cuda/fattn-tile.cu"
+#include "ggml-cuda/fattn-tile.cu"
 
 #include <algorithm>
 #include <cstdio>
@@ -190,6 +190,7 @@ int main(int argc, char ** argv) {
     const float max_bias = 0.0f;      memcpy(dst_t->op_params + 1, &max_bias, sizeof(float));
     const float softcap  = 0.0f;      memcpy(dst_t->op_params + 2, &softcap,  sizeof(float));
     dst_t->src[0] = q_t; dst_t->src[1] = k_t; dst_t->src[2] = v_t; dst_t->src[3] = m_t; dst_t->src[4] = nullptr;
+    dst_t->op = GGML_OP_FLASH_ATTN_EXT; // asserted by get_f16_extra_data
 
     if (served) {
         // full served entry: exercises the fattn.cu TILE selection +
@@ -231,9 +232,8 @@ int main(int argc, char ** argv) {
         if (arms[a] == ARM_BASEDUP) continue;
         printf("ORACLE %s vs base: %s (%d/%zu els differ, max rel %.3e)\n",
                arm_name(arms[a]), mism[a] == 0 ? "BIT-EXACT" : "DUST",
-               mism[a], dst_bytes/4);
+               mism[a], dst_bytes/4, max_rel);
     }
-    (void) max_rel;
 
     // timing: reps x (niter back-to-back launches, hip events), arms interleaved;
     // events ride ctx.stream() so they bracket the real launch stream
@@ -260,10 +260,10 @@ int main(int argc, char ** argv) {
         std::sort(s.begin(), s.end());
         const double med = s[s.size()/2];
         const double spread = (s.back() - s.front()) / med * 100.0;
-        printf("  %-8s med=%8.1f us  min=%8.1f  max=%8.1f  spread=%.2f%%  vs base %+7.2f%%\n",
+        printf("  %-8s med=%8.1f us  min=%8.1f  max=%8.1f  spread=%.2f%%  vs base %+7.2f%%%s\n",
                arm_name(arms[a]), med, s.front(), s.back(), spread,
-               (med - t[0][t[0].size()/2]) / t[0][t[0].size()/2] * 100.0);
-        if (spread > 5.0) printf("  SPREAD LAW WARN >5%%\n");
+               (med - t[0][t[0].size()/2]) / t[0][t[0].size()/2] * 100.0,
+               spread <= 1.05 ? "" : "  SPREAD-FAIL (>1.05%)");
     }
     ggml_free(gctx);
     return 0;
