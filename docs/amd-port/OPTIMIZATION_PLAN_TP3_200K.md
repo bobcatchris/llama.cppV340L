@@ -3366,3 +3366,40 @@ to Gemini's guard battery, die 3 is the dev cell.
   against artifact evidence, not desk claims. LDS desk healthy (lock
   arm A4-byte-identity 14:26, compile observed 14:37) but its
   CHECKIN.log lapsed 58 min - cadence reminder sent. Snapshots pushed.
+- E-116 (cont.) 14:55 CYCLE: (1) ERRATUM RESOLVED - the bogus
+  CHECKIN.log line was NOT a false desk claim: the boundary desk's
+  CHECKIN.log (with its own badly-stamped completion line) was
+  COMMITTED into its branch and inherited by the transport worktree
+  via the merge base 68766bec1. Transport desk appended its erratum,
+  real state: P0 DONE (multi-die probe harness, fork mode +
+  inproc served-regime mode ncclCommInitAll + grouped calls, per-rank
+  histograms, 3% spread law; commits be25146ce + c8979d91c), A1
+  baselines firing. LAW FIX: CHECKIN.log is now gitignored
+  (per-desk ephemeral state, never committed) so stale lines can
+  never cross worktrees again. (2) LDS DESK ALIVE AND AHEAD: A2
+  formal sessions banked (W7_ldsy_a2_formal 14:21), A4 byte-identity
+  checks running (W7_ldsy_a4_checks 14:28), fresh check-in 14:52,
+  live hipcc observed; its stale lock was session hygiene, cleared
+  with pid evidence by the transport desk. Both desks healthy;
+  transport on the per-die residual lever (up to 12.6 ms), LDS on
+  the 56 ms MMVQ pool.
+- E-117 2026-09-23 S2R WIRING DEFECT (FOUND BY THE LDS DESK'S A4
+  ORACLE, CONFIRMED IN MAIN): mul_mat_vec_q_switch_type receives the
+  s2r flag but forwards a LITERAL false to every
+  mul_mat_vec_q_switch_ncols_dst call - the *_S2R gates were NO-OPS
+  served. ENGAGEMENT EVIDENCE: grep -c 'S2R' on the s2r5 arm's server
+  log (combowin_s2r5_200k.server) = 0 - the mmvq_share_env_flag INFO
+  lines never printed. CONSEQUENCES: (a) E-113's "s2r NOT PROMOTED
+  (neutral at 10k)" verdict is VOID - the arm measured s2r OFF; the
+  true served s2r effect is UNKNOWN pending a re-run on the fixed
+  wiring; (b) the "s2r -17% at 200k" reading is REINTERPRETED as pure
+  heat-soak position (cell-3 vs cell-1 of the same effective config)
+  - which independently confirms the 200k soak law; (c) coordinator
+  error of record: the arm-identity law says verify ENGAGEMENT before
+  sealing verdicts - the identity block had the env echoed but the
+  engagement INFO lines were never grepped before banking E-113. The
+  LDS desk's fix (303c92546 on amd/mmvq-lds) corrects the forwarding
+  and re-verifies engage + bit-exact + default byte-identity on its
+  final tree. PATH: when the LDS desk lands (it is at final commits),
+  merge -> rebuild -> served window with a NOW-ACTUALLY-ENGAGING s2r
+  arm (engagement lines REQUIRED in the verdict) -> real s2r verdict.
