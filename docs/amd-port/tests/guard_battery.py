@@ -136,6 +136,63 @@ def get_git_provenance() -> Dict[str, Any]:
     return prov
 
 
+def collect_provenance(server_binary: str, launch_config: str, allow_dirty: bool) -> Tuple[Dict[str, Any], List[str]]:
+    """Collect mandatory run provenance and return (provenance, errors).
+
+    A guard result is only attributable if we can say WHICH binary, built
+    from WHICH commit and build config, served it, and that the tree the
+    binary claims to represent is clean. Missing hashes or a dirty tree
+    with tracked modifications FAIL the battery before any cell runs.
+    """
+    errors: List[str] = []
+    prov: Dict[str, Any] = get_git_provenance()
+    prov["binary"] = ""
+    prov["binary_sha256"] = ""
+    prov["cmake_cache_sha256"] = ""
+    prov["launch_config"] = launch_config or ""
+    prov["dirty_files"] = []
+
+    status = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=str(REPO_ROOT), capture_output=True, text=True
+    ).stdout.splitlines()
+    tracked_dirty = [l for l in status if not l.startswith("??")]
+    untracked = [l for l in status if l.startswith("??")]
+    prov["dirty_files"] = status
+
+    if tracked_dirty:
+        (errors if not allow_dirty else []).append(
+            "tracked tree is dirty (results may not match HEAD): " + " | ".join(tracked_dirty[:10])
+        )
+    if untracked:
+        # untracked files cannot change a built binary; recorded, not fatal
+        prov["untracked"] = untracked[:10]
+
+    if server_binary:
+        p = Path(server_binary)
+        if p.is_file():
+            prov["binary"] = str(p)
+            try:
+                prov["binary_sha256"] = hashlib.sha256(p.read_bytes()).hexdigest()[:16]
+            except Exception as e:
+                errors.append(f"could not hash server binary: {e}")
+            cache = p.parents[1] / "CMakeCache.txt"
+            if cache.is_file():
+                try:
+                    prov["cmake_cache_sha256"] = hashlib.sha256(cache.read_bytes()).hexdigest()[:16]
+                except Exception:
+                    pass
+            else:
+                errors.append(f"CMakeCache.txt not found next to binary ({cache}); build config unattributable")
+        else:
+            errors.append(f"server binary not found: {server_binary}")
+    else:
+        errors.append("--server-binary is required (the guard refuses unattributable results)")
+
+    if allow_dirty and tracked_dirty:
+        print("PROVENANCE OVERRIDE: --allow-dirty used; dirty-tree failure suppressed but RECORDED.")
+    return prov, errors
+
+
 def get_model_metadata(model_path: str) -> Dict[str, Any]:
     """Capture model file metadata for receipt provenance."""
     meta: Dict[str, Any] = {"model_path": model_path}
@@ -627,7 +684,33 @@ def main() -> int:
     parser.add_argument("--needle-only", action="store_true", help="Run only the needle-recall guard")
     parser.add_argument("--ratchet", action="store_true", help="Ratchet baseline upward on verified gains")
     parser.add_argument("--timeout", type=float, default=300.0, help="Per-guard HTTP timeout in seconds")
+    parser.add_argument("--server-binary", type=str, default="",
+                        help="Path to the llama-server binary under test (REQUIRED: hashed into provenance)")
+    parser.add_argument("--launch-config", type=str, default="",
+                        help="Full server launch command + env, recorded verbatim in provenance")
+    parser.add_argument("--allow-dirty", action="store_true",
+                        help="Suppress the dirty-tree failure (recorded loudly; tracked dirt still reported)")
     args = parser.parse_args()
+
+    # 0. Provenance Gate (fail closed): no binary hash, no build-config
+    #    hash, or a dirty tracked tree -> the battery refuses to run.
+    provenance, prov_errors = collect_provenance(args.server_binary, args.launch_config, args.allow_dirty)
+    if prov_errors:
+        print("=== PROVENANCE FAIL - battery refused ===", file=sys.stderr)
+        for e in prov_errors:
+            print(f"  {e}", file=sys.stderr)
+        print("Every guard number must be attributable: commit hash, clean tree,")
+        print("binary sha256, build-config sha256, launch config.", file=sys.stderr)
+        return 2
+    print("Provenance Gate:     PASS (commit {}, binary {}, config {})".format(
+        provenance.get("commit", "?")[:12],
+        provenance.get("binary_sha256", "?"),
+        provenance.get("cmake_cache_sha256", "?")))
+    if provenance.get("tree_dirty"):
+        print("WARNING: untracked files present (recorded, cannot affect the binary):")
+        for l in provenance.get("dirty_files", []):
+            if l.startswith("??"):
+                print(f"  {l}")
 
     # 1. Battery Version Identity
     version_meta = compute_battery_version()
@@ -760,6 +843,10 @@ def main() -> int:
     # Stop Thermal Sampler and gather thermal stats
     thermal_summary = thermal_sampler.stop()
 
+    # Stamp provenance into every cell row
+    for r in guard_results:
+        r["provenance"] = provenance
+
     # Compute overall verdict
     worst = "PASS"
     for r in guard_results:
@@ -804,6 +891,11 @@ def main() -> int:
 
         print(f"{st:<8} {g:<18} {metric:<18} {m_val:<14} {b_val:<14} {notes}")
     print("=" * 92)
+    print("PROVENANCE: commit={} tree_clean={} binary={} config={}".format(
+        provenance.get("commit", "?")[:12],
+        not provenance.get("tree_dirty"),
+        provenance.get("binary_sha256", "?"),
+        provenance.get("cmake_cache_sha256", "?")))
     print(f"OVERALL VERDICT: {worst}")
     print(f"THERMAL DRIFT:   +{thermal_summary.get('thermal_drift_c', 0.0)}°C (Max Edge: {thermal_summary.get('max_edge_c')}°C, Max Junc: {thermal_summary.get('max_junction_c')}°C)\n")
 
@@ -812,7 +904,7 @@ def main() -> int:
         "timestamp": datetime.now().isoformat(),
         "verdict": worst,
         "battery_version": version_meta,
-        "git": get_git_provenance(),
+        "git": provenance,
         "model": get_model_metadata(baseline_cfg.get("config", {}).get("model", "")),
         "thermal": thermal_summary,
         "config": baseline_cfg.get("config", {}),
