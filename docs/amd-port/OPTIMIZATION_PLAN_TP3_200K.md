@@ -3044,3 +3044,28 @@ to Gemini's guard battery, die 3 is the dev cell.
   touching decode paths runs the decode-guard cell vs the baseline
   BEFORE the landing is done, and the baseline RATCHETS on every
   validated improvement. Automation prompt updated with the law.
+- E-111 2026-09-23 DIAGNOSTIC VERDICT: CODE EXONERATED - MACHINE IS
+  THE VARIABLE. The pre-aln binary (wt-diag-prealn at 69097e3c7, the
+  exact code class that measured the 23.23 anchor at 08:38, no aln/
+  s2r code at all) decoded 14.97 @10k at ~11:03 - WORSE than the
+  merged tree (18.3) and -36% vs the anchor. The aln-completion and
+  merge hypotheses are DEAD; the E-105 anchors are reproducible only
+  on a healthy machine. THERMAL LOG EVIDENCE: during the diag cell
+  the dies collapse to 300 MHz mid-battery (samples: sclk 1350 -> 300
+  -> 1350 across 5 s intervals, junctions 74-79 C), the -20..-36%
+  mechanism; after ~6 h uptime and ~12 heavy boots the card is heat-
+  soaked and cannot hold clocks under load (fresh-boot 08:30 window
+  on the same code: 23.34/23.23). CONSEQUENCE: EVERY served decode
+  number measured today 10:31-11:05 (regress 18.58/18.32, s2r5
+  16.33/18.19, prealn 14.97) is VOID for decision-making - decay
+  slope dominates code deltas; the s2r promotion decision is DEFERRED
+  to the post-reboot window; no code fix is warranted for decode.
+  Side finding: at 10k the s2r gates were neutral vs regress on the
+  same (sick) machine - bw's -3.1..-7.7% kernel-level wins did not
+  translate at 10k class; re-judge at 200k post-reboot. PROCESS:
+  run_postreboot_queue2.sh staged (regress arm -> s2r5 arm on the
+  merged tree vs the re-stamped baseline; pre-aln diag binary kept
+  ready for a second attribution pass if a healthy machine still
+  reads < 22.5). REBOOT REQUESTED (user-owned action, precedent
+  05:20). The re-stamped baseline gate worked as designed: it turned
+  a silent -20% into loud FAILs within one cycle.
