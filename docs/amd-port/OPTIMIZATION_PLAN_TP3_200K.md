@@ -2643,3 +2643,13 @@ to Gemini's guard battery, die 3 is the dev cell.
   each. Campaign waiting state: driver decay (reboot pending Chris),
   prefill numerics class decision, MMVQ share A/B done (neutral,
   banked).
+- E-100 2026-09-23 SECOND COOLING UPGRADE (Chris, ~05:2x, on the fresh
+  boot): idle junctions 25-27 C. Thermal soak - the confound behind
+  the 15.04->8.78 slide and the 13.27 re-stamp FAIL - is now unlikely
+  to recur at this thermal budget. Implications: (1) the running
+  post-reboot queue's numbers become the cleanest of the campaign;
+  (2) the efficiency-trade option (undervolt for heat) loses its
+  motivating constraint - heat is no longer the binding issue;
+  (3) the driver-decay cadence (~4-6 h heavy booting, E-098 cont) is
+  a PLATFORM issue independent of temperature - reboots remain the
+  operational mitigation.
