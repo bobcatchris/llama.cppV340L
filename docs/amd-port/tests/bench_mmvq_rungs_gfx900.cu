@@ -12,15 +12,23 @@
 //   A1 staging: mostly ILLEGAL by alignment law. Block strides 110/98/136 B
 //     and the 36 B y stride keep the contiguous dword pairs misaligned for
 //     dwordx2/x4 on half or all blocks; the y-side relayout is the W4 aln
-//     NEGATIVE. Only iq4_xs qs (8 B aligned on every block) merges 4 -> 2.
-//   B1 decode atom: SURVIVES for the LUT+sign types (iq3_s, iq3_xxs). The
-//     shipped sign chain (__vcmpne4 + __vsub4 = byte-loop + sub_sat emu)
-//     compiles to 28-30 VALU ops per sign pair on gfx900; the v_perm_b32
-//     MSB-replication atom (probe_sign exhaustive ALL EXACT, probe_isa
-//     census) builds the FF/00 masks in 2-3 ops and applies signs in 3:
-//       s0 = perm(m | (m << 7), same, 0xBA98)   [iq3_s masks: bits 7,8,23,24]
-//       s0 = perm(m * 0xF0, ...) / perm(m | m * 0x0E, ...)  [iq3_xxs even/odd]
-//       dec = (g ^ s0) + (s0 & 0x01010101)      [grid bytes never 0, no carry]
+//     NEGATIVE. Only iq4_xs qs (8 B aligned on every block) merges 4 -> 2:
+//     measured NEUTRAL (+0.1% vs share, session W6_rungs_s1) - concurs with
+//     the W5 bw desk wide-x NOT-MOVEMENT verdict (-0.9..-1.2%).
+//   B1 decode atom: REFUSED ON DEVICE. The shipped sign chain (__vcmpne4 +
+//     __vsub4 = byte-loop + sub_sat emu) compiles to 28-30 VALU ops per sign
+//     pair on gfx900 vs 8-19 for the v_perm_b32 atom (probe census), and the
+//     atom is exhaustively exact on host (probe_sign: 256 grid entries x 256
+//     sign bytes, ALL EXACT under the host perm model). On device the oracle
+//     REFUSED both perm arms (bit mismatch): gfx900 v_perm_b32 selector
+//     behavior does not match the assumed MSB-replication mode model
+//     (probes: uniform/masked selectors return FF-pattern results that no
+//     nibble-wise model fits; dbg_perm*.cu). Upside was capped anyway: W3's
+//     FULL decode removal on these types wins only -2.8/-3.8%, and the W5
+//     consume ceilings (E-106) measure issue slack ~5.5x (1446 inst/iter,
+//     issue demand ~144 us vs ~800 us) = the kernel is stall-bound, not
+//     VALU-issue-bound. Do not re-open without a schedule that makes decode
+//     issue-bound again.
 //   q4_K: no arm - decode is nibble shift/mask (cheap), apply is 8 emulated
 //     dp4a (6 VALU each, gfx900 ISA wall, 09-21 probe); residual = traffic
 //     (W3 ceiling statement). Reproduce base/share only.
