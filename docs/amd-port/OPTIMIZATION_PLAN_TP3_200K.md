@@ -2739,3 +2739,16 @@ to Gemini's guard battery, die 3 is the dev cell.
   3.4-3.9x the weight floor at T=4); decode-ALU was binding only for the
   K-quant scale walks. Next lever in this cell class is the aln producer
   relayout (48 B q8_1, banked W2), not more decode restructuring.
+- E-104 2026-09-23 EXTENDED SHARE SET VALIDATED SERVED + IN PLAY.
+  Full stack (RCCL + 7 byte-exact fixes + 6 per-type share gates,
+  IQ4_XS off per its bench negative): 200k full battery 5/5 GREEN -
+  decode 20.01 (+6.90% vs the 18.72 pre-extension gate; THE 20 LINE
+  CROSSED AT 200k), prefill 161.64, accept 0.66667, determinism
+  byte-identical (sha 793bf51b - the share kernels change nothing
+  numerically), needle 3/3. 10k cell: 19.64 (+4.93%) - the 20 @ 10k
+  line is one banked lever wide. launch_tp3_200k.sh updated with the
+  six share envs. NEXT (dispatched): MMVQ ALN LAYOUT desk
+  (wt-mmvq-kernel2, amd/mmvq-kernel2) - the banked -50.4% T=4 lever
+  (48 B aligned uint4 y-operands) requiring the quantize-side
+  producer change, shape-aware gate for the T=2/3 regression, served
+  projection ~20+ @ 10k if the T=4 win holds served.
