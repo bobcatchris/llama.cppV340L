@@ -3137,3 +3137,47 @@ to Gemini's guard battery, die 3 is the dev cell.
   unattributable binaries) are now structurally closed: the battery
   refuses unattributable runs, and the baseline ratchets with every
   validated improvement.
+
+- E-115a TP4 ROUND MAP DESK COMPLETE (wt-tp4-round on amd/tp4-roundmap,
+  zero-GPU): THE UNNAMED ~23 MS/ROUND IS NAMED - IT IS THE TP4 BOUNDARY
+  TAX, TRIPLE THE ASSUMED COUNT. Instrument: the fresh TP4 kernel census
+  (TP4_kernel_census_2026-09-23, 589k dispatches, TP4+RCCL+full opt set,
+  6964-token prefill + 98 decode tokens = 30 rounds) phase-split by
+  timestamp; cross-grounded on combowin_regress_200k (23.26 t/s, round
+  129.0 ms) and the E-072/E-078/E-084 receipts. (1) THE ROUND (per die,
+  130.5 ms census / 129.0 battery): verify T=4 pass ~108 ms wall = MMVQ
+  56.0 (54.7 GB/s effective on 3.063 GB/die; per-type ms: IQ3_S 17.6,
+  IQ3_XXS 14.8, IQ4_XS 10.9, Q4_K 8.5, Q6_K 3.7) + NCCL ~21-24 + flash
+  ~12 + small kernels ~10; then a 6.5 ms HOST gap where ALL 4 DIES GO
+  IDLE SIMULTANEOUSLY (host, not skew - E-078's 5.5-8 ms confirmed);
+  catch-up only ~2.3 ms device (draft ctx); draft loop 8.9 ms wall
+  (2.98 ms/step period, ~1.4 ms/step host); dies 87% busy. (2) THE
+  FINDING: boundaries are 137.2/die/round at median 165.6 us = 22.7-25.6
+  ms/round - the of-record structure math said 48 x 94 us = 4.5 ms
+  (E-085/E-105 era). The count TRIPLED at n=4 (~1 cut point per layer x
+  2 passes vs ~24/pass at TP3) and per-boundary runs 1.3-1.8x the probe
+  floors (126.5 us @80 KB fp32, 94 us @32 KB). This +21 ms delta against
+  the old floor math IS the unnamed gap; second unnamed item = the 11.3
+  ms small-kernel/copy class (never priced). The 106 ms floor of E-105
+  has no written composition in the ledger - the census decomposition is
+  now the of-record map. (3) CONTEXT-INSENSITIVE: round @32k-slot = 130.5
+  ms vs @200k-slot = 129.0 ms - all served decode numbers to date are
+  ~7-8k-token prompts in big caches; flash/KV scaling to real deep
+  context is UNBOUNDED (flash_attn_tile 16.1 ms/round at ~8k, 16
+  full-attn layers x ~723 us). (4) RANKED LEVERS: MMVQ T=4 bandwidth
+  (W5 C-rung LDS-y staging; 12.2-30.5 ms in the measured cfull band,
+  35.6 at the 150 GB/s hypothetical; L, s2r-transfer risk); boundary
+  latency to probe parity (5.3-9.7 ms, S/M, env+clustering); boundary
+  count back to TP3 class (12-17 ms, L, needs the partial-axis audit);
+  host slice 6.5 ms (2-4 ms, M, needs -lv 4 TP4 boot); draft host
+  (1.5-2.5 ms); copies class (2-3 ms). Catch-up waste CONFIRMED neutral
+  (device only 2.3 ms/round - E-091 upheld with mechanism). (5) TOP-3
+  DESKS: T1 TP4 BOUNDARY DESK (partial-axis audit n=3 vs n=4 + TP4 RCCL
+  micro-probe at 80 KB n=4 + NCCL_DEBUG fingerprint; 5-10 then 12-17 ms);
+  T2 MMVQ C-RUNG DESK (build the banked LDS-y design, bit-exact oracle,
+  interleaved multi-rep A/B; 10-20 ms); T3 HOST SLICE DESK (one -lv 4
+  boot; 3-5 ms). Realistic stack: 129 -> ~100-108 ms = 28-30 t/s.
+  UNBOUNDED windows requested: U1 deep-context decode census (>=64k real
+  prompt), U2 -lv 4 TP4 timeline, U3 TP4 boundary micro-probe. Receipt:
+  results/TP4_roundmap_2026-09-23.md (census provenance files copied
+  in-tree).
