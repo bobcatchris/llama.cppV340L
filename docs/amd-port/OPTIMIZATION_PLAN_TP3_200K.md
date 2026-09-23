@@ -3325,3 +3325,34 @@ to Gemini's guard battery, die 3 is the dev cell.
   cleared with evidence after verification; both probe sessions
   lock-compliant, released promptly; WIP committed per step +
   CHECKIN.log per the new law.
+- E-116 2026-09-23 BOUNDARY DESK LANDED + MERGED (68766bec1); RCCL
+  TRANSPORT DESK DISPATCHED. W8 results (receipt
+  W8_tp4_boundary_receipt_2026-09-23.md, 5 commits on amd/tp4-bound):
+  (1) P0: RCCL 2.20.5 REFUSES multi-rank-on-one-die (ncclInvalidUsage
+  for n>=2) - the "4 ranks on one die" probe does not exist; delivered
+  floors instead: enqueue 0.2 us, launch ~12 us size-flat 16-128 KB,
+  transport-free 4-rank ring us_ring(S,4) = 24.1 + 0.573 x KB
+  (r > 0.999) = 69.5 us @ 80 KB. SERVED RESIDUAL (served - floor):
+  59 us (die 3) to 141 us (die 1) = transport + peer wait - THE LEVER.
+  (2) A1 census EXACT: 136.0 NCCL/die/round all 4 dies = 128 verify
+  (out-proj AND ffn_down row-parallel AXIS_0 in
+  src/llama-model.cpp:444/467/481 -> PARTIAL mul_mat -> subgraph cut ->
+  1 allreduce each = 2/layer x 65) + 2 catch-up + 6 draft. PER-DIE
+  MEDIANS 128.8/151.9/191.6/210.8 us - the wall pays the slowest die:
+  31.2 ms/round. The old "TP3 = 24-48/round" figure was never measured;
+  n=3 timeline boot settles the count mechanism cheaply (queued).
+  (3) A2 clustering NEGATIVE (single-tensor data-dependent boundaries,
+  enqueue already pipelined; no legal candidate - no dead code added).
+  (4) A3 count reduction NOT FEASIBLE-CLEAN (column-parallel flips
+  multiply the weight-stream pool; RS/AG keeps the count; folding
+  blocked by the inter-reduction norm). Count levers CLOSED; honest
+  levers = per-die RCCL env tuning + nextn 8-boundary slice.
+  (5) DISPATCHED: RCCL TRANSPORT DESK (wt-rccl-transport on
+  amd/rccl-transport off 68766bec1): P0 multi-die 4-process probe
+  harness (per-rank histograms, the campaign RCCL instrument) -> A1
+  residual localization -> A2 env sweep (PROTO/ALGO/channels/buffsize;
+  win bar: worst-rank -15% reproducible) -> A3 served spec (pure-env
+  preferred) -> W9 receipt. Prize: flatten die 1 toward die 3 = up to
+  12.6 ms/round = ~+10% decode. LDSY desk (wt-mmvq-lds) continues
+  (A1 committed, oracle re-validation -> A2 sessions). Snapshot
+  backups current.
