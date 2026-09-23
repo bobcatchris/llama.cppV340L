@@ -12,6 +12,7 @@
 #include "ggml-backend-impl.h"
 #include "ggml-alloc.h"
 #include "ggml-impl.h"
+#include "ggml-launch-timeline.h"
 
 #include <assert.h>
 #include <limits.h>
@@ -415,6 +416,14 @@ void ggml_backend_tensor_memset(struct ggml_tensor * tensor, uint8_t value, size
 void ggml_backend_synchronize(ggml_backend_t backend) {
     GGML_ASSERT(backend);
     if (backend->iface.synchronize == NULL) {
+        return;
+    }
+
+    if (ggml_launch_timeline_enabled()) {
+        const int64_t t0 = ggml_time_us();
+        backend->iface.synchronize(backend);
+        g_launch_tl.backend_syncs++;
+        g_launch_tl.backend_sync_us += ggml_time_us() - t0;
         return;
     }
 
@@ -1595,9 +1604,20 @@ static bool ggml_backend_sched_alloc_splits(ggml_backend_sched_t sched) {
     return true;
 }
 
+static bool ggml_sched_light_input_sync() {
+    static const bool on = [] {
+        const char * e = getenv("LLAMA_TARGET_LIGHT_SYNC");
+        return e != nullptr && atoi(e) == 1;
+    }();
+    return on;
+}
+
 static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
     GGML_ASSERT(sched);
     struct ggml_backend_sched_split * splits = sched->splits;
+
+    const bool tl_on = ggml_launch_timeline_enabled();
+    const int64_t tl_t0 = tl_on ? ggml_time_us() : 0;
 
     ggml_tensor * prev_ids_tensor = nullptr;
     std::vector<int32_t> ids;
@@ -1608,18 +1628,37 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
         int split_backend_id = split->backend_id;
         ggml_backend_t split_backend = sched->backends[split_backend_id];
 
+        // LLAMA_TARGET_LIGHT_SYNC: without scheduler events every input copy
+        // below drains the whole split backend first; one drain before the
+        // loop is strictly stronger (the copies are blocking either way) and
+        // leaves the copied bytes identical
+        const bool light_sync = ggml_sched_light_input_sync() &&
+            sched->events[split_backend_id][sched->cur_copy] == NULL && split->n_inputs > 0;
+        if (light_sync) {
+            ggml_backend_synchronize(split_backend);
+        }
+
         // copy the input tensors to the split backend
         for (int input_id = 0; input_id < split->n_inputs; input_id++) {
             ggml_backend_t input_backend = ggml_backend_sched_get_tensor_backend(sched, split->inputs[input_id]);
             struct ggml_tensor * input = split->inputs[input_id];
             struct ggml_tensor * input_cpy = tensor_copy(input, split_backend_id, sched->cur_copy);
 
+            if (tl_on) {
+                g_launch_tl.sched_inputs++;
+            }
+
             if (input->flags & GGML_TENSOR_FLAG_INPUT) {
                 // inputs from the user must be copied immediately to prevent the user overwriting the data before the copy is done
                 if (sched->events[split_backend_id][sched->cur_copy] != NULL) {
                     ggml_backend_event_synchronize(sched->events[split_backend_id][sched->cur_copy]);
                 } else {
-                    ggml_backend_synchronize(split_backend);
+                    if (!light_sync) {
+                        if (tl_on) {
+                            g_launch_tl.sched_csyncs++;
+                        }
+                        ggml_backend_synchronize(split_backend);
+                    }
                 }
                 ggml_backend_tensor_copy(input, input_cpy);
             } else {
@@ -1627,7 +1666,12 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
                 if (sched->events[split_backend_id][sched->cur_copy] != NULL) {
                     ggml_backend_event_wait(split_backend, sched->events[split_backend_id][sched->cur_copy]);
                 } else {
-                    ggml_backend_synchronize(split_backend);
+                    if (!light_sync) {
+                        if (tl_on) {
+                            g_launch_tl.sched_csyncs++;
+                        }
+                        ggml_backend_synchronize(split_backend);
+                    }
                 }
 
                 // when offloading MoE weights, we can reduce the amount of data copied by copying only the experts that are used
@@ -1776,6 +1820,16 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
                 ggml_backend_event_record(sched->events[split_backend_id][sched->cur_copy], split_backend);
             }
         }
+    }
+
+    if (tl_on) {
+        g_launch_tl.sched_computes++;
+        GGML_LOG_INFO("[launch-timeline] sched splits = %d, host = %.3f ms, tot {cpy = %llu, csync = %llu, syncs = %llu, sync_us = %llu}\n",
+            sched->n_splits, (ggml_time_us() - tl_t0)/1e3,
+            (unsigned long long) g_launch_tl.sched_inputs,
+            (unsigned long long) g_launch_tl.sched_csyncs,
+            (unsigned long long) g_launch_tl.backend_syncs,
+            (unsigned long long) g_launch_tl.backend_sync_us);
     }
 
     return GGML_STATUS_SUCCESS;

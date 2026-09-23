@@ -1223,6 +1223,9 @@ struct ggml_cuda_graph {
     bool warmup_complete = false;
     uint64_t uid = 0;
     int64_t last_used_time = 0;
+    // GGML_CUDA_COMPAT_CACHE: uid the compatibility verdict was computed for
+    uint64_t compat_uid = 0;
+    bool     compat_verdict = false;
     struct node_properties {
         ggml_tensor node;
         void *   node_src_data_ptrs[GGML_MAX_SRC];
