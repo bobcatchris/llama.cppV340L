@@ -3623,3 +3623,21 @@ to Gemini's guard battery, die 3 is the dev cell.
   the LAST ARRIVER's NCCL duration + max compute (W8's "die 1 pays
   31.2 ms" counted overlapped wait as wall); no runtime code changed
   by this desk (python + docs only), no build required.
+- E-119 (cont.) 17:25 AGENT KILL EVENT + FULL RECOVERY. The ~17:15
+  kill took the llama-server AND both remaining desk agents (attn,
+  host-slice) plus 17 in-flight git object writes (empty object files
+  in the shared store). RECOVERY COMPLETE: empty objects purged, git
+  fsck CLEAN, host-slice branch reseated to its healthy P0 commit
+  (0b679b5cc) with ALL on-disk WIP preserved and checkpointed
+  (66bf25a23: A1 timeline rounds + backend-meta/ggml-cuda edits),
+  attn branch intact to its A2 commit (49b21dbc9) with the A3 bench
+  checkpointed (c0f57e07c). BOTH DESKS RELAUNCHED as continuations
+  with resume-from-branch-tip briefs (attn: finish A3 measurement on
+  its wide-GQA arm; host-slice: audit the predecessor's unverified
+  edits then finish A2/A3 under the CI law). Interleaved split A/B
+  relaunched (s0/s1/s0/s1 x 10k). LESSON LAWS: (1) the WIP-commit +
+  CHECKIN law held - zero committed work was lost, only one WIP
+  commit's metadata (recovered from disk); (2) CHECKIN.log files are
+  worktree-local and gitignored; (3) post-kill protocol: find -size 0
+  in .git/objects, delete, fsck, reseat refs to last healthy commit,
+  checkpoint WIP, relaunch continuations.
