@@ -3069,3 +3069,39 @@ to Gemini's guard battery, die 3 is the dev cell.
   reads < 22.5). REBOOT REQUESTED (user-owned action, precedent
   05:20). The re-stamped baseline gate worked as designed: it turned
   a silent -20% into loud FAILs within one cycle.
+- E-112 2026-09-23 PROVENANCE GATE (CHRIS-DIRECTED) + E-111 CORRECTION
+  + REGRESSION CONFIRMED IN CODE. (1) GUARD PROVENANCE LAW
+  IMPLEMENTED (4b6a51815): guard_battery.py now FAILS CLOSED unless
+  it can attribute the run - clean tracked tree (dirty = refuse,
+  --allow-dirty overrides LOUDLY and records), commit hash, server
+  binary sha256, CMakeCache sha256 (build config), and the launch
+  config string; provenance is stamped into every cell row and the
+  receipt. Verified both directions (dirty tree refused naming the
+  file; clean tree prints commit/binary/config). Window scripts
+  (run_combined_window.sh, run_diag_cell.sh) pass --server-binary +
+  --launch-config. MOTIVATION (Chris): "next time no matter what we
+  do not lose anything and have to spend hours looking backwards."
+  (2) E-111 CORRECTION: the "code exonerated" verdict was WRONG -
+  the pre-aln diag binary had been built with GGML_HIP_RCCL=OFF and
+  a drifted arch list (my configure error), an invalid instrument;
+  its 14.97 (sick) / 15.29 (fresh) readings were artifacts. With the
+  CANONICAL config on the fresh machine the pre-aln binary decodes
+  23.43 @10k (PASS, +0.85% vs the re-stamped baseline; provenance
+  commit 4b6a51815fd7 / binary 4ed48ea7b1f851d8 / config
+  b2f955866c44e382, SOURCE_COMMIT=69097e3c7 in launch config) - the
+  morning anchor reproduces exactly. (3) REGRESSION CONFIRMED: the
+  merged tree reads 18.5-18.7 on the SAME fresh machine (post-reboot
+  queue: regress-200k 18.68, regress-10k 18.51, s2r5-200k 17.33,
+  s2r5-10k 18.47 - all FAIL vs 23.23). Machine exonerated, code
+  guilty: the tax entered between 69097e3c7 and the merge
+  (567c508cd aln layout / 1f7a6a330 aln completion / bw s2r merge);
+  prime suspect = 1f7a6a330's runtime aln branches per-type inside
+  the MMVQ share hot loop. s2r gates cost a further ~1.2 t/s at 200k
+  on top (17.33 vs 18.68). Prefill stable 214-218 all day.
+  (4) FIX PATH: compile-time ALN dispatch (kernel variant selection -
+  default instantiation carries zero aln code, aln arm stays
+  reproducible via env); validate with the SAME battery (must PASS
+  5/5 to restore the of-record), then re-judge s2r on the fixed base.
+  LESSON OF RECORD: the provenance gate would have caught the
+  invalid instrument at first use - binary+config hashes make
+  "which build" unambiguous; no more multi-hour backwards looks.
