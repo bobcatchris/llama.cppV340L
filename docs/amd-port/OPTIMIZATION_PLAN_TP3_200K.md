@@ -2439,3 +2439,25 @@ to Gemini's guard battery, die 3 is the dev cell.
   sampling). The 20 t/s @10k line needs the next subsystem (on-device
   sampling or RCCL extension to more transfer classes), not more
   micro-optimization.
+- E-096 2026-09-22 THE THREE SUBSYSTEM PROJECTS STARTED (Chris: "start
+  on the 3 designed subsystem projects now"). All zero-GPU
+  (design/implement/host-test), fresh worktrees off 3f17b0f28:
+  (1) ON-DEVICE SAMPLING (wt-onsample, amd/onsample): per-shard
+  argmax op for the greedy draft path - 3 tiny (value,index) pairs
+  per step replace the 517 KB row consumption; deterministic
+  tie-break matched to the host argmax, meta-carve-out designed to
+  avoid the E-065 SPLIT_AXIS_UNKNOWN abort; LLAMA_DRAFT_ONDEVICE_
+  ARGMAX=1. Strategic value: prerequisite for step-batching.
+  (2) RCCL COVERAGE EXTENSION (wt-rccl-ext, amd/rccl-ext): prefill-
+  sized reductions (ne >= 131072) currently fall back to butterfly/
+  bf16-compress - bench RCCL vs butterfly at real prefill sizes,
+  gate-extend if it wins; numerics: the owner's sum-order sign-off
+  covers the class globally, but prefill numerics feed KV - served
+  full battery gates required; plus a transfer-class audit table.
+  (3) LAUNCH/REPLAY-PATH (wt-launchpath, amd/launchpath): per-replay
+  and scheduler-sweep cost measurement (LLAMA_LAUNCH_TIMELINE=1
+  counter as first deliverable), TARGET-side sweep audit (draft side
+  already 5-6 -> 1), per-replay overhead attack if measured high,
+  honest ceiling doc for persistent-kernel/mega-graph options.
+  All env-gated, unset = byte-identical; validation arms run in the
+  coordinator's window when the desks land.
