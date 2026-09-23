@@ -3546,3 +3546,37 @@ to Gemini's guard battery, die 3 is the dev cell.
   propose rebalanced --tensor-split ratios (pure launch flag) or an
   in-code rebalance design; coordinator serves the best ratio.
   Prize if imbalance confirms: up to ~10 ms/round of peer wait.
+- E-121a ATTENTION DESK COMPLETE (wt-attn-fa on amd/attn-fa): WIDE-GQA TILE
+  ARM IS A RIGOROUS NEGATIVE - NO PROMOTION, SERVED INSTANCE UNCHANGED.
+  (1) P0 (zero-GPU): served instance pinned flash_attn_tile<256,256,4,2,
+  false> at T=4 gqa6/die ne11=7168 q4_0, grid (1,37,3) pb=37 LDS 22528
+  (census-exact); flash class corrected to 13.0 ms/round (round map's 16.1
+  double-counted; GDN decode is 0.84 ms/round not 3.8); f16-KV-pool tax
+  named: 0.82 ms/round dequant + 3x KV re-read, unbounded (item U1).
+  (2) A2 (49b21dbc9): env-gated wide-GQA tile arms GGML_CUDA_FATTN_TILE_
+  GQA_WIDE, (256,256,12) 192t and (256,256,24) 384t - one block per KV
+  head streams the f16 KV pool once instead of 3x.
+  (3) A3 REAL-KERNEL (W7 bench law; bench_attn_real.cu includes fattn-tile.cu
+  verbatim, real launch_fattn host chain, real GGUF KV bytes, oracle-gated):
+  wide6 +7.85/+9.07%, mid3 +25.07/+26.47% SLOWER (sessions 6-7; direction-
+  consistent across 8 sessions, +7.85..+12.44% / +24.67..+29.20%); oracle
+  DUST as predicted (KV-split fp dust, max rel 1.28e-3; NO bit-exact claim;
+  basedup bit-exact every session); spread law PASS on base (0.21/0.45%)
+  and basedup (0.37/0.68%), mid3/wide6 windows bimodal-class = VOID cells,
+  re-run twice, deltas 8-12x jitter. ROCProf decomposition: the wide MAIN
+  KERNELS WIN (FA<4,6> 515 vs FA<4,2> 681 us = -24.4%, KV-once confirmed)
+  but every wide launch pays a CONSTANT ~210 us GPU idle gap before the
+  fattn kernel (host clean: all HIP calls sub-3 us, no hipMalloc, pool
+  reuses; intrinsic - back-to-back probe reproduces 824 vs 585.8 kernel
+  sum; mechanism NOT identified = named open item) + combine +26-51% from
+  pb 56 vs 37. Kernel-level win fully eaten end-to-end.
+  (4) A4: ggml-hip canonical-flags build BUILD-EXIT:0; run_premerge_ci.sh
+  CI-VERDICT PASS. Bench-law note for future desks: link real-kernel benches
+  against their OWN tree's libggml-hip - the campaign lib's context dtor
+  layout differs across branches and aborts at exit.
+  (5) VERDICT: env stays default-OFF, no served change; arm kept in tree as
+  documented negative (INFO line = engagement witness, negative control
+  verified). RECEIPT: docs/amd-port/results/W11_attn_receipt_2026-09-23.md.
+  Forward levers: (a) the ~210 us wide-launch start latency (if solved,
+  wide6 kernel win becomes ~-18% real), (b) item U1 f16-KV-pool tax / a
+  q4_0-direct tile kernel (deletes pool dequant 0.82 ms/round + re-read).
