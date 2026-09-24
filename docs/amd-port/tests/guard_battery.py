@@ -210,6 +210,28 @@ def get_model_metadata(model_path: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Thermal Sideband Sampler
 # ---------------------------------------------------------------------------
+# Die coverage keys on PCI, not card numbers: the four V340 die PCI addresses
+# are stable across reboots but card NUMBERS are not (after a boot reshuffle
+# card1 can be the NVIDIA display GPU and the dies move - E-133 instrument
+# gap: the old rocm-smi card0/1/2 loop never sampled die 4 at 0000:10:00.0).
+# Each die PCI is resolved per boot to its DRM cardN (via /sys/class/drm,
+# same pattern as run_combined_window.sh die_cards()) and its amdgpu hwmon
+# dir; values are read from sysfs (hwmon temp1/2/3_input = edge/junction/
+# memory, pp_dpm_sclk starred level = the sclk rocm-smi reports), verified
+# identical to the rocm-smi sensors and immune to card renumbering and to
+# rocm-smi's own AMD-only card indexing.
+#
+# HEADER CHANGE: with all four dies resolved the sideband log is
+#   timestamp,elapsed_s,c0_edge,c0_junc,c0_mem,c0_sclk,...,c3_edge,...,c3_sclk
+# where c0..c3 are DIE POSITIONS in DIE_PCIS order (die 1..4), NOT card
+# indices - so with 4 groups the void-gate default (last group) reads die 4,
+# and --die3-group 2 pins die 3 (the E-133 calibrated far-die stand-in).
+# Legacy 3-group logs stay readable; if any die is unresolvable the sampler
+# keeps the legacy 14-column layout (c0..c2), writes zeros for the missing
+# groups, and reports it in the stop() summary (die_layout/unresolved_dies).
+DIE_PCIS = ("0000:05:00.0", "0000:08:00.0", "0000:0d:00.0", "0000:10:00.0")
+
+
 class ThermalSampler(threading.Thread):
     """Background sampler recording temperatures and clocks every 5 seconds."""
 
@@ -220,11 +242,65 @@ class ThermalSampler(threading.Thread):
         self.running = True
         self.samples: List[Dict[str, Any]] = []
         self._lock = threading.Lock()
+        self._dies = self._resolve_dies()
+        self._finalize_layout()
+
+    @staticmethod
+    def _resolve_dies() -> List[Optional[Dict[str, Optional[str]]]]:
+        """Resolve {card, hwmon} per die PCI (DIE_PCIS order); None if absent."""
+        resolved: List[Optional[Dict[str, Optional[str]]]] = []
+        for pci in DIE_PCIS:
+            card = hw = None
+            for c in Path("/sys/class/drm").iterdir():
+                if re.fullmatch(r"card\d+", c.name) and \
+                        os.path.basename(os.path.realpath(c / "device")) == pci:
+                    card = c.name
+                    break
+            for h in Path("/sys/class/hwmon").glob("hwmon*"):
+                try:
+                    if (h / "name").read_text(errors="replace").strip() == "amdgpu" and \
+                            os.path.basename(os.path.realpath(h / "device")) == pci:
+                        hw = str(h)
+                        break
+                except Exception:
+                    pass
+            resolved.append({"card": card, "hwmon": hw} if (card or hw) else None)
+        return resolved
+
+    def _finalize_layout(self) -> None:
+        self._legacy = not all(self._dies)
+        self._ngroups = 3 if self._legacy else len(DIE_PCIS)
+        self._header = "timestamp,elapsed_s," + ",".join(
+            "c%d_%s" % (i, s) for i in range(self._ngroups)
+            for s in ("edge", "junc", "mem", "sclk")) + "\n"
+
+    @staticmethod
+    def _read_temp_c(hwmon: Optional[str], sensor: str) -> float:
+        if not hwmon:
+            return 0.0
+        try:
+            return round(int(Path(hwmon, sensor).read_text().strip()) / 1000.0, 1)
+        except Exception:
+            return 0.0
+
+    @staticmethod
+    def _read_sclk_mhz(card: Optional[str]) -> int:
+        if not card:
+            return 0
+        try:
+            for line in Path("/sys/class/drm", card, "device/pp_dpm_sclk").read_text().splitlines():
+                if "*" in line:  # active DPM level == rocm-smi "sclk clock speed"
+                    m = re.search(r"(\d+)\s*mhz", line, re.IGNORECASE)
+                    if m:
+                        return int(m.group(1))
+        except Exception:
+            pass
+        return 0
 
     def run(self) -> None:
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.log_path, "w", encoding="utf-8") as f:
-            f.write("timestamp,elapsed_s,c0_edge,c0_junc,c0_mem,c0_sclk,c1_edge,c1_junc,c1_mem,c1_sclk,c2_edge,c2_junc,c2_mem,c2_sclk\n")
+            f.write(self._header)
 
         t0 = time.time()
         while self.running:
@@ -236,76 +312,66 @@ class ThermalSampler(threading.Thread):
             time.sleep(self.interval)
 
     def _sample(self, elapsed: float) -> Optional[Dict[str, Any]]:
-        try:
-            out = subprocess.check_output(
-                ["rocm-smi", "--showtemp", "--showclocks", "--json"],
-                text=True, stderr=subprocess.DEVNULL
-            )
-            data = json.loads(out)
-            row: Dict[str, Any] = {
-                "timestamp": datetime.now().isoformat(),
-                "elapsed_s": round(elapsed, 1),
-                "cards": {}
-            }
-            for c in ("card0", "card1", "card2"):
-                cd = data.get(c, {})
-                try:
-                    edge = float(cd.get("Temperature (Sensor edge) (C)", 0))
-                    junc = float(cd.get("Temperature (Sensor junction) (C)", 0))
-                    mem = float(cd.get("Temperature (Sensor memory) (C)", 0))
-                    sclk_str = cd.get("sclk clock speed:", "").strip("()")
-                    sclk_mhz = int(re.sub(r"[^\d]", "", sclk_str) or 0)
-                except Exception:
-                    edge, junc, mem, sclk_mhz = 0.0, 0.0, 0.0, 0
-
-                row["cards"][c] = {
-                    "edge": edge,
-                    "junction": junc,
-                    "memory": mem,
-                    "sclk_mhz": sclk_mhz
-                }
-            return row
-        except Exception:
+        if not any(self._dies):
             return None
+        row: Dict[str, Any] = {
+            "timestamp": datetime.now().isoformat(),
+            "elapsed_s": round(elapsed, 1),
+            "dies": []
+        }
+        for d in self._dies[:self._ngroups]:
+            hw = d.get("hwmon") if d else None
+            card = d.get("card") if d else None
+            row["dies"].append({
+                "edge": self._read_temp_c(hw, "temp1_input"),
+                "junction": self._read_temp_c(hw, "temp2_input"),
+                "memory": self._read_temp_c(hw, "temp3_input"),
+                "sclk_mhz": self._read_sclk_mhz(card)
+            })
+        return row
 
     def _append_log(self, s: Dict[str, Any]) -> None:
         try:
-            c = s["cards"]
-            c0, c1, c2 = c.get("card0", {}), c.get("card1", {}), c.get("card2", {})
-            line = (
-                f"{s['timestamp']},{s['elapsed_s']},"
-                f"{c0.get('edge', 0)},{c0.get('junction', 0)},{c0.get('memory', 0)},{c0.get('sclk_mhz', 0)},"
-                f"{c1.get('edge', 0)},{c1.get('junction', 0)},{c1.get('memory', 0)},{c1.get('sclk_mhz', 0)},"
-                f"{c2.get('edge', 0)},{c2.get('junction', 0)},{c2.get('memory', 0)},{c2.get('sclk_mhz', 0)}\n"
-            )
+            parts: List[Any] = [s["timestamp"], s["elapsed_s"]]
+            for d in s["dies"]:
+                parts += [d["edge"], d["junction"], d["memory"], d["sclk_mhz"]]
             with open(self.log_path, "a", encoding="utf-8") as f:
-                f.write(line)
+                f.write(",".join(str(p) for p in parts) + "\n")
         except Exception:
             pass
 
     def stop(self) -> Dict[str, Any]:
         self.running = False
         with self._lock:
-            if not self.samples:
-                return {"thermal_log": str(self.log_path), "samples_count": 0}
-
-            first = self.samples[0]["cards"]
-            last = self.samples[-1]["cards"]
-
-            max_edge = max(max(s["cards"].get(k, {}).get("edge", 0) for k in ("card0", "card1", "card2")) for s in self.samples)
-            max_junc = max(max(s["cards"].get(k, {}).get("junction", 0) for k in ("card0", "card1", "card2")) for s in self.samples)
-            max_mem = max(max(s["cards"].get(k, {}).get("memory", 0) for k in ("card0", "card1", "card2")) for s in self.samples)
-
-            summary = {
+            summary: Dict[str, Any] = {
                 "thermal_log": str(self.log_path),
                 "samples_count": len(self.samples),
-                "start_edge_c": {k: first[k]["edge"] for k in first},
-                "end_edge_c": {k: last[k]["edge"] for k in last},
+                "die_layout": "legacy-3group" if self._legacy else "die4-pci-indexed",
+                "die_pci_map": {pci: (d or {}).get("card")
+                                for pci, d in zip(DIE_PCIS, self._dies)}
+            }
+            if self._legacy:
+                summary["unresolved_dies"] = [pci for pci, d in zip(DIE_PCIS, self._dies) if not d]
+                summary["die_coverage_note"] = ("not all 4 die PCIs resolved; legacy "
+                                                "c0..c2 column count kept, missing groups written as zeros")
+            if not self.samples:
+                return summary
+
+            first = self.samples[0]["dies"]
+            last = self.samples[-1]["dies"]
+
+            max_edge = max(max(d["edge"] for d in s["dies"]) for s in self.samples)
+            max_junc = max(max(d["junction"] for d in s["dies"]) for s in self.samples)
+            max_mem = max(max(d["memory"] for d in s["dies"]) for s in self.samples)
+
+            summary.update({
+                "start_edge_c": {"die%d" % i: d["edge"] for i, d in enumerate(first)},
+                "end_edge_c": {"die%d" % i: d["edge"] for i, d in enumerate(last)},
                 "max_edge_c": max_edge,
                 "max_junction_c": max_junc,
                 "max_mem_c": max_mem,
-                "thermal_drift_c": round(max(last[k]["edge"] - first[k]["edge"] for k in first), 2)
-            }
+                "thermal_drift_c": round(max(l["edge"] - f["edge"] for f, l in zip(first, last)), 2)
+            })
             return summary
 
 
