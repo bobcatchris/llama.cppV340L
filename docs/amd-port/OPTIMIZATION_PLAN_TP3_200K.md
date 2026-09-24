@@ -3580,3 +3580,49 @@ to Gemini's guard battery, die 3 is the dev cell.
   Forward levers: (a) the ~210 us wide-launch start latency (if solved,
   wide6 kernel win becomes ~-18% real), (b) item U1 f16-KV-pool tax / a
   q4_0-direct tile kernel (deletes pool dequant 0.82 ms/round + re-read).
+- E-123 WIDE-LAUNCH DESK COMPLETE (wt-attn-fa on amd/attn-fa, base b63e9f9d1):
+  E-121a's NAMED OPEN ITEM (the ~210 us pre-fattn GPU idle gap on wide-GQA
+  tile launches) CLOSED AS CHARACTERIZED-NOT-REMOVABLE; wide6 REMAINS NOT
+  VIABLE; no served change. (1) P0: bench_attn_real.cu extended with
+  --matrix (per-launch event brackets, probe/pipelined/double/sparse
+  disciplines, LDS/spill/big-code/vgpr-burn dummy discriminators) and
+  --adj (ww/bb/wb/bw/nw/nb/idle* adjacency pairs for rocprof per-boundary
+  decomposition); 5 matrix sessions + 9 rocprof traces banked in
+  results/w14_traces/. (2) THE LAW (rocprof BeginNs/EndNs, 3 sessions):
+  the gap sits EXACTLY at the deq->FA dispatch boundary, ~221-225 us
+  CONSTANT. Trigger class named: (E1) every wide-tile instance (ncols2>2,
+  mid3 AND wide6) pays it EVERY launch - any predecessor, drained or deep
+  queue, warm or cold; (E2) ONE-SHOT CONTAGION - the served FA<4,2> pays
+  the same ~223 us on its first dispatch after any wide dispatch (through
+  comb+deq+deq); pure-base sequences are gap-FREE (bb all gaps 0.0) and a
+  noop predecessor triggers nothing (nb=bb). Plus wide6 exit tail
+  (+24 us FA->comb vs 0) and combine +7 us. Cost model closes to ~5 us:
+  wide6-base = -173 kernel + 221 gap + 24 tail + 7 combine = +79 model vs
+  +84 measured. (3) ELIMINATED by direct measurement: LDS carve-out both
+  static (dummy 32768 B at exact wide6 shape: 10 us clean) and DYNAMIC
+  (decisive: the REAL served kernel with dynamic shared padded to mid3's
+  25088 and wide6's 32768 total footprint runs CLEAN at 791.6/791.7 us);
+  host (3.5 us/launch enqueue); queue depth/order (pipelined = drained);
+  power state (gap constant at 71% duty; post-idle DVFS ramp is a separate
+  additive effect: base +358, wide6 +698 after 2 ms idle); icache/code
+  size (gap constant over 300+ launches; sizes anti-order: mid3 37.5 KB >
+  wide6 35.4 KB both pay, base 20.8 KB clean, 69 KB dummy clean);
+  dissimilar-grid reprogramming (same-instance ww pays, noop->base clean);
+  grid/threads per se (mid3 192t pays, base 256t clean). UNEXCLUDED (below
+  public-tooling depth): scr/thread (1104 clean vs 1432 pays; spill dummies
+  are execution-bound and cannot isolate start latency) and the wide
+  template's instruction stream itself; synthetic vgpr-burn dummies were
+  voided by optimizer DCE and excluded from evidence. (4) A2 VERDICT: NO
+  schedule-only mitigation exists - batching (double-launch zero relief),
+  warm-up (not a warmup phenomenon), PDL (CUDA-only, no HIP/gfx900 path),
+  launch LDS rebalancing (moot: footprint does not trigger), grid/nbatch
+  (numerics, out of scope). Only effective mitigation = do not dispatch
+  wide tiles (env stays OFF), now mechanistically sealed: -173 us kernel
+  win can never beat +221 start + +24 tail at any layer count. Design-only
+  note for a future desk: compile-time scratch/register-profile reshaping
+  of the wide arms (byte-exact for the arm itself) is the only untried
+  lever; requires fattn owner sign-off on the documented DUST. (5) A3:
+  verdict cells reproduce x3 sessions (gap med 221.1/222.9/225.2, ~0.9%
+  cell spread, deltas 100x jitter, direction identical); no ggml-cuda code
+  touched -> no build/CI due; bench revisions COMPILE-EXIT:0 each.
+  RECEIPT: docs/amd-port/results/W14_widelaunch_receipt_2026-09-23.md.
