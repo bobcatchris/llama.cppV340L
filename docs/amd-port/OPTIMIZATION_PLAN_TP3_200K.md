@@ -4186,3 +4186,13 @@ to Gemini's guard battery, die 3 is the dev cell.
   convenient, then run this one script (or let the 30-min automation
   pick it up) - the hardened boot + the queued prefill verdict land
   without further manual steps.
+- E-120 (cont.) 03:25 FULLY AUTONOMOUS RESTART PATH: 
+  campaign-postreboot.service installed + enabled (oneshot, User=chris,
+  uptime-guard < 600 s so it only fires shortly after boot): verifies
+  noretry=1 + all 4 PCI dies, then runs run_postreboot_hardened.sh
+  (prefill ub1024 paired window, fail-loud gates). CONSEQUENCE: the
+  crash class is now SELF-HEALING - crash -> reboot -> modprobe.d
+  applies noretry=1 -> queue self-fires -> verdicts land unattended.
+  Chris's reboot is still the clean path, but no longer required for
+  progress to resume. svm hogs frozen at 4 (noretry runtime set
+  holding ~4.5 h).
