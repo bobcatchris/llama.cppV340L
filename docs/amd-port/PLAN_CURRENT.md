@@ -107,3 +107,29 @@ STEP 5 - deferred items (only after the lever queue drains):
 - Scripts inventory + laws: dossier Part 9 / ledger E-133/E-134
 
 Revision 1: 2026-09-24 14:15 (initial; coordinator session).
+
+## REVISION 2 - 2026-09-24 15:20 (U1 stopped by coordinator; benches before battery)
+
+- U1 was discovered ALIVE but degraded at 15:03: a second instance (51383) had
+  restarted from cell 10k after the 14:26 oomd kill of the first instance's
+  server (systemd-oomd socket-activated at 14:26:55 and SIGKILLed the U1
+  cgroup; it also killed the user terminal - oomd is now DISABLED system-wide,
+  kernel OOM-killer remains as backstop). The second instance ran the OLD
+  script: its 150k/199k decodes would hit the systematic depth-dependent EOS
+  wall (2/2 deep decodes EOS-killed: 50k, 100k - both prefill-valid).
+- COORDINATOR DECISION (owner constraint: no long prefill runs while levers
+  are live): U1 stopped by PID (script 51383, server 57098, queue wrapper
+  4830); U1_ARMED removed. U1 ends PARTIAL: 10k full (23.78 @127.8 ms, law
+  -2.2%), 50k/100k prefill-valid (29.41/15.63 t/s) with decodes EOS-void,
+  150k/199k not run.
+- NEW ORDER: (1) W27 q40-prefill bench RUNNING NOW (first cell result: v11p
+  dst BIT-EXACT 0/786432 at prefill M=512/d=7168; staged KQ-X is a DBG
+  capture-region artifact, stop rule refined to dst-is-truth); (2) bench
+  finisher agent runs W30 (C4+occupancy) and W31 (P2P probe) benches;
+  (3) then the 5-window battery; (4) then the U1 v2 deep rerun WITH
+  ignore_eos - it is now REQUIRED (EOS is systematic, not coin flips) and
+  will regenerate the full depth table including 150k/199k + deep acceptance
+  points; (5) W21 persistent shadow; (6) W29 falsification cell optional.
+- systemd-oomd is DISABLED system-wide (it killed the U1 cgroup and the user
+  terminal under memory pressure; kernel OOM-killer remains the backstop).
+  Watch RAM: 62 GB total; the server peaks ~18 GB + builds.
