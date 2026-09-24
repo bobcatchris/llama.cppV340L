@@ -3849,3 +3849,22 @@ to Gemini's guard battery, die 3 is the dev cell.
   split A/B is RUNNING on the fixed gates (s0 boot in progress,
   identity block verified). E-120's reboot request is WITHDRAWN -
   the 17:18 reboot already covered it.
+- E-120 (cont.) 19:30 SECOND RESTART (18:55:45) + FULL FLEET RELAUNCH
+  (Chris: "spin up a few agents"). RESTART COST: the interleaved A/B
+  chain + the draft-cache desk (died mid-commit; HEAD object emptied).
+  RECOVERY: empty objects purged, draft-cache reseated via reflog to
+  its A1 commit (68f729074, LLAMA_DRAFT_SHAPE_CACHE implemented,
+  default OFF) + host replicate-test checkpointed (9c229b3ae); card
+  mapping shifted AGAIN (05->card1, 08->card3, 0d->card0, 10->card4)
+  - the PCI-address gates adapted automatically (the card-number
+  gates would have wedge-looped again). FLEET NOW: (1) interleaved
+  split A/B chain on the GPUs (s0 boot live 19:24, 4 cells, the
+  ~4.3 ms tensor-split verdict); (2) WIDE-LAUNCH LATENCY DESK
+  (wt-attn-fa continuation, die-3 benches): root-cause the ~210 us
+  wide-launch gap that ate the wide6 kernel win - solving it
+  reopens a ~-18% real attention lever; (3) DEEP-CENSUS DESK (U1,
+  one sanctioned TP4 boot at ctx 131072 on lane 8083): bounds
+  attention/KV ms-vs-depth (8k/64k/120k) and the f16-KV-pool tax;
+  (4) DRAFT-CACHE CONTINUATION (zero-GPU): host replicate-test ->
+  build -> CI -> served spec for the ~3 ms shape-cache lever.
+  Every desk: WIP-commit + CHECKIN laws; snapshots current.
