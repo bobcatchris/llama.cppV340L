@@ -1,0 +1,24 @@
+# k4v4 refactor BASELINE — captured 2026-09-05 at 87ff17fb
+# GPU: RTX 5060 Ti x2, sm_120a. Lease: agent1-k4v4.
+# This is the pre-refactor snapshot. After extracting the per-side prologues, EVERY
+# line below must reproduce BYTE-IDENTICAL for BOTH <5,4> and <4,2>.
+
+## sha256 of raw outputs
+a47bd314d041bc399b34835feb0e523da6ebe55ef90c01feb5e27242d9d5fb9c  oracle.txt
+ec3d69aef77997955ee6c074e7985d731bddfd75627e3ae25457bd26597daa83  dispatch.txt
+4a2ec9c6b5bc80b46f1a156ffdab1302f651023880b34d4c7a6ea1115a00a972  known_answer.txt
+
+## pass/fail counts
+oracle: 11 PASS / 0 FAIL
+dispatch: 10 PASS / 0 FAIL
+known_answer: PASS
+
+## worst error vs tolerance (the sensitive numbers)
+max_err=0.0311902 tol=0.0616363
+max_err=0.0222437 tol=0.064298
+max_err=0.0222339 tol=0.0709194
+
+## k4v2-side tests (slice4 is also being edited)
+ninfer_slice4_kvarn_test      PASS rc=0
+ninfer_kvarn_batched_ops_test PASS rc=0
+ninfer_kvarn_gqa_test         PASS rc=0

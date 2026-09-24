@@ -1,0 +1,80 @@
+PREFILL_OPTRACE_row — window 3 / P1: prefill per-op decomposition (DECISIVE CHECK P1), 2026-09-17 GPU-OWNER window (amd/tp4-cure)
+bin: /home/chris/artifacts_bin/ninfer-serve_6c8ae21399516750.bin (HEAD 61c1ecc0b; BANK-BEFORE-RELINK; strings 5/5)
+config: /media/chris/EMTEC256/qwen3_8_27b_nvfp4.ninfer --port 8100 --devices 0,1,2,3 --prefill-chunk 128
+  --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16 --spec mtp --draft-tokens 2
+  --allow-nvfp4-weights
+env: NINFER_ALLOW_NVFP4_TP2=1 NINFER_WORKSPACE_MIB=96 NINFER_DRAFT_VOCAB=<qwen38_draft_vocab_ids.json>
+  NINFER_VERIFY_TAIL_TRACE=1 NINFER_TP2_TIMING=1 NINFER_TP2_OPTRACE=1 NINFER_VERIFY_LAYER_TRACE=1
+  NINFER_LMHEAD_ARM=simt NINFER_LMHEAD_TRACE=1 NINFER_PREFILL_OPTRACE=1 NINFER_TILED_TRACE=1
+serve log: W3_bootD_p1_serve.log (boot D, pid 587686 anchored-TERM'd, KFD=0 after; draft-vocab load verified)
+probe: ONE plen-2000 conc=1 prefill (BLUE body 62 tok + 1938 alphas — body tokenized 62, request landed
+  plen 2000 not 1996; same 16x128 chunk geometry), mt 64 temp 0, FIRST+ONLY request on a fresh boot after a
+  120 s cool window. Response: 'BLUE', finish=stop, completion 41, client wall 28.95 s
+  -> TTFT ~28.1 s (decode 41 tok ~0.8 s at the flip leg's round rate), prefill ~75.5 tok/s
+  (chunks 1-15 sum 24.27 s / 1920 tok = 79.0 tok/s chunk-rate) — ON the doc's 75.7 anchor class.
+clocks sideband (W3_p1_clocks.log, 14 samples x 4 GPUs over the probe window): mclk 3 (945) throughout;
+  sclk oscillated levels 4-7 (1138-1500) across dies during the burst — PARTIAL droop band; per-chunk
+  columns below are same-boot internally consistent; cross-leg absolute deltas carry the band caveat.
+
+== [PREFILL-SUM] n=16 (the probe request's chunk=1..16 run), verbatim, all four ranks ==
+[PREFILL-SUM] rank=2 n=16 mean_ms wall=1641.780 gemm=800.981 ar=71.850 body=646.800 gap=122.148
+[PREFILL-SUM] rank=1 n=16 mean_ms wall=1641.867 gemm=769.746 ar=92.017 body=657.830 gap=122.274
+[PREFILL-SUM] rank=3 n=16 mean_ms wall=1642.361 gemm=840.432 ar=47.966 body=631.225 gap=122.738
+[PREFILL-SUM] rank=0 n=16 mean_ms wall=1643.383 gemm=803.857 ar=71.080 body=644.643 gap=123.803
+(4-rank means: wall 1642.3 = gemm 798.8 + ar 70.7 + body 645.1 + gap 122.7; ngemm=192/chunk at every
+ site, gemm_over=0 everywhere — no cap clipping; rank0 printed here; earlier n=1 blocks are the boot
+ self-probe prefills, excluded.)
+
+== per-chunk gap column (rank0, probe request) ==
+chunk tok wall   gemm    ar   body   gap
+  1  128 1577.7  772.2  10.7    0.0 1526.6  <- request-first-chunk drain artifact: the one-chunk-wide
+  2  128 1541.8  768.6  75.6  717.7    0.0     drain hands chunk1's layer detail to chunk2's window
+  3  128 1549.4  763.8  71.7  690.3   23.5     (body=0/gap=1526 on chunk1 is the artifact; chunk-wall
+  4  128 1557.6  765.5  73.6  694.0   24.4     and gemm columns remain valid)
+  5  128 1560.6  767.0  74.2  700.3   19.0
+  6  128 1569.8  766.5  72.6  705.3   25.4
+  7  128 1578.1  770.0  73.7  710.0   24.3
+  8  128 1581.8  769.1  71.1  721.8   19.8
+  9  128 1593.7  768.1  72.0  725.7   28.0
+ 10  128 1599.8  767.9  74.0  735.8   22.2
+ 11  128 1607.6  770.1  75.8  737.8   23.9
+ 12  128 1619.6  771.8  74.3  745.2   28.3
+ 13  128 1635.7  772.2  72.4  758.4   32.6
+ 14  128 1737.4  816.7  71.1  731.4  118.2  <- transient (sideband shows sclk dip on GPU0/2 this window)
+ 15  128 1770.1  829.9  57.5  833.8   48.9
+ 16   80 2213.6 1222.3 116.8  838.5   36.0  <- last chunk: finalize_at_end + last-chunk lm_head + MTP
+                                              prefill chunk + request-end sync folded in (gemm 1222 is
+                                              this finalize class, NOT the per-chunk steady GEMM)
+
+== THE DELIVERABLE: the [PREFILL-SUM] gap number and the falsifier verdicts ==
+steady-state per-chunk decomposition (4-rank means, n=16):
+  wall 1642.3 = gemm 798.8 (48.6%) + ar 70.7 (4.3%) + body 645.1 (39.3%) + gap 122.7 (7.5%)
+  THE GAP NUMBER: 122.7 ms/chunk — NOT the ~900 ms/chunk unnamed residual the check was built to name.
+
+The three falsifiers, applied verbatim (P1_PREFILL_NOTES.md):
+  1. gemm > ~1100 ms/chunk?  NO — 798.8 mean (770 steady; only the finalize-class chunk16 touches 1222).
+     -> cold-weight GEMM lever (Fix C / hypothesis I) stays CLOSED on this number.
+  2. ar > ~250 ms/chunk?      NO — 70.7 mean (48-92 by rank).
+     -> TP AR bandwidth (Fix B / hypothesis H) stays CLOSED on this number.
+  3. body < 300 AND gap large? NO — body is 645.1, nowhere near < 300.
+     -> the tail/sync/MTP class does NOT own.
+  ELSE branch (verbatim): "hypothesis G owns (eager inter-op stream gaps, prefill NOT graph-captured)
+  -> chunk graph capture is the lever." The letter of the tree lands on G — but the SAME boot's gap
+  column REFUTES G's mechanism: gap is 122.7 ms/chunk (7.5%), not large. Graph capture can only
+  reclaim the gap class -> bounded upside ~1642->~1519 ms/chunk (~84.7 tok/s, +7.5%), NOT the
+  100-130 tok/s Fix A predicted from the sketch's phantom ~900 gap.
+
+== WINNER, NAMED LOUD ==
+The doc's "~950 ms/chunk unnamed residual" is now NAMED and it is NOT gaps, NOT AR, NOT cold-GEMM:
+  it is the IN-LAYER NON-GEMM/NON-AR BODY — 645.1 ms/chunk (39.3% of wall) of kernel-execution time in
+  the 64 layer bodies outside the tiled GEMMs and the ARs (GDN mixer/conv/norm/activation/rope/
+  quant-dequant class at T=128), PLUS a ~270 ms GEMM underestimate in the doc's sketch (predicted 530,
+  measured 798.8 — real tiled-GEMM device time, rank-uniform, NOT the >1100 cold-weight class).
+  Winner: BODY (in-layer non-GEMM ops), 645 ms/chunk — kernel-efficiency lever on the non-GEMM op class;
+  runner-up: GEMM at 799 (49%) — legal, warm, rank-uniform; a GEMM lever must beat 798.8 warm, not 1100 cold.
+  Chunk graph capture (Fix A) is DEMOTED to the 122.7 ms gap class it can actually touch (~7.5%).
+
+Side effects observed (documented, env-gated): [LTRACE] dumps every 64 passes during the probe's
+  decode tail (P1_NOTES documented side effect), supplementary, not part of P1.
+
+Default-OFF byte-identity: no cell owed (OFF adds only getenv per process; structural-gate pattern).

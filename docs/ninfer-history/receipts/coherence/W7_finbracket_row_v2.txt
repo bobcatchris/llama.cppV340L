@@ -1,0 +1,81 @@
+W7 FINALIZE DESK — FINAL ROW v2 (named owner + cure + A/B) — 2026-09-18, GPU-owner continuation
+================================================================================================
+PLATFORM: FINAL config — iommu=pt LIVE (verified: /proc/cmdline + 39/39 IOMMU groups identity),
+clocks pinned power_dpm_force_performance_level=high on all four gfx900 dies (card0/1/3/4).
+Every number below is final-config truth. Probe grammar: plen-2075 mt64 temp0 known-answer
+('BLUE'/stop/52) — PARITY GREEN ON EVERY LEG (A and all cure arms; resp jsons banked).
+
+VERDICT (one line): the ~1394 ms finalize-chunk gap is a HOST-side stall in the MTP tail path —
+NOT GPU compute, NOT the recurrent delta-net (dn=7-8 ms at tok=27), NOT the MTP finalize/AR
+path (extent==0, never runs). Cured by NINFER_MTP_TAIL_ASYNC=1 (device-side tail composition):
+chunk-17 prep 922-1602 ms -> 14.0-15.1 ms on all ranks, plus ONE process-lifetime ~330-676 ms
+first-T=27 stem quantum (named, uncured-in-window; proposal below).
+
+OWNER CHAIN (each step measured, bins + logs banked):
+1. v3 fin brackets (bin 6a684e7f2988adf7, leg W7_fintail_base_v3_serve.log): prep bracket
+   (mark0->mark1) OWNS the whole gap: prep 921.8/943.3/1271.9/1602.1 vs gap
+   924.6/946.1/1274.7/1604.9 (r2/r1/r0/r3); final_fwd+arsteps_tail 0.004-0.007.
+   => stall between the is_last argmax and the seeding draft chunk.
+2. v1 cure (bin 09766994e2caea0e, W7_fintail_async_b_leg_serve.log): removed
+   cudaStreamSynchronize + 4-byte D2H (final column via io_.token D2D) — arm proven ON —
+   but gap PERSISTED (prep 654.5/668.5/1313.8/1328.0). => sync/D2H exonerated as owner.
+3. FINHOST host-clock sub-brackets (bin ae0e9d2d63775dd7, W7_fintail_finhost_leg_serve.log):
+   copy= (work_.alloc + pageable H2D of mtp_ids) = 659.36-659.74 ms on ALL FOUR ranks
+   (+-0.4 ms!), chunk= (mtp_prefill_chunk host section) 668.7/1000.8/1000.8/1333.1;
+   warmup final chunk (same calls, T=51): copy=47-49, chunk=0.06-0.18. ~330 ms quanta.
+4. Recipe-bail leg (bin f320ee6062c80156, W7_fintail_v5_recipebail_leg_serve.log): guard
+   text_prefill==nullptr never true on the serve text path (prefill_chunk always passes
+   &TextPrefill) — leg still precious: prep(stream) = 349.2/684.4/1013.4/1343.2 =
+   EXACTLY 1/2/3/4 quanta of ~330-335 ms; copy=664.3-664.6.
+5. CURE v2 (bin d986ea7a187b87c5, W7_fintail_v6_recipe_leg_serve.log): NINFER_MTP_TAIL_ASYNC=1
+   device recipe — prompt columns = the chunk's own ids shifted by one (D2D from ids_device,
+   already resident), final column = io_.token D2D; guard shifted_embedding_begin ==
+   text_prefill->begin + 1 (plus multimodal==nullptr). Pageable H2D GONE:
+   copy= 0.007-0.008 ms (from 660). chunk-17 wall 1037.2/1037.3/1037.9/1356.3
+   (r1/r2/r0/r3) vs baseline 1585-2266; gap 16.6/16.7/17.3/335.7 — three ranks AT THE
+   STEADY-CHUNK GAP LEVEL (~17-20 ms). Request mean gap/chunk (PREFILL-SUM):
+   72.99/73.43/73.68/92.30 vs baseline 126.3/127.4/147.4/166.8.
+6. Reproduction + last-quantum naming (bin 0572d4108317ee85, W7_fintail_async_serve.log +
+   FINMTP stamps): stem= (mtp_forward_stem host section) 345.4/341.9/676.0/328.7 ms at T=27
+   while the SAME call costs 0.52 ms (T=51 first-ever), 0.015 (T=2), 0.02-0.04 (T=128 x16)
+   — a width-class-specific ~330 ms host path, ONE-TIME per process (first mid-width
+   request), paid in PARALLEL by all ranks (only the rank whose layer backlog is smallest
+   exposes it on-stream: prep 319.7-333.1; the others hide it). chunk-17 walls
+   1064.0/1064.1/1065.0/1369.7, gaps 16.8/16.9/18.0/322.4 — reproduces leg 5.
+
+A/B SUMMARY (same band, same probe, pinned+pt; baseline bin has no arm so A IS the legacy path):
+  chunk-17 wall (max over ranks):   2265.5 ms  -> 1356.3 / 1369.7 ms   (-40%)
+  chunk-17 gap (min over ranks):    924.6 ms   -> 16.6 / 16.8 ms        (-98%)
+  chunk-17 prep (max over ranks):   1602.1 ms  -> 333.1 / 319.7 ms (one-time; 3 ranks ~14.5)
+  request mean unbracketed gap/chunk: 126-167 ms -> 73-92 ms           (-53 to -75 ms/chunk;
+      REV2 §5 projected -82 amortized — measured -53..-75, honest band)
+  Steady chunks (1-16): UNCHANGED (wall 1015-1038, gap 17-23) — the cure touches only the
+  finalize chunk's tail path; byte-identical output (parity 'BLUE'/stop/52 every leg).
+  Pinned-vs-auto note: the 12:03/12:08 pre-pin legs (auto band, bins 1e03e5af/dn-class) show
+  the same staircase (gaps 1035-1386/716-1394) as the post-pin legs — the stall is
+  clock-band-independent; a same-bin auto-band leg was NOT run this window (box is pinned for
+  the platform verdict; re-leg on demand).
+
+RESIDUAL (named, NOT cured in this window — one-time per PROCESS, not per request):
+  First mtp_forward_stem call at a NEW width class (T=27; classes seen warm: 2, 51, 128) costs
+  ~330 ms host (one rank also paid 2 quanta = 676 ms). Mechanism is width-class-specific, NOT
+  warm-up of the op itself; suspect a width-quantized kernel variant's first launch (lazy
+  code-object load) inside the stem's launch sequence. PROPOSAL: warm the mid-width class at
+  boot — one ~27-token prefill during serve warmup ("warming up..." phase) — expected to move
+  the quantum off the critical path entirely; needs one boot-path edit + leg to verify.
+
+WEDGE SAGA ADDENDUM: no recurrence on iommu=pt across 7 boots + 6 probe legs this window
+(13:54 partial boot fragment preserved in git history was the dead session's model-request
+failure, not a wedge). The gpureset playbook row stands; passthrough appears to harden the class.
+
+RED/GREEN CLOSURE: RED rows = baseline legs (this row + W7_optrace3_serve.log staircase +
+W7_finbracket_v2_1341_serve.log); GREEN rows = legs 5/6 above (parity BLUE/stop/52, prep ~14 ms).
+The standing cell = the [PREFILL-FIN]/[PREFILL-FINHOST]/[PREFILL-FINMTP] prints (env-gated by
+NINFER_PREFILL_OPTRACE / NINFER_MTP_TAIL_ASYNC, zero cost unset — byte-identical law holds):
+any regression of prep re-appears in the per-request FIN line. PROMOTED bin:
+/home/chris/artifacts_bin/ninfer-serve_0572d4108317ee85.bin; serve_10k.sh flipped (BIN + env).
+BOOT_BATTERY: GREEN at 2026-09-18 14:57 port 8100 (row BOOT_BATTERY_20260918_145747.row).
+
+BANKED BINS: 6a684e7f2988adf7 (v3 brackets, baseline) / 09766994e2caea0e (v1 cure) /
+ae0e9d2d63775dd7 (+FINHOST) / f320ee6062c80156 (recipe-bail probe) / d986ea7a187b87c5 (cure v2)
+/ 0572d4108317ee85 (cure v2 + FINMTP, PROMOTED, SERVING).
