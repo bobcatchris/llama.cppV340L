@@ -1,5 +1,5 @@
 {
-  "description": "Baseline gates for llama-server TP4 200k (Qwen3.8-27B-ASCII-P1M, draft-mtp) - ratcheted 2026-09-24 (E-137) to the fa40 var-11 q4_0-direct serving of record (paired +5.0%/+4.3%, clean pair-1 cell 24.55, oracle bit-exact W17); prior stamp E-105 decode 23.23 @10k / 23.34 @200k, prefill 217.71, accept 0.66667. SUPERSEDES the 2026-09-22 TP3 stamp (18.72) that let the aln-completion hot-path tax (landed post-TP4-validation) read as -0.73% PASS; with the true anchor the same number is a -20% FAIL.",
+  "description": "Baseline gates for llama-server TP4 200k (Qwen3.8-27B-ASCII-P1M, draft-mtp) - ratcheted 2026-09-24 (E-137) to the fa40 var-11 q4_0-direct serving of record (paired +5.0%/+4.3%, clean pair-1 cell 24.55, oracle bit-exact W17); prior stamp E-105 decode 23.23 @10k / 23.34 @200k, prefill 217.71, accept 0.66667. SUPERSEDES the 2026-09-22 TP3 stamp (18.72) that let the aln-completion hot-path tax (landed post-TP4-validation) read as -0.73% PASS; with the true anchor the same number is a -20% FAIL. | E-148 (2026-09-24 16:20): ub1024 PROMOTED (paired decode +0.36/+0.33, prefill co-metric +5.02/+4.14% from server logs - W32); decode anchor 24.55 -> 24.69 (ub1024 arm mean).",
   "source": "E-105 TP4 validation receipts (TP4-DONE + 10K-DONE guard batteries, 2026-09-23 08:30-08:38 window)",
   "ratchets": 2,
   "config": {
@@ -38,7 +38,7 @@
     "decode_8k_10k": {
       "ctx_target": 7857,
       "completion_tokens": 128,
-      "decode_per_second": 24.55,
+      "decode_per_second": 24.69,
       "mtp_accept_ratio": 0.667,
       "mtp_mean_len": 3.0,
       "description": "Decode throughput at 8k-10k primed context with draft-mtp (PLOG-101)"
