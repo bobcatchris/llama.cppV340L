@@ -1,17 +1,19 @@
 # THE V340L LATENCY DOSSIER - v2 (self-contained review package)
 
-**Repo:** llama.cpp, branch `amd/v340-port-v2`, HEAD `a710244d4` (2026-09-24). NOT upstream
+**Repo:** llama.cpp, branch `amd/v340-port-v2`, HEAD `68654e245` era, synced to ledger
+E-148 (2026-09-24 ~18:30). NOT upstream
 master - this is a private port carrying campaign-specific kernel/context work, all described
 fully below. **Audience:** you are (likely) an LLM receiving ONLY this document. Everything
 needed is inline: full code of every hot path, all measured numbers verbatim, all failed
 attempts, all incident logs. You have no filesystem access to our receipts - nothing important
 is left as an external reference. **Your job:** find what we missed. The standing owner
-question: short-prompt decode is 24.55 t/s; the owner believes ~30 t/s should be
-reachable. The cycle budget (E-141 correction): ~24-25% of each speculative cycle is
+question: short-prompt decode is 24.69 t/s (ratcheted 24.55 -> 24.69 by the ub1024
+promotion, E-148); the owner believes ~30 t/s should be reachable. The cycle budget
+(E-141 correction): ~24-25% of each speculative cycle is
 inter-GPU allreduce latency (136 boundaries/cycle over PCIe - structurally hard to
 remove, proven); ~65% is per-die weight-stream compute (MMVQ at 39-75 GB/s vs ~327
 available - latency-starved, and the LARGER pool). ASCII throughout (project rule). Claims cite: ledger entry
-(E-NNN in docs/amd-port/OPTIMIZATION_PLAN_TP3_200K.md, 214+ append-only entries), desk
+(E-NNN in docs/amd-port/OPTIMIZATION_PLAN_TP3_200K.md, 223+ append-only entries), desk
 receipt (WNN in docs/amd-port/results/), or file:line in the tree. Ledger wins on conflict.
 
 ---
@@ -30,19 +32,19 @@ tensor-parallel mode over PCIe Gen3.
 
 | metric | value | condition |
 |---|---|---|
-| decode | **24.55 t/s** | 8k-10k context, temp 0, full stack (E-137 ratchet) |
+| decode | **24.69 t/s** | 8k-10k context, temp 0, full stack (E-148 ratchet, ub1024; 24.55 = the pre-ub1024 E-137 stamp) |
 | decode reference without spec | 12.24 t/s | same stack, speculative off (baseline row) |
 | decode (superseded stamp) | 23.23 @10k / 23.34 @200k | E-105 lineage |
-| prefill | 217.71 t/s @2k; 82.17 @8k | baseline |
-| prefill at depth | 170.35 @10k; 29.41 @51k | U1 cells, measured 09-24 |
+| prefill | ~224 t/s of-record (ub1024 co-metric, E-148); 217.71 @2k / 82.17 @8k | baseline was pre-ub1024 |
+| prefill at depth | 170.35 @10k; 29.41 @51k | U1 cells, measured 09-24 (pre-ub1024 binary) |
 | MTP acceptance | 0.66-0.68 | temp 0; mean accepted len ~3.04 of 3-token chain |
 | VRAM per die under load | 6,978 / 8,176 MiB | dies are 8 GiB (8,576,157,376 B), NOT 16 |
 
-### 1.3 The decode round budget (~40.7 ms at 24.55 t/s)
+### 1.3 The decode round budget (~40.5 ms/token at the 24.69 of-record; 40.7 at the 24.55 stamp)
 
 | component | ms/round | share | how measured |
 |---|---|---|---|
-| **136 allreduce boundaries** (TP4 per-layer sync) | **~28.7-31.2 per CYCLE** | **24-25% of cycle** | W8 probe: per-die per-boundary medians 128.8/151.9/191.6/210.8 us; wall = slowest die: 136 x 210.8 us = 28.7 ms. SCALE NOTE (E-141): the wall is per speculative CYCLE (~124 ms = 3.04 tokens / 24.55 t/s), not per token |
+| **136 allreduce boundaries** (TP4 per-layer sync) | **~28.7-31.2 per CYCLE** | **24-25% of cycle** | W8 probe: per-die per-boundary medians 128.8/151.9/191.6/210.8 us; wall = slowest die: 136 x 210.8 us = 28.7 ms. SCALE NOTE (E-141): the wall is per speculative CYCLE (~124 ms = 3.04 tokens / 24.69 t/s), not per token |
 | MMVQ weight matvecs (3.08 GB/die/CYCLE) | ~80-85 of the concurrent cycle | **~65% of cycle - THE LARGEST TERM** | W23 per-type implied GB/s (section 5.4); runs concurrently at TP width 4 |
 | attention (16 KV layers, fa40 direct arm) | ~2-3 | ~5% | W17: -37.5%/launch vs the f16-pool arm |
 | KV pool conversion (f16 pool -> tiles) | 0 | 0% | eliminated by fa40 (need_f16=false); was 3.98 us/1k tokens/launch |
@@ -56,7 +58,10 @@ parallelism requires 2 allreduces per layer x 65 layers + 2 catch-up + 6 draft-c
 boundaries = 136/cycle; the count is STRUCTURAL (W8 section 3). CONSEQUENCE: the MMVQ
 access-pattern work (section 4.4) targets the LARGER term; the sync wall's live lever is
 arrival-skew compression (clock floors). PP (serial staging) removes the sync but
-serializes the concurrent compute: PP4 predicts 8-9 t/s (-65%) - NO-GO by math (E-141).
+serializes the concurrent compute: PP4 predicts 8-9 t/s (-65%) and tp2xpp2 is
+unimplementable in this tree - NO-GO x2, CLOSED by derivation (E-141/W29); the early-era
+PP "loss" was an anecdote (the layer arm crashed at decode entry - PP decode was never
+measured).
 
 ### 1.4 The boundary's own anatomy (why each allreduce costs 128-211 us)
 
@@ -119,15 +124,17 @@ GGML_CUDA_FATTN_TILE_Q40_DIRECT=1 \
 GGML_PINNED_DEV_COPY=1 \
 HIP_VISIBLE_DEVICES=0,1,2,3 /media/chris/ssd128/llamacpp/llama.cpp/build-hip/bin/llama-server \
   -m /media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf \
-  -ngl 999 -sm tensor -c 200000 --batch-size 512 --ubatch-size 512 \
+  -ngl 999 -sm tensor -c 200000 --batch-size 1024 --ubatch-size 1024 \
   -ctk q4_0 -ctv q4_0 -fa on --spec-type draft-mtp \
   -device ROCm0,ROCm1,ROCm2,ROCm3 \
   --port 8080 -t 8
 ```
 
-Every env is individually validated (receipts E-090/E-094/E-095/E-104/E-137). The baseline
-gates (docs/amd-port/tests/baseline_tp3_200k.json, ratcheted E-137): decode 24.55 (warn
--5% / fail -10%), prefill 217.71, MTP canary accept >= 0.63, determinism double-run
+Every env is individually validated (receipts E-090/E-094/E-095/E-104/E-137). The 1024/1024
+geometry is the E-148 promotion (battery decode +0.36/+0.33 paired, prefill co-metric
++5.02/+4.14% recovered from the server logs after the --decode-only harness gap skipped
+the prefill guard). The baseline gates (docs/amd-port/tests/baseline_tp3_200k.json,
+ratcheted E-137 then E-148): decode 24.69 (warn -5% / fail -10%), prefill 217.71, MTP canary accept >= 0.63, determinism double-run
 byte-identical, needle recall 3/3 depths - all behind a provenance block that FAILS CLOSED
 without a clean tracked tree + commit hash + binary sha256 + CMakeCache sha256 + full
 launch config.
@@ -137,8 +144,8 @@ launch config.
 ## PART 4 - ONE DECODE ROUND, END TO END, IN CODE
 
 A "round" = one generation step (M<=4 tokens): the draft context proposes 3 tokens (the
-MTP chain), the target context verifies them plus the real token in one ubatch. 40.7 ms.
-Follow the code.
+MTP chain), the target context verifies them plus the real token in one ubatch. ~40.5 ms
+at the 24.69 of-record. Follow the code.
 
 ### 4.1 Entry chain (the exact frame order, from a real crash backtrace)
 
@@ -252,6 +259,16 @@ further heals); one rate-limited WARN per clear epoch names the healed tensor. D
 behavior byte-identical. Host-proven by docs/amd-port/tests/test_meta_reentry_host.cpp
 (CI section 2c): pre-fix reproduces the abort class, post-fix ALL PASS with convergence.
 
+**Second crash path - the feature is PARKED (E-147).** The battery's w19 window re-opened
+the feature with the heal live: engagement banner 2/2 (target + draft contexts), then FOUR
+successful lazy re-registrations (norm-64 simple + cache_k_l64 view, both warmup rounds),
+then a hard `GGML_ASSERT(src_ss[i].axis != GGML_BACKEND_SPLIT_AXIS_UNKNOWN)` at
+ggml-backend-meta.cpp:832 - a THIRD draft-graph shape variant arrives at the re-split with
+an UNKNOWN split source axis. Deterministic 2/2 arm cells, identical timestamps; controls
+PASS. The E-138 heal fixed the 1929 class; the re-split source-axis assignment is a second
+unguarded hole (needs an UNKNOWN-axis fallback or axis capture at clear time). Two crash
+paths for a ~3 ms lever: PARKED permanently, default-off, docket documented.
+
 ### 4.3 The meta backend (ggml/src/ggml-backend-meta.cpp) - where the wall executes
 
 The meta backend executes the whole graph across the 4 die backends and owns the
@@ -343,7 +360,7 @@ bench-to-serving multiplier exists):
 | type | GB/die | served ms/round | implied GB/s | gate today |
 |---|---|---|---|---|
 | IQ3_S | 0.890 | 17.6 | 50.6 | SHARE=1 |
-| IQ4_XS | 0.818 | 10.9 | **75.0** (base 78.8 in W7) | share OFF (E-104; re-open queued) |
+| IQ4_XS | 0.818 | 10.9 | **75.0** (base 78.8 in W7) | share OFF (E-104; re-open measured NO-PROMOTE, E-147) |
 | IQ3_XXS | 0.615 | 14.8 | 41.6 | SHARE=1 |
 | Q4_K | 0.415 | 8.5 | 48.8 | SHARE=1 |
 | Q6_K | 0.145 | 3.7 | 39.2 | SHARE=1 |
@@ -351,10 +368,15 @@ bench-to-serving multiplier exists):
 The zero-compute ablation (E-106 cfull): the exact same schedule with compute removed
 still ceilings at 70-120 GB/s - ~2.7-4.7x of the 6x aggregate gap is the ACCESS PATTERN
 itself. The attempted fix (wide-s2r: hoist all 4 tokens' y preloads into registers)
-measured NULL (W25): the compiler already hoists (+0-3 regs, CTAs/CU unchanged).
-Remaining cash: the env window (IQ4XS_SHARE re-open + the IQ3 S2R gates never set in
-serving, ~-3.4 ms) and C4 (lift the T=1-only GLU fusion ban to T=4 at ggml-cuda.cu:2648 /
-mmvq.cu:1205 - gate+up tensors re-read y twice; -2 to -4.5 ms, code change, OPEN).
+measured NULL (W25): the compiler already hoists (+0-3 regs, CTAs/CU unchanged). The two
+remaining named cash items were both measured 09-24 evening and both came back negative:
+the env window (IQ4XS_SHARE re-open + the IQ3 S2R gates, ~-3.4 ms predicted) promoted
+NOTHING - +0.32% mean inside the window's own 0.28 t/s repeat spread; gates stay unset
+(E-145/E-147/W33). C4 (lift the T=1-only GLU fusion ban to T=4 at ggml-cuda.cu:2648 /
+mmvq.cu:1205) is DEAD: oracle-fail on iq4_xs (19449/69632 els, max_rel 0.114) and +21.8%
+SLOWER on iq3_s - FMA-contraction divergence between template instantiations,
+instantiation-local, not source-expressible (W30/E-144, double-derived E-146). The
+70-120 GB/s access-pattern ceiling stands as the wall.
 
 ### 4.5 Attention - fattn-tile + the fa40 arm (ggml/src/ggml-cuda/fattn-tile.cuh) - ~2-3 ms/round
 
@@ -509,8 +531,12 @@ channels - each refutation has a receipt). The transport floor itself: ~69.5 us/
 What does NOT move it (all proven): host enqueue (0.2 us no-op), NUMA/pinning (single
 NUMA), transport tuning (W9 flat x1.07), channel count (chan4 -12.6% served), count
 reduction (forced structure), same-tensor clustering (no legal candidate). What DOES:
-compressing the skew (clock floors, queued, +2.4-4.8%), or eliminating boundaries
-structurally (PP - re-evaluation in flight, W29).
+compressing the skew (clock floors - the lever is still UNMEASURED: the battery window
+was a structural CTRL-FAIL, the hook refused unprivileged execution; root retry queued,
+E-147/E-148). Eliminating boundaries structurally is CLOSED: PP NO-GO x2 by derivation
+(E-141/W29), and the reviewer's flat P2P bypass of the ring is DEAD EMPIRICALLY - all 12
+ordered die-pairs canAccess=0 (driver-level refusal, explaining RCCL's own x12 enable
+failures) and the host-staged-flat fallback WEDGES (W31/E-144).
 
 ### 4.7 The draft chain + sampler
 
@@ -521,9 +547,17 @@ first-on-equal = same token; bandwidth lever only). Sampler on CPU ("backend sam
 not supported with SPLIT_MODE_TENSOR" - server log). Acceptance 0.66-0.68 is
 head-calibration-bound (W28): the draft KV is ALREADY f16 (defaults common/common.h:340-341;
 -ctk/-ctv touch only the target, common/common.cpp:1602-1603), the verifier's q4_0 noise
-is shared conditioning and cancels. Chain shape (--spec-draft-n-max 4, arg.cpp:3738) is
-the only live acceptance-adjacent lever: mean_len 3.04 -> ~3.6+ if acceptance holds
-(wired as battery window 5 with a content-invariance sha check).
+is shared conditioning and cancels. Chain shape (--spec-draft-n-max 4) was MEASURED and
+REJECTED (battery w28nmax, E-147): paired -43.4%; the 4-token chain drafted 167 but
+accepted 84 - the IDENTICAL 84 that chain-3 accepted, i.e. position-4 acceptance ~0% and
+the extra slot is pure verify overhead. Head-calibration-bound is now empirical, not
+inferred. The acceptance AXIS itself became measurable on 09-24: the W34 fixed-text
+instrument (built, E-146) uses the server's own per-position acceptance line ("acc per
+pos = (...)" at -lv 5, server-context.cpp:619-633) with frozen prompt-side token-id
+cascades (identical text across arms by construction) and an A/A null cell; runner
+staged, unrun. Known gap: target top-k logprobs are NOT populated on the spec path (TODO
+server-context.cpp:4091). The L4 acceptance-rises-with-depth prediction stays untested
+until the U1 v2 deep rerun.
 
 ---
 
@@ -579,6 +613,28 @@ iff die-3 sclk act-mean < 1150 MHz or <=991 MHz duty > 20%** (decode 23.2-23.6 i
 act-mean >= ~1190; 17.3-17.7 iff duty 44-53%; hot-but-unthrottled cells still decode
 21.8-22.5 - hot alone is not slow, THROTTLED is slow).
 
+### 5.4 The ub1024 promotion (battery window, 09-24 16:50-17:20; adjudicated E-148)
+
+The battery's machine verdict for the ub1024 window was SPLIT (decode positive, prefill
+"not measured") - a harness artifact: --decode-only cells never run the prefill guard.
+The desk adjudicated the prefill co-metric straight from the server logs' print_timing
+lines (provenance: all 4 cells tree_clean=True, binary 0d5eb814 unchanged throughout):
+
+```
+decode (cells/decode_8k_10k):  r1=24.48  a1=24.84  a2=24.75  r2=24.42
+  PAIRS: a1-r1 = +0.36   a2-r2 = +0.33   mean +0.34 t/s (+1.41%)  both-positive -> WIN
+prefill (server logs, print_timing): 187.08 / 196.47 / 195.02 / 187.26 t/s
+  arm pairs +5.02% / +4.14% vs predicted +4.8/+5.3%  -> INSIDE the E-139a band
+acceptance: 0.6667 ctrl vs 0.6614 arm (-0.5 pts; draft chain 127 vs 126 - benign)
+VOID-GATE 4/4 PASS (indep 1250/1352/1288/1230)
+```
+
+PROMOTION EXECUTED (E-148): baseline decode ratcheted 24.55 -> 24.69 on the guard-read
+field (cells/decode_8k_10k/decode_per_second - the correct field this time); 1024/1024
+applied to launch_tp3_200k.sh + run_combined_window.sh + run_postreboot_hardened.sh +
+run_u1_window_v2.sh; args-only, no rebuild. Of-record now: decode 24.69, prefill ~224
+(ub1024 co-metric), accept 0.66-0.68, TP4+RCCL+fa40+ub1024.
+
 ---
 
 ## PART 6 - THE WALLS (each: the barrier, the attempts, the verdict)
@@ -591,9 +647,16 @@ scale error). Proven sealed: count reduction (2 cuts/layer forced by the shardin
 alternatives multiply weight streaming) and same-tensor clustering (boundaries are
 data-dependent, one tensor each, separated by nonlinear consumers; enqueue already
 stream-pipelined). Proven dead: chan4 channels (-12.6% served), tensor-split rebalance
-(paired -1.92/-2.33), host pinning (0-1% class), transport tuning (W9 flat). LIVE: W22-C1
-per-die clock floors (compress arrival skew: +2.4% halved, +4.8% full t_d equalization,
-plus it cures the W18 soak) and W29 pipeline re-evaluation (in flight). The absolute TP4
+(paired -1.92/-2.33), host pinning (0-1% class), transport tuning (W9 flat). LIVE:
+W22-C1 per-die clock floors (compress arrival skew: +2.4% halved, +4.8% full t_d
+equalization, plus it cures the W18 soak) - the lever itself is UNMEASURED: the battery
+window was a structural CTRL-FAIL (the clock hook refuses unprivileged execution), root
+retry queued (E-147/E-148). CLOSED: PP NO-GO x2 by derivation (E-141/W29) - PP4
+serializes the 65% concurrent compute: cycle = 4C + ~25 ms = ~350-365 ms = 8-9 t/s
+(-65%), and winning would need a 3.3x per-die compute gain the banked physics forbids;
+tp2xpp2 is not implementable (no composable TPxPP mode in the tree) and TP2-class
+capacity cannot boot at 200k (E-032). Kernel progress SHRINKS C, which makes PP
+monotonically worse. The absolute TP4
 floor: ring transport 69.5 us x 136 = 9.5 ms sync + ~10 ms compute -> ~20-23 ms round ->
 ~43-50 t/s IF skew were fully eliminated - that is the physical ceiling of this fabric.
 
@@ -611,7 +674,7 @@ characterization table was the deliverable (names the miscompiled pass for upstr
 Institutionalized: every kernel arm ships an oracle; no perf verdict without same-session
 bit-exactness.
 
-### WALL 3 - Prefill-at-depth collapse (fix implemented, bench pending)
+### WALL 3 - Prefill-at-depth collapse (BENCHED: 9/9 bit-exact, -40..-44% at depth; merge staged)
 
 Law: cost/token = 3.73 + 0.42 x D/1000 ms (zero free parameters; lands on both clean
 measured points). The linear floor matches W13 census (GEMM 41% + nccl 17% + other 12%;
@@ -625,6 +688,15 @@ canary gate; var-11 at the prefill instance <256,256,8,2> with need_f16=false. B
 staged as one command (9 oracle cells incl tail M=268 and non-multiple-of-256 n_kv, then
 timing at 4 depths vs basep). Predicted: prefill 170->199 @10k, 67->94 @50k, 38->57
 @100k, 22->34 @199k. Kill: <+5% @10k, any GARBAGE, decode_guard breach.
+
+BENCHED (W27/E-143, 09-24 15:35): oracle 9/9 cells BIT-EXACT (0 els differ) at depths
+7168-199936 - M=512, tail M=268, padded used-boundary, both M geometries, incl depth
+199936 (the staged KQ-X mismatches were a DBG capture-region artifact; stop rule refined
+to dst-is-truth). Timing (basep -> v11p, medians): d51200 550.9 -> 313.4 ms (-43.0%);
+d102400 1409.2 -> 830.7 (-40.8%); d199936 3061.7 -> 1687.7 (-44.0%) - BETTER than the
+W24 model (-37.5%): the prefill tile is even more read-amp-bound than decode. U2 served
+window JUSTIFIED and queued. Merge-order law: merge amd/q40-prefill + rebuild + CI after
+the lever battery, BEFORE the U2 served window (branch NOT yet merged as of E-148).
 
 ### WALL 4 - ROCm KFD SVM machine deaths (mitigated)
 
@@ -647,7 +719,11 @@ boot #3 with zero deaths. Plus 180 s inter-cell churn spacing. Structural fix na
 persistent-server battery (one boot, N cells; slot-erase between cells needs zero server
 code via --slot-save-path; W21) - owner decision pending. Collateral: hard deaths corrupt
 git objects (two purges hit desk WIP tips; recovered via reflog + working tree both
-times) - hence the snapshot-push law.
+times) - hence the snapshot-push law. A SIXTH, userspace death class: systemd-oomd
+SIGKILLed the U1 cgroup at 14:26:55 (mid-150k-prefill) and the user terminal; it is now
+DISABLED system-wide (kernel OOM-killer remains as backstop) - E-143. Corollary: oomd/kill
+events leave zero-byte .o objects that cmake treats as fresh (35 repaired in a desk
+build; watch for this after every crash event, E-144).
 
 ### WALL 5 - The thermal soak (mechanism proven, cure queued)
 
@@ -676,9 +752,15 @@ the original backbone; the verifier's q4_0 noise is shared conditioning and canc
 LLAMA_DRAFT_ONDEVICE_ARGMAX carries an exact-equivalence contract
 (src/llama-ext.h:113-120) - acceptance-neutral by design. Cross-project evidence (ninfer
 103-row study, adopted): context is the biggest acceptance lever (+25 pts 10k->72k on
-their stack) - registered as a falsifiable prediction on our U1 deep cells. The live
-lever: chain shape (--spec-draft-n-max 4, wired as battery window 5, content-invariance
-sha-checked; mean_len 3.04 -> ~3.6+ if acceptance holds inside the +/-3 pt band).
+their stack) - registered as a falsifiable prediction on our U1 deep cells (still
+untested - the deep decodes were EOS-voided; U1 v2 rerun REQUIRED). The chain-shape
+lever (--spec-draft-n-max 4) was MEASURED 09-24 evening and REJECTED decisively: paired
+-43.4%, 167 drafted / 84 accepted = the identical 84 of chain-3, position-4 acceptance
+~0 - the head's calibration ends at 3 tokens (E-147/W32). "Head-calibration-bound" is
+therefore empirical, not inferred. The W34 fixed-text acceptance instrument (BUILT,
+E-146) makes any future head-quality idea measurable: server-exposed per-position
+acceptance at -lv 5 (server-context.cpp:619-633), frozen prompt-side token-id cascades
+(divergence cannot enter), r1-vs-r2 A/A null; runner staged, unrun.
 
 ### WALL 7 - MMVQ latency starvation (partially cashed)
 
@@ -686,15 +768,35 @@ sha-checked; mean_len 3.04 -> ~3.6+ if acceptance holds inside the +/-3 pt band)
 stall-bound - 1-2 kbx iterations/lane at K=5120, register-capped occupancy (8/40 waves),
 and the E-106 zero-compute ablation still ceilings at 70-120 GB/s (the access pattern
 itself). Cashed: share gates (served, promoted), the S2R wiring fix (E-117 - dispatch
-dropped the s2r flag; the gates were no-ops served). Queued: IQ4XS_SHARE re-open + the
-IQ3 S2R gates (env-only, ~-3.4 ms). Refuted: wide-s2r (W25 NULL). OPEN: C4 fusion-ban
-lift to T=4 (-2 to -4.5 ms).
+dropped the s2r flag; the gates were no-ops served). Measured, NO-PROMOTE: the env
+window (IQ4XS_SHARE re-open + IQ3 S2R gates, ~-3.4 ms predicted) - +0.32% mean inside
+the window's own 0.28 t/s repeat spread; gates stay unset; the window's EXACT-VOID
+verdict was a harness false-positive (see WALL 8) and the kernels are exonerated
+(E-145/E-147/W33). Refuted: wide-s2r (W25 NULL). CLOSED DEAD: the C4 fusion-ban lift to
+T=4 (oracle-fail iq4_xs, +21.8% slower iq3_s - FMA contraction, instantiation-local,
+W30/E-144/E-146) and the occupancy rungs (lb2 codegen no-op; max-vgpr 80/96 arms
+unbuildable - ROCm 6.2 LLVM 18 has no -mllvm -amdgpu-max-vgpr, E-144). The 70-120 GB/s
+access-pattern ceiling stands as the wall's current face.
 
 ### WALL 8 - Measurement integrity (the meta-wall, solved by law)
 
 The origin incident: a real -20% decode regression shipped as "-0.73% PASS" because the
 baseline anchor was stale (E-111/E-112). Everything in section 9 exists because of that
-and the silent-failure classes listed in section 8. Standing summary: nothing promotes
+and the silent-failure classes listed in section 8. NEWEST CLASS - the harness
+false-positive (E-145/W33, 09-24): the w23env window's cells ran --decode-only, which
+structurally never emits the determinism_guard line (guard_battery.py:895 skips it under
+that flag); the adjudicator demanded the row anyway and compared det=None != PASS ->
+"EXACT-VOID" with a misleading "text_sha256 diverged" ratchet. The kernels were
+EXONERATED: all three gates route through the s2r-capable entry at the served shape (no
+second E-117-class gap), the composition is host-proven bit-exact at served geometry
+(W7 A4), and all four cells' decode counters are identical (draft_n=126, accepted=84,
+ratio 0.66667). Fix queued: the adjudicator must distinguish det-missing from det-fail
+under --decode-only. Twin lesson banked the same evening (E-148): the guard and the
+ratchet must read the SAME field path - three ratchet-anchor incidents now share it
+(E-137 walked the wrong path; E-148 fixed it; a battery-side assertion that
+baseline-decode == the guard-printed value is named). Also banked: --decode-only skips
+the prefill guard entirely - the ub1024 prefill co-metric had to be recovered from the
+server logs by hand (E-148). Standing summary: nothing promotes
 without paired served cells; no perf verdict without same-session bit-exactness;
 provenance or it did not happen; every gate fails loud; every engagement line prints at
 WARN (served log drops ggml INFO); dies are PCI addresses; chains run system-scope;
@@ -726,16 +828,26 @@ snapshots after every landing.
 | 18 | per-shard on-device argmax | merged (exact-equivalence; bandwidth lever) | d2eb60966 |
 | 19 | MMVQ S2R gates in serving | queued (never set; ~-1.4 ms) | W23-C2 |
 | 20 | IQ4XS_SHARE re-open | queued (disabled on stale numbers; ~-2.0 ms) | W23-C1 |
-| 21 | per-die clock floors | queued (+2.4-4.8% + anti-decay) | W22-C1 |
+| 21 | per-die clock floors | battery window CTRL-FAIL structural (hook needs root); UNMEASURED - root retry queued | W22-C1, E-147/E-148 |
 | 22 | taskset P-core pinning | queued (0-1% class) | W22-C2 |
-| 23 | chain shape n_max=4 | wired (window 5; sha-checked) | W28 |
-| 24 | q4_0-direct PREFILL arm | implemented, oracle staged | W24/W27 |
-| 25 | PP-vs-TP re-evaluation | IN FLIGHT (W29) | - |
-| 26 | depth table measurement | IN FLIGHT (U1) | W26 |
+| 23 | chain shape n_max=4 (w28nmax) | REJECTED -43.4% paired: 167 drafted, 84 accepted (= chain-3's identical 84; position-4 acceptance ~0) | E-147/W32 |
+| 24 | q4_0-direct PREFILL arm | **BENCHED: oracle 9/9 BIT-EXACT, -40..-44% per launch at depth; merge staged, U2 queued** | E-143/W27 |
+| 25 | PP-vs-TP re-evaluation (W29) | **NO-GO x2 by derivation: PP4 = 8-9 t/s (-65%); tp2xpp2 unimplementable + TP2-class cannot boot 200k; early-era PP loss was an anecdote (crash at decode entry, decode never measured)** | E-141/W29 |
+| 26 | depth table measurement (U1) | PARTIAL: 10k full 23.78; 50k/100k prefill-valid; deep decodes EOS-void; oomd-killed at 14:26 -> v2 rerun REQUIRED | E-140/E-143/W26 |
 | 27 | svm-watchdog | LIVE (proven at counter 5-7) | E-134 |
 | 28 | provenance/identity/void gates | LIVE (fail-closed) | E-112/E-133 |
 | 29 | persistent-server battery protocol | designed; OWNER DECISION pending | W21 |
 | 30 | weight-bit reduction | OWNER-GUARDED (the only short-prompt true-2x door) | L7 |
+| 31 | W29 PP4 / tp2xpp2 pipeline modes | NO-GO x2, closed by derivation (zero GPU; reopen conditions registered) | E-141/W29 |
+| 32 | W30 lb2 launch-bounds occupancy rung | codegen no-op (regs 84/77/112 + occupancy unchanged) | E-144 |
+| 33 | W30 C4 GLU-fusion lift to T=4 | DEAD: oracle-fail iq4_xs (19449/69632 els, max_rel 0.114), +21.8% slower iq3_s; FMA-contraction, instantiation-local | E-144/E-146 |
+| 34 | W30 max-vgpr occupancy rungs (80/96) | UNBUILDABLE: ROCm 6.2.0 LLVM 18 lacks -mllvm -amdgpu-max-vgpr | E-144 |
+| 35 | W31 flat P2P allreduce bypass | DEAD EMPIRICALLY: 12/12 die-pairs canAccess=0 (driver refusal); host-staged fallback WEDGES | E-144/W31 |
+| 36 | w23env env window (IQ4XS share + IQ3 S2R gates) | NO-PROMOTE on merits (+0.32% in 0.28 t/s spread); its EXACT-VOID was a harness false-positive - kernels exonerated | E-145/E-147/W33 |
+| 37 | ub1024 round 3 (battery R/A/A/R) | **PROMOTED: decode +0.36/+0.33 (+1.41%), prefill co-metric +5.02/+4.14% (server logs); ratchet 24.55 -> 24.69; 1024/1024 canonical** | E-147/E-148 |
+| 38 | draft shape-cache served post-heal (w19) | ARM-CRASH x2 deterministic at NEW site ggml-backend-meta.cpp:832 (UNKNOWN split axis on re-split) -> PARKED permanently | E-147 |
+| 39 | W34 fixed-text acceptance instrument | BUILT (zero GPU): server -lv 5 per-position acceptance (server-context.cpp:619-633), frozen token-id cascades, A/A null; runner staged | E-146/W34 |
+| 40 | systemd-oomd | DISABLED system-wide (SIGKILLed U1 cgroup + user terminal 14:26:55); kernel OOM-killer remains | E-143 |
 
 ---
 
@@ -774,6 +886,11 @@ snapshots after every landing.
    walked the wrong JSON path for the value (top-level loop vs cells/decode_8k_10k); the
    guard kept gating against 23.23 while serving produced 24.55. Caught because a fresh
    cell printed "vs baseline 23.23". Born: the walk-all-fields fix (5ad25e902).
+   Postscript (E-148): the class recurred from the other side - the E-137 ratchet
+   anchored the wrong field while the promotion procedure then had to pick the SAME
+   field the guard reads (cells/decode_8k_10k/decode_per_second). Three ratchet-anchor
+   incidents share one lesson: guard and ratchet must read the same path; a
+   battery-side assertion (baseline == guard-printed value) is named.
 10. **The EOS-killed depth decode.** U1's 50k decode: temp-0 EOS as the first token
     after 51k filler tokens -> 1-token generation, sentinel tps=1e6, draft_n=0. The
     server was healthy. Born: ignore_eos in run_u1_window_v2.sh + EOS-void cell marking.
@@ -785,7 +902,24 @@ snapshots after every landing.
     characterized. Born: the oracle-before-timing law.
 13. **The served shape-cache crash.** First honest engagement aborted at
     GGML_ASSERT(bcj.nodes[i]) (ggml-backend-meta.cpp:1929) in the draft path. Born: the
-    heal + the meta re-entry host suite (section 4.2/4.3).
+    heal + the meta re-entry host suite (section 4.2/4.3). SECOND PATH (E-147): the
+    battery w19 window crashed 2/2 at ggml-backend-meta.cpp:832 (UNKNOWN split axis on
+    a third shape variant during re-split) with the heal live - the feature is PARKED,
+    not fixed.
+14. **systemd-oomd killed U1 (14:26:55).** Socket-activated oomd SIGKILLed the U1
+    cgroup mid-150k-prefill AND the user terminal; a second U1 instance had restarted
+    from cell 10k on the OLD plan and was found alive-but-degraded at 15:03, then
+    stopped by PID. U1 ends PARTIAL (10k full 23.78; 50k/100k prefill-valid; deep
+    decodes EOS-void 2/2). Born: oomd DISABLED system-wide (kernel OOM-killer remains),
+    run_u1_window_v2.sh (ignore_eos) rerun is REQUIRED and deferred, and the
+    zero-byte-.o corollary (oomd/kill events leave objects cmake treats as fresh - 35
+    repaired, E-144).
+15. **The EXACT-VOID that wasn't.** The w23env battery window's cells ran --decode-only,
+    which structurally never emits the determinism_guard row; the adjudicator compared
+    None != PASS and voided the window ("text_sha256 diverged"). Kernels exonerated
+    (counters identical across all 4 cells; composition host-proven W7; no second
+    E-117-class gap). Born: det-missing vs det-fail adjudicator fix queued; the
+    same-field guard/ratchet law (E-145/E-148, WALL 8).
 
 ---
 
@@ -817,26 +951,39 @@ snapshots after every landing.
 
 ---
 
-## PART 10 - OPEN QUESTIONS (what we would ask you, the reviewing LLM)
+## PART 10 - OPEN QUESTIONS (status after the 09-24 evening desks; originally posed to the reviewing LLM)
 
-1. The sync wall: 136 boundaries x (69.5 us floor + skew). Count reduction and clustering
-   are proven negative FOR TENSOR PARALLELISM. Pipeline (PP) eliminates per-layer sync
-   entirely; it lost in the early era but was never re-measured under the current kernel
-   stack (a desk is evaluating now: W29). Is there a sharding/mode we have not considered
-   that removes per-layer sync without PP's serial-staging cost at decode M<=4?
+1. The sync wall / pipeline structures: **CLOSED (E-141/W29).** PP4 = 8-9 t/s (-65%): it
+   removes the 31 ms boundary wall but serializes the ~65% concurrent per-die compute
+   (cycle = 4C + ~25 = ~350-365 ms); winning needs a 3.3x per-die compute gain the
+   banked physics forbids. tp2xpp2 is unimplementable (no composable TPxPP mode in the
+   tree) and TP2-class capacity cannot boot at 200k. The early-era PP "loss" was an
+   anecdote (layer arm crashed at decode entry - decode never measured), so this closure
+   is by derivation, with falsification cells pre-registered (boundary wall > 250
+   ms/cycle, or C < 31 ms/cycle, or bubble-free multi-ubatch PP reopens it). Still open
+   only in the weak sense: a sharding/mode not in this tree that removes per-layer sync
+   without serial staging.
 2. The arrival skew: 59-141 us/die multiplicative with compute rate. Clock floors are
-   queued. Is there a way to make the WAIT cheap instead of preventing it (e.g., overlap
-   the wait with useful per-die work)?
-3. MMVQ: 1-2 kbx iterations/lane at K=5120 with 8/40 wave occupancy. The wide hoist was
-   NULL (compiler hoists). C4 (T=4 fusion) is open. Is there an access-pattern
-   restructure that beats the 70-120 GB/s cfull ceiling on gfx900 (DP4A, wave64)?
-4. Acceptance: head-calibration-bound (W28). If acceptance rises with depth (L4
-   prediction, being tested tonight), deep decode compounds. Any served-side way to
-   raise proposal quality without a head re-fit?
-5. The ring floor: 69.5 us/boundary transport-free on PCIe Gen3 x8 uplinks. Is there a
-   cheaper 4-rank exchange for 80 KB payloads on this fabric (multicast? shared-memory
-   staging? the meta backend's own butterfly was 25% slower END-to-end but that includes
-   its compute placement - is a hybrid placement possible)?
+   the named lever - the battery window was a structural skip (unprivileged hook), root
+   retry queued (E-147/E-148); +2.4-4.8% predicted. Still open: a way to make the WAIT
+   cheap instead of preventing it (overlap the wait with useful per-die work).
+3. MMVQ: the named follow-ups are all measured and dead - C4 DEAD (oracle-fail iq4_xs,
+   +21.8% iq3_s; FMA-contraction, instantiation-local), occupancy rungs DEAD (lb2
+   no-op; max-vgpr unbuildable on ROCm 6.2 LLVM 18), env window NO-PROMOTE (+0.32% in
+   0.28 spread) (W30/E-144/E-146/E-147). Still open: an access-pattern restructure that
+   beats the 70-120 GB/s cfull ceiling on gfx900 (DP4A, wave64).
+4. Acceptance: head-calibration-bound is now EMPIRICAL - chain-4 drafted 167, accepted
+   the identical 84 of chain-3, position-4 acceptance ~0 (E-147). The W34 fixed-text
+   instrument (built, E-146) makes acceptance measurable for any future head-quality
+   idea. Still open: any served-side way to raise proposal quality without a head
+   re-fit; and the L4 acceptance-rises-with-depth prediction is untested until the U1
+   v2 deep rerun.
+5. The ring floor / cheaper exchange: **CLOSED for this stack (W31/E-144).** Flat P2P
+   bypass DEAD EMPIRICALLY: all 12 ordered die-pairs canAccess=0 enable=0 (driver-level
+   refusal; explains RCCL's own x12 enable failures on this PLX-switched fabric) and the
+   host-staged-flat fallback WEDGES (zero completed iterations; probe watchdog fired).
+   Multicast/shared-memory staging would face the same fabric refusal; the butterfly
+   remains 25% slower end-to-end.
 
 ---
 
@@ -851,7 +998,11 @@ snapshots after every landing.
 | 09-24 05-07 | hardened boot + fleet | boot queue; 3 reboots; deaths #4-#5 -> svm-watchdog; hardened paired queue: ub1024 verdict; W18 soak named |
 | 09-24 06-09 | desks era | W20 void gate; W21 persistent-server; W22 asymmetry; W23 MMVQ v2; dc stale-binary scandal fixed; fa40 var-11 oracle-proven + MERGED + PROMOTED (24.55); planned reboot |
 | 09-24 10-13 | boot #4 | queue 4/4 PASS on new config; ub1024 contradiction; W24/W25/W27/W28 landed; U1 marching (10k measured); EOS bug fixed in v2; acceptance synthesis adopted |
-| tonight | U1 deep cells + post-U1 battery | depth table; acceptance-vs-depth test; q40-prefill bench; the 5-window battery |
+| 09-24 13-14 | dossier + review | CAMPAIGN_DOSSIER v2 written 13:30; W29 PP NO-GO x2 + the scale correction (E-141); external review adopted -> W30 (MMVQ-C4+occupancy) and W31 (P2P-allreduce) dispatched, battery confirmed as the vehicle (E-142) |
+| 09-24 14-16 | oomd incident + negatives | systemd-oomd SIGKILLs U1 cgroup + user terminal 14:26:55 -> DISABLED system-wide; dual U1 instance discovered 15:03 (restarted from 10k on the old plan), stopped by PID; U1 PARTIAL, v2 rerun REQUIRED (E-140/E-143); W27 q40-prefill 9/9 BIT-EXACT -40..-44% at depth, U2 queued (E-143); W30 arms fail + W31 P2P dead; battery launched 16:06 (E-144) |
+| 09-24 16-19 | battery + promotions | W33: w23env EXACT-VOID overturned - harness false-positive, kernels exonerated, no-promote on merits (E-145); W34 fixed-text acceptance instrument built (E-146); battery DONE 18:02 - w19 ARM-CRASH x2 at meta.cpp:832 -> PARKED, w22c1 CTRL-FAIL (root hook), w28nmax REJECTED -43.4% (E-147); ub1024 PROMOTED from server-log adjudication -> ratchet 24.69, 1024/1024 canonical (E-148) |
 
 *End of dossier. When this document and the ledger disagree, the ledger wins
-(append-only, authoritative). Latest ledger head at writing: E-139 (cont.), commit a710244d4.*
+(append-only, authoritative). Latest ledger head at writing: E-148, commit 68654e245.*
+Queued behind this sync: amd/q40-prefill merge + rebuild + CI (merge-order law), the
+w22c1 clock-floor re-run under root, U2 served window, U1 v2 deep rerun.
