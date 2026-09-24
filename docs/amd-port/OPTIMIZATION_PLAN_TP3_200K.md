@@ -4068,3 +4068,36 @@ to Gemini's guard battery, die 3 is the dev cell.
   attacks both terms - gate it on END-TO-END per-launch wins (the W11
   wide-arm lesson: kernel-sum wins die on launch latency). Deep prefill
   tile (sub-1 TF/s latency-bound, W13) joins the same desk umbrella.
+- E-125 2026-09-24 00:10 SPLIT A/B VERDICT: TENSOR-SPLIT REJECTED.
+  Paired interleaved 10k cells (all provenance-stamped, clean tree):
+  s0a 22.98 / s1a 21.06 / s0b 23.51 / s1b 21.18. PAIRED DELTAS:
+  -1.92 and -2.33 - BOTH pairs negative, direction-consistent, so
+  the --tensor-split 1.04,1.04,1.02,1.00 rebalance is a REAL served
+  LOSS (~-2.1 t/s, ~-9%), not soak position (pair 1 ran at minimal
+  soak). The audit-engine rate-equalization model did not transfer
+  served - the W12/W15-class lesson now extends to launch-flag
+  models: nothing promotes without paired served cells. Serving of
+  record UNCHANGED; the flag stays rejected with this data banked.
+  (The prefill-side rebalance prize from the prefill desk is
+  likewise suspect until paired-served.)
+- E-119 (cont.) DEEP-CENSUS DESK COMPLETE (merged e116dbb1d) - THE
+  DEPTH LAW, campaign-reframing: (1) the round is NOT context-
+  insensitive at real KV depth - it grows +1.95 ms per 1k tokens
+  beyond ~9.4k; the earlier "insensitive to 32k" was a CACHE-SIZE
+  artifact (all served tests prime ~7-8k prompts in a big cache).
+  At REAL depth: 32k = +39% round, 64k = +87%, 200k = ~3.9x
+  (~503 ms, ~6 t/s). DISCLOSURE OF RECORD: the 23.26 @200k of-record
+  is SHORT-PROMPT decode in a big cache; real 200k-context decode
+  runs ~6 t/s today. (2) f16-KV-pool dequant is LINEAR at 3.98
+  us/1k tokens/launch (measured 8k->68k; U1's "unbounded" item is
+  now a measured line: 0.82 -> 26.0 ms/round from 8k to 200k).
+  (3) Served prefill collapses with depth: 218 t/s @4k -> 13.9
+  @65k - deep prompts are minutes-class today. (4) Deep-delta
+  split at 200k: tile KV re-read 92%, pool dequant 7% - the
+  Q4_0-DIRECT ATTENTION KERNEL DESK DISPATCHED (wt-fa-q40 on
+  amd/fa-q40): read q4_0 KV natively in the tile kernel, skip the
+  f16 pool; attacks both terms; win bar >=25% attention+dequant
+  reduction at 64k; numerics class (dequant-in-kernel rounding) to
+  be measured and flagged for owner. Wide-launch desk ALSO complete
+  (merged 5797678ec, E-123): 221-225 us per-instance start latency
+  sealed (E1/E2), wide6 not viable, probe-matrix instrument banked.
