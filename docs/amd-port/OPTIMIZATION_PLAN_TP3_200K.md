@@ -3868,3 +3868,20 @@ to Gemini's guard battery, die 3 is the dev cell.
   (4) DRAFT-CACHE CONTINUATION (zero-GPU): host replicate-test ->
   build -> CI -> served spec for the ~3 ms shape-cache lever.
   Every desk: WIP-commit + CHECKIN laws; snapshots current.
+- E-120 (cont.) 20:20 SESSION-CRASH CLASS NAMED + SYSTEM-SCOPE LAW.
+  The "repeated crashing in the terminal" (Chris 20:14) is the
+  DESKTOP SESSION, not the campaign: journalctl shows GNOME/xrdp
+  session components crash-looping since 19:34 (gdm keyring,
+  pipewire-xrdp, user-scope scope failures, uid 1636). COROLLARY
+  DEFECT: campaign chains run in the USER session's cgroup, so
+  session crashes killed the A/B chain (s0 23.30 banked; s1 died
+  mid-prefill; s0b/s1b never ran) AND the three v1 agents. FIX:
+  campaign GPU chains now launch via `sudo systemd-run --collect
+  --unit=campaign-<name>` = SYSTEM scope, immune to user-session
+  crashes - campaign-ab.service relaunched (s0 live 20:16).
+  AGENTS RE-DISPATCHED (v2, resume briefs): wide-launch latency
+  (210 us mystery), deep-census (U1, one ctx-131072 boot on 8083),
+  draft-cache (A2 host-test run -> build -> CI -> served spec).
+  ADVISORY to Chris: if the XRDP session keeps degrading, a
+  logout/login (or reboot) on his side will clear it - campaign
+  chains now survive it either way.
