@@ -527,7 +527,7 @@ int main(int argc, char ** argv) {
                 HIP_CHECK(hipStreamSynchronize(st[j]));
                 int m = 0, tok = 0;
                 HIP_CHECK(hipMemcpy(&m, mism[j], sizeof(int), hipMemcpyDeviceToHost));
-                HIP_CHECK(hipMemcpy(&tok, (const void *) (dbuf[j] + 2048), sizeof(int), hipMemcpyDeviceToHost));
+                HIP_CHECK(hipMemcpy(&tok, (const void *) (dbuf[j] + nprobe), sizeof(int), hipMemcpyDeviceToHost));
                 fp[i][j].kstore = (m == 0 && tok == 42) ? 1 : 0;
 
                 HIP_CHECK(hipMemset(dbuf[j], 0, nprobe * sizeof(float)));
