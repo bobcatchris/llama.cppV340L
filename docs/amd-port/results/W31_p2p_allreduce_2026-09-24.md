@@ -290,3 +290,67 @@ Decision tree at run time:
   WIP commit 993dfb0b9.
 - 2026-09-24 14:3x receipt written; bench staged pending coordinator
   window (U1 still holding at last check).
+
+## 7. EXECUTOR EMPIRICAL RESULT (bench-finisher, 2026-09-24 15:59 CDT) - DESK KILLED
+
+The staged run happened (lock-arbitrated, cool-die gate PASS 36 C max,
+COMPILE-EXIT:0).  Three sessions, line-buffered capture after the first
+watchdog firing ate the buffered output:
+
+- Session 1 (run_p2p_allreduce.sh, buffered): probe wedged, internal
+  SIGALRM watchdog fired at 600 s, PROBE-EXIT:3, no stdout flushed.
+  Log: p2p_allreduce_probe_r4_20260924_153919.log.
+- Session 2 (direct, stdbuf -oL, --timeout 480):
+  p2p_allreduce_probe_r4_linebuf_20260924_155026.log.
+- Session 3 (host-arm-only diagnostic, --ranks 2, --timeout 90):
+  p2p_allreduce_probe_r2_hostdiag_20260924_155905.log.
+
+### 7.1 Direct P2P: DEAD on this stack (measured, matches the A2 census)
+
+FEAS matrix, all 12 ORDERED pairs (n=4):
+
+    FEAS i->j: canAccess=0 enable=0   for every (i,j), i != j
+
+Verbatim verdict line: "FEAS verdict: P2P NOT available for all pairs
+(p2p arm skipped, host arm carries the design)".  hipDeviceCanAccessPeer
+returns 0 platform-wide - the refusal is at the DRIVER level, not RCCL
+policy; RCCL's x12 "Could not enable P2P" lines are now explained as
+case (a) of section 1.4.  HOSTMAP sanity was fine (hipHostMalloc(Mapped)
++ hipHostGetDevicePointer + device post/verify OK, token=7), so the
+negative is specifically peer mappings, not host-mapped staging.
+
+### 7.2 Host-staged flat fallback: WEDGES, no timing exists
+
+With the p2p arm skipped, the host arm never completed ONE allreduce in
+any configuration: n=4 (lockstep+burst) and n=2 diagnostic both hang
+after the BENCH header with no correctness line, no ARM timing line, and
+no kernel spin-bound escape print, until the alarm watchdog fires
+(PROBE-EXIT:3).  The section-3.1 invariant "a wedged handshake can never
+hang a die" is FALSE as implemented: the spin bound did not produce its
+error-flag escape within the watchdog windows, i.e. the wedged state is
+host-side or the bound is effectively unbounded.  No 80 KB number vs the
+69.5 us / 103.2 us floors can be recorded - a transport that cannot
+finish one iteration cannot serve.
+
+### 7.3 Verdict update (supersedes section 1's "UNRESOLVED")
+
+Kill condition of section 1.4 is MET on both prongs: (i) direct P2P
+infeasible - MEASURED, driver-level; (ii) host-staged flat loses to the
+banked floors - it completes zero iterations (strictly worse than
+losing).  DESK KILLED with measured reasons.  Flat allreduce at 80 KB
+vs the 69.5 us RCCL floor: NOT OBTAINABLE on this stack (no P2P path;
+fallback non-functional as designed).  If anyone revisits: fix the host
+arm's handshake/spin-bound first, then rerun - but the 2-phase flat
+scheme now has no transport substrate (no P2P) and a design burden
+(SHM-class staging already served by RCCL at 103.2 us).
+
+## LOG (continued)
+
+- 2026-09-24 15:39 staged runner executed by bench-finisher (lock
+  handed over from q40-prefill W27 at 15:31); watchdog fired 600 s,
+  buffered output lost.
+- 2026-09-24 15:50 line-buffered rerun: FEAS matrix all-12-pairs
+  NEGATIVE (canAccess=0 enable=0), p2p arm skipped, host arm wedged to
+  the 480 s watchdog.
+- 2026-09-24 15:59 n=2 host-only diagnostic: same wedge.  Receipt
+  verdict updated to DESK KILLED (section 7); logs committed.
