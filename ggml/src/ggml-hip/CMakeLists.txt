@@ -146,6 +146,16 @@ else()
     set_source_files_properties(${GGML_SOURCES_ROCM} PROPERTIES LANGUAGE HIP)
 endif()
 
+# W30 MMVQ occupancy rung: optional per-TU direct VGPR clamp on mmvq.cu only.
+# Default empty adds no flag and the build stays identical. A set value (e.g.
+# 80 or 96) changes codegen of every kernel instantiated in this TU, so any
+# build using it needs its own bit-exact oracle pass before any timing counts.
+if (GGML_HIP_MMVQ_MAXREG)
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../ggml-cuda/mmvq.cu PROPERTIES
+        COMPILE_OPTIONS "-mllvm;-amdgpu-max-vgpr=${GGML_HIP_MMVQ_MAXREG}")
+    message(STATUS "ggml-hip: mmvq.cu compiled with -amdgpu-max-vgpr=${GGML_HIP_MMVQ_MAXREG}")
+endif()
+
 if (GGML_STATIC)
     message(FATAL_ERROR "Static linking not supported for HIP/ROCm")
 endif()

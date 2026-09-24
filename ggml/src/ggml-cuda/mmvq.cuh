@@ -6,6 +6,11 @@
 
 bool ggml_cuda_should_use_mmvq(enum ggml_type type, int cc, int64_t ne11);
 
+// GGML_CUDA_MMVQ_GLU_FUSION_T4=1 (W30): extends the mul_mat_vec_q GLU fusion
+// from ncols_dst = 1 to 2..4 for the plain base variant, same-type gate/up
+// only. WARN line on engagement (E-117 witness law).
+bool ggml_cuda_mmvq_glu_fusion_t4_enabled();
+
 // Returns the maximum batch size for which MMVQ should be used for MUL_MAT_ID,
 // based on the quantization type and GPU architecture (compute capability).
 int get_mmvq_mmid_max_batch(ggml_type type, int cc);
