@@ -123,7 +123,7 @@ __global__ void widelaunch_noop_kernel(int * p) {
     }
 }
 
-template <int LDS_BYTES>
+template <int LDS_BYTES, bool BURN_VGPR = false>
 __global__ void widelaunch_lds_kernel(float * out) {
     __shared__ float buf[LDS_BYTES/4];
     const int tid = threadIdx.x;
@@ -131,12 +131,17 @@ __global__ void widelaunch_lds_kernel(float * out) {
         buf[i] = 0.0f;
     }
     __syncthreads();
+    uint32_t src = tid, sink = 0;
+    if (BURN_VGPR) {
+        // force >=128 arch vgpr allocation (real FA tile kernels use 128)
+        asm volatile("v_mov_b32 v127, %1\n\tv_mov_b32 %0, v127\n" : "=v"(sink) : "v"(src));
+    }
     if (tid == 0) {
         float s = 0.0f;
         for (int i = 0; i < LDS_BYTES/4; i += 128) {
             s += buf[i];
         }
-        out[blockIdx.y] = s;
+        out[blockIdx.y] = s + (BURN_VGPR ? (float) sink * 0.0f : 0.0f);
     }
 }
 
@@ -508,6 +513,11 @@ int main(int argc, char ** argv) {
                 widelaunch_lds_kernel<32768><<<g_wide, b_wide, 0, st>>>(lds_out);
                 widelaunch_lds_kernel<22528><<<g_base, b_base, 0, st>>>(lds_out);
                 widelaunch_lds_kernel<32768><<<g_base, b_base, 0, st>>>(lds_out);
+                widelaunch_lds_kernel<32768, true><<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_lds_kernel<22528, true><<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_lds_kernel<16384, true><<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_spill_kernel<<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_bigcode_kernel<4096><<<g_wide, b_wide, 0, st>>>(lds_out);
             }
             HIP_CHECK(hipDeviceSynchronize());
             auto lds_scenario = [&](const char * name, auto kern, dim3 g, int b) {
@@ -519,6 +529,19 @@ int main(int argc, char ** argv) {
             lds_scenario("lds32k_gw384", widelaunch_lds_kernel<32768>, g_wide, b_wide);
             lds_scenario("lds22k_gb256", widelaunch_lds_kernel<22528>, g_base, b_base);
             lds_scenario("lds32k_gb256", widelaunch_lds_kernel<32768>, g_base, b_base);
+            lds_scenario("lds32k_vg128", widelaunch_lds_kernel<32768, true>, g_wide, b_wide);
+            lds_scenario("lds22k_vg128", widelaunch_lds_kernel<22528, true>, g_wide, b_wide);
+            lds_scenario("lds16k_vg128", widelaunch_lds_kernel<16384, true>, g_wide, b_wide);
+            // print dummy attributes once (vgpr check for the burn variants)
+            {
+                hipFuncAttributes attr{};
+                HIP_CHECK(hipFuncGetAttributes(&attr, (const void *) widelaunch_lds_kernel<32768, true>));
+                printf("MATRIX attr lds32k_vg128: numRegs=%d shared=%zu local=%zu\n",
+                       attr.numRegs, attr.sharedSizeBytes, attr.localSizeBytes);
+                HIP_CHECK(hipFuncGetAttributes(&attr, (const void *) widelaunch_spill_kernel));
+                printf("MATRIX attr spill: numRegs=%d shared=%zu local=%zu\n",
+                       attr.numRegs, attr.sharedSizeBytes, attr.localSizeBytes);
+            }
             // spill and big-code discriminators, wide6-like shape
             for (int w = 0; w < 50; ++w) {
                 widelaunch_spill_kernel<<<g_wide, b_wide, 0, st>>>(lds_out);
