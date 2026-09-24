@@ -57,8 +57,13 @@ big = [b for b in bursts if sum(1 for s, e in cijk if b[0] <= s < b[1]) > 2000]
 print("Cijk bursts:", [(round((b[0]-t0)/1e9, 2), round((b[1]-t0)/1e9, 2)) for b in bursts])
 print("PREFILL bursts:", [(round((b[0]-t0)/1e9, 2), round((b[1]-t0)/1e9, 2)) for b in big])
 if len(big) < 2:
-    print("FATAL: expected two prefill bursts"); sys.exit(1)
-PA, PB = big[0], big[1]
+    # canceled-delta shape (W15): one big burst + a fragmented continuation
+    # tail (ubatch Cijk bursts separated by >1 s host gaps at slow rates)
+    print("note: single big burst - using the tail after it as the continuation burst")
+    PA = big[0]
+    PB = [PA[1], t1]
+else:
+    PA, PB = big[0], big[1]
 preA_end = PA[1]; preB_start = PB[0]; preB_end = PB[1]
 
 W = [  # (label, lo, hi) exclusive windows between phases
@@ -178,18 +183,41 @@ for label, lo, hi in W:
           " ".join(f"{a}:{m:.1f}" for a, m in meds.items()) +
           f"  max/min {spread:.3f}")
 
-# --- PREFILL_B flash depth ramp (linearity witness across the depth range) ---
-P("\n== PREFILL_B flash_attn_tile + dequant depth ramp (per ~1/12 of the burst) ==")
-tileB = sorted((s, d) for a, f, s, d in rows if f == FAM["tile"] and PB[0] <= s < PB[1])
-deqB = sorted((s, d) for a, f, s, d in rows if f == FAM["deq40"] and PB[0] <= s < PB[1])
-NB = 12
-for i in range(NB):
-    lo = PB[0] + (PB[1] - PB[0]) * i // NB
-    hi = PB[0] + (PB[1] - PB[0]) * (i + 1) // NB
-    ds = [d / 1e3 for s, d in tileB if lo <= s < hi]
-    dq = [d / 1e3 for s, d in deqB if lo <= s < hi]
-    if ds:
-        P(f"  ramp {i:2d}: tile med {statistics.median(ds):8.1f} us  n {len(ds):5d}   "
-          f"deq40 med {statistics.median(dq) if dq else 0:8.1f} us  n {len(dq):5d}")
+# --- PREFILL depth ramps: per die, per ubatch (16 tile launches = one
+# 512-token ubatch); depth = tokens processed before the ubatch ---
+P("\n== PREFILL depth ramps (tile + deq40 per-launch med us by ubatch depth) ==")
+for bname, PBx, depth0 in (("A", PA, 0), ("B", PB, 48682)):
+    for fname in ("tile", "deq40"):
+        f = FAM[fname]
+        for a in sorted(set(x[0] for x in rows)):
+            ser = sorted((s, d / 1e3) for ag, ff, s, d in rows
+                         if ff == f and ag == a and PBx[0] <= s < PBx[1])
+            nub = len(ser) // 16
+            row = []
+            for k in range(nub):
+                ds = [d for s, d in ser[k * 16:(k + 1) * 16]]
+                dep = depth0 + 512 * k
+                row.append((dep, statistics.median(ds)))
+            if not row: continue
+            line = f"  burst {bname} {fname:6s} die{a}: "
+            line += " ".join(f"{dep//1000}k:{m:.0f}" for dep, m in row)
+            P(line)
+
+# --- prefill ramp fit points (per die, aggregated quarters of each burst) ---
+P("\n== ramp fit points (per-die median us at quarter-depths) ==")
+for bname, PBx, depth0, depth1 in (("A", PA, 0, 48682), ("B", PB, 48682, 65536)):
+    for fname in ("tile", "deq40"):
+        f = FAM[fname]
+        for a in sorted(set(x[0] for x in rows)):
+            ser = sorted((s, d / 1e3) for ag, ff, s, d in rows
+                         if ff == f and ag == a and PBx[0] <= s < PBx[1])
+            if not ser: continue
+            qs = len(ser) // 4
+            pts = []
+            for q in range(4):
+                seg = ser[q * qs:(q + 1) * qs] if q < 3 else ser[3 * qs:]
+                dep = depth0 + (depth1 - depth0) * (q + 0.5) / 4
+                pts.append((int(dep), round(statistics.median(d for s, d in seg), 1)))
+            P(f"  burst {bname} {fname:6s} die{a}: {pts}")
 out.close()
 print("wrote", OUT)

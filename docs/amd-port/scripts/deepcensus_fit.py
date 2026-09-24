@@ -1,88 +1,71 @@
 #!/usr/bin/env python3
-# W15 DEEP-CENSUS DESK A2: attention/KV ms-per-round vs KV depth, 200k
-# projection, 5 ms/round threshold depth. Reads the phase-split dump for the
-# measured per-launch medians at the two window depths, fits linear models
-# us(d) = a + b*d (physical: parallel-block tile waves + full-pool dequant),
-# and projects the served geometry (16 verify + 1 catch-up + 3 draft tile
-# launches, 20.6 combines, 33 pool dequants per round per die - W11 P0).
-import sys, re, os
+# W15 DEEP-CENSUS DESK A2: attention/KV ms-per-round vs KV depth.
+# Model (per die, served geometry W11 P0):
+#   verify tile  16 x 0.102 us/token x d   (wave model: pb=ceil(d/192), 3 z,
+#                 112 CTAs/wave, per-CTA scan of 192 KV cols ~ 730 us fixed;
+#                 anchored 722 us at 7168 = census of record)
+#   catch-up      1 x same
+#   draft vec     3 x 61.8 us x d/7168
+#   combine  20.6 x 21.3 us x pb(d)/37
+#   pool dequant 33 x 3.98e-3 us/token x d  (MEASURED W15 die-1 linear slope,
+#                 anchored 25.0 us at the 8k bin vs banked 24.9 at 7168)
+# The 5 ms/round threshold, the 200k projection, and the deep-delta split
+# between the f16-pool dequant tax and the tile KV re-read.
+import sys
 
-DUMP = sys.argv[1] if len(sys.argv) > 1 else \
-    "/media/chris/ssd128/llamacpp/wt-deep-census/docs/amd-port/results/W15_deepcensus_phase_split_2026-09-23.txt"
-
-# banked of-record at ne11=7168 (W11_attn_p0 census): per-launch medians
 D0 = 7168
-BANKED = {"verify": 722.4, "catchup": 722.0, "draft": 61.8, "combine": 21.3, "deq40": 24.9}
-# per-round launch counts per die (W11 P0 table)
-CNT = {"verify": 16.0, "catchup": 1.0, "draft": 3.0, "combine": 20.6, "deq40": 33.0}
+PER_CTA_US = 722.0          # one 192-col scan wave-step, = banked tile @7168
+WAVE_CTAS = 112.0           # 56 CUs x occ 2
+COLS_PER_CTA = 192
+Z = 3.0
+CNT_TILE = 16.0 + 1.0       # verify + catch-up
+CNT_DRAFT = 3.0
+DRAFT0 = 61.8
+CNT_COMBINE = 20.6
+COMBINE0 = 21.3
+CNT_DEQ = 33.0
+DEQ_SLOPE = 3.98e-3         # us per token per launch (W15 measured, die 1)
+DEQ_ANCHOR = 25.0           # us at 8k bin (banked 24.9 at 7168)
+SETROWS = 0.31              # flat ms/round (W11)
+GDN = 0.84                  # flat ms/round (W11)
+FLASH_CLASS0 = 13.0         # banked ms/round at 7168 (W11 P0)
 
-txt = open(DUMP).read()
+def tile_us(d):
+    import math
+    pb = max(1, math.ceil(d / COLS_PER_CTA))
+    waves = pb * Z / WAVE_CTAS
+    return waves * PER_CTA_US * (1.0 if waves >= 1.0 else waves)
 
-meas = {}   # (win, name) -> median us
-for m in re.finditer(r"win ([AB]) (verify|catchup|draft|combine|deq40)\s+med\s+([\d.]+) us", txt):
-    meas[(m.group(1), m.group(2))] = float(m.group(3))
-for m in re.finditer(r"round period (DECODE_[AB]): med ([\d.]+) ms", txt):
-    print(f"round period {m.group(1)}: {m.group(2)} ms (direct wall witness)")
+def class_ms(d):
+    tile = CNT_TILE * tile_us(d) / 1e3
+    draft = CNT_DRAFT * DRAFT0 * d / D0 / 1e3
+    combine = CNT_COMBINE * COMBINE0 * (d / COLS_PER_CTA) / (D0 / COLS_PER_CTA) / 1e3
+    deq = CNT_DEQ * (DEQ_ANCHOR + DEQ_SLOPE * (d - 8000)) / 1e3 if d > 8000 \
+        else CNT_DEQ * DEQ_SLOPE * d / 1e3
+    return tile, draft, combine, max(deq, 0.0)
 
-# window depths: from the server usage lines of the run (set at analysis time)
-DA = float(os.environ.get("W15_DEPTH_A", 64 * 1024))
-DB = float(os.environ.get("W15_DEPTH_B", 120 * 1024))
-DT = float(os.environ.get("W15_DEPTH_T", 200 * 1024))
+print("== attention/KV class ms/round/die vs KV depth ==")
+print("  depth     tile(v+c)  draft  combine  deq40   class  class+flat  round(129-base+class-delta)")
+base = FLASH_CLASS0
+for d in (D0, 16000, 32000, 64000, 120000, 200000):
+    t, dr, cb, dq = class_ms(d)
+    cls = t + dr + cb + dq
+    rnd = 129.0 - base + cls + SETROWS + GDN
+    print(f"  {d:7.0f}  {t:8.2f} {dr:6.2f} {cb:7.2f} {dq:6.2f} {cls:7.2f} {cls+SETROWS+GDN:8.2f} {rnd:8.1f}")
 
-def fit(pts):  # least squares us = a + b*d
-    n = len(pts)
-    sx = sum(p[0] for p in pts); sy = sum(p[1] for p in pts)
-    sxx = sum(p[0] * p[0] for p in pts); sxy = sum(p[0] * p[1] for p in pts)
-    b = (n * sxy - sx * sy) / (n * sxx - sx * sx)
-    a = (sy - b * sx) / n
-    return a, b
-
-print("\n== measured per-launch medians (us) ==")
-print(f"  banked @ {D0:.0f}: {BANKED}")
-for w, d in (("A", DA), ("B", DB)):
-    row = {k: meas.get((w, k)) for k in ("verify", "catchup", "draft", "combine", "deq40")}
-    print(f"  win {w} @ {d:.0f}: {row}")
-
-print("\n== linear fits us(d) = a + b*d ==")
-fits = {}
-for k in ("verify", "catchup", "draft", "combine", "deq40"):
-    pts = [(D0, BANKED[k])]
-    if meas.get(("A", k)): pts.append((DA, meas[("A", k)]))
-    if meas.get(("B", k)): pts.append((DB, meas[("B", k)]))
-    if len(pts) >= 2:
-        fits[k] = fit(pts)
-        a, b = fits[k]
-        print(f"  {k:8s}: a {a:9.1f}  b {b * 1e6:9.4f} us per 1k KV   "
-              f"pts {[(round(p[0]), round(p[1], 1)) for p in pts]}")
-
-def us_at(k, d):
-    if k in fits:
-        a, b = fits[k]
-        return max(a + b * d, 0.0)
-    return BANKED.get(k, 0.0)
-
-print("\n== attention/KV ms per decode round (per die) vs depth ==")
-print("  depth       verify  catchup   draft  combine   deq40   SUM(ms/round/die)")
-for d in (D0, 32 * 1024, DA, DB, 160 * 1024, DT):
-    vals = {k: us_at(k, d) for k in CNT}
-    tot = sum(CNT[k] * vals[k] for k in vals) / 1e3
-    print(f"  {d:8.0f}  {CNT['verify'] * vals['verify'] / 1e3:8.2f} {CNT['catchup'] * vals['catchup'] / 1e3:7.2f} "
-          f"{CNT['draft'] * vals['draft'] / 1e3:7.2f} {CNT['combine'] * vals['combine'] / 1e3:8.2f} "
-          f"{CNT['deq40'] * vals['deq40'] / 1e3:7.2f} {tot:9.2f}")
-
-base = sum(CNT[k] * us_at(k, D0) for k in CNT) / 1e3
-lo, hi = D0, 512 * 1024
+# threshold: class delta vs 8k > 5 ms/round
+lo, hi = D0, 512000
 for _ in range(60):
     mid = (lo + hi) / 2
-    if sum(CNT[k] * us_at(k, mid) for k in CNT) / 1e3 - base < 5.0:
+    t, dr, cb, dq = class_ms(mid)
+    if (t + dr + cb + dq) - base < 5.0:
         lo = mid
     else:
         hi = mid
-print(f"\nattention/KV class @8k banked: {base:.2f} ms/round/die")
-print(f"depth where the class DELTA vs 8k exceeds 5 ms/round: ~{lo:.0f} tokens")
+print(f"\nclass @8k: {base:.1f} ms/round/die; DELTA > 5 ms/round at d ~= {lo:.0f}")
 
-deqT = CNT["deq40"] * us_at("deq40", DT) / 1e3
-tileT = (CNT["verify"] * us_at("verify", DT) + CNT["catchup"] * us_at("catchup", DT)) / 1e3
-print(f"\n200k projection per round/die: verify+catchup tile {tileT:.1f} ms, deq40 {deqT:.1f} ms")
-print(f"q4_0-direct tile lever @200k: +{deqT:.1f} ms (dequant deleted) "
-      f"+ tile KV traffic cut x{(2 * 3) / (18 / 32):.2f} if BW-bound")
+t, dr, cb, dq = class_ms(200000)
+delta = t + dr + cb + dq - base
+print(f"200k delta split: tile {CNT_TILE*tile_us(200000)/1e3:.1f} ms "
+      f"({100*CNT_TILE*tile_us(200000)/1e3/delta:.0f}% of delta), "
+      f"deq40 {dq:.1f} ms ({100*dq/delta:.0f}%), combine {cb:.1f}, draft {dr:.1f}")
