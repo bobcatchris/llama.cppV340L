@@ -1,0 +1,104 @@
+W7 V-PERM-3 CO-RESIDENCY ROW (companion) — co-residency push desk: ABLATION arms a/d, band-health
+  gates, and the bug-closure commit chain; 2026-09-18, window 7, lane amd/wo-w7-body
+RELATION TO THE PRIMARY ROW: results/amd/coherence/W7_vperm3_row.txt (the parallel vperm-3blocks
+  desk, commits 38af51c90/b182e2c6f) ran the same mission concurrently and reached the SAME
+  verdict (FALSIFIED) with the SAME two bug closures and the SAME census. THIS row adds what the
+  primary row pre-registered OUT of its scope: the a/d ABLATION benches, band-health-gated
+  protocol with a rejected-run receipt, and the three-artifact RED->GREEN commit chain. The two
+  bug fixes are landed in the BANKED bench file here (the primary desk's fix lives in its harness
+  copy only) — the class is now guarded at both copies.
+bin: /tmp/w7_vperm3_bench (hipcc -O3 -DNDEBUG -std=gnu++20 --offload-arch=gfx900 -Iinclude -Isrc
+  -Isrc/common/hip_shim + src/core/device.cu; source tools/v340l/w7_repack_bench.cu, shipped
+  kernel TU untouched; GREEN bin sha16 70b89f70587f38eb, src f7aed33699a437a7).
+raw: W7_vperm3_run2_c.log (V3c primary survivor), run3_a.log (control), run4_d.log (ablation),
+  W7_vperm3_run1_banddead_REJECTED.log, W7_vperm3_parity_{REDBOTH,REDA,GREEN}.log.
+method: w7_pk16/repack methodology verbatim (5 s mclk hammer, 256 MiB ceiling, hipEvent 3 warmup
+  + 20 iters, rel-L2 vs REF, M=128, four full geometries).
+BAND: die 3, clocks AUTO, ninfer-serve_7c ACTIVE on sibling dies 1-2 throughout (84 C boards,
+  shared DRAM, ceiling 358.6 GB/s vs solo class ~900) — same-window in-process V0 ratios only,
+  with HEALTH GATES checked before any verdict counts: (1) reproduce-first: V0 reproduced the
+  banked repack row within 6.5% (3090.5/2752.5/3110.3/2376.6 vs banked 3303.8/2893.2/3264.2/
+  2456.3); (2) sanity anchors: P 0.992x (banked 0.983x, bit-identical-layout class) and V 1.102x
+  (banked 1.136x); (3) V0 anchors stable +-1% across runs 2-4. RUN 1 (die 0) REJECTED AS
+  BAND-DEAD: the server burst mid-run (ceiling 69 GB/s; P read 0.59x — impossible for a
+  bit-identical-layout kernel); kept as W7_vperm3_run1_banddead_REJECTED.log.
+PRE-REGISTERED (committed BEFORE benching, a4de0b567/67eb41674): V3 = best census survivor;
+  V3/V0 mean >= 1.30 PASS | 1.15-1.30 AMBER | < 1.15 KILL (co-residency falsified at this
+  register budget). Correctness: V3 BIT-EXACT vs V (--v3parity patterned cell) + relL2 vs REF
+  < 1e-2 + bitdiff(vsV0) == 0 on bench data.
+
+CENSUS (kill-switch first; post-fix; STILES 80/96 identical; V ref reproduces the banked row):
+  V  <64r,4r/t,TN64,256t>: 113 VGPR, 0 B scratch, 1358 instr, 128 pk_fma, 32 waits
+  a  <64r,4r/t,TN32,256t>:  90 VGPR, 0 B, 1004 instr, 64 pk_fma, 22 waits   -> SURVIVOR
+  b  <64r,4r/t,TN64,512t>:  92 VGPR, 0 B, 1009 instr                        -> SURVIVOR
+  c  <32r,2r/t,TN64,256t>:  71 VGPR, 0 B,  830 instr, 28 waits              -> SURVIVOR
+  d  <64r,2r/t,TN64,512t>:  70 VGPR, 0 B,  811 instr                        -> SURVIVOR
+  f  <32r,2r/t,TN32,256t>: 161 VGPR — DEAD at census (pipeliner hoard; zero bench seconds)
+  e  <...minB=3 FORCING>:   84 VGPR + 104 B SPILL, waits 32->59 — DEAD at census (the forcing
+       technique's pre-registered death mode; honest 3-block bar is <=84 VGPR at 0 scratch,
+       NOT 96 — primary row reached the same conclusion independently).
+  Technique verdict: KTPR=2 (rows-per-thread rebalance) is what moves the census — it halves
+  EVERY row-indexed live range (acc+s2 stripe AND decode temps); kS=2 stripe-shrink alone
+  lands 90-92 VGPR.
+MEASURED co-residency (hipOccupancyMaxActiveBlocksPerMultiprocessor): V 113 = 2 blocks/CU |
+  a 90 = 2 | b/d (512-thr) = 1 | c 71 = 3 | e (spill) = 3. ONLY c unlocks the 3rd block; the
+  512-thread shapes cap at 1 (8-wave blocks), 90-92 VGPR still rounds to 2.
+
+BUG CLOSURE (RED->GREEN closure law; two latent V-family bugs the uniform bench could not see;
+  fixed in V, PV and V3 in the BANKED bench file; production kernel immune — TN = whole M =>
+  grid.y == 1; the primary row found the same two independently and fixed its own copy):
+  BUG 1 restage-order (decode emits (v0,v4),(v2,v6),(v1,v5),(v3,v7); stage fed words in
+     sequential order -> j=1/j=2 swapped = 1/4 of products wrong on real data; invisible on
+     uniform bench AND --debug): RED a4de0b567 bin 76a98ca6f3838f06 relL2(V,REF)=4.760e-01
+     -> GREEN 67eb41674 bin ba364d711a04f023 (with bug 2 still present) 1.089e-01.
+  BUG 2 stage-token (stage read x at BLOCK-LOCAL token; grid.y = M/TN tiles => every y>0 CTA
+     computed tokens >= TN on token t%TN's x = exactly (M-TN)/M half the outputs wrong at
+     M=128/TN=64; trap-3's twin — the READER was fixed to block-local, the STAGE left
+     global-shaped): GREEN e7985fadf bin 70b89f70587f38eb: relL2(V,REF) = 1.285e-03
+     (fp16-window class, gate PASS), ALL V3 variants BIT-EXACT vs V, V-vs-V0 bitdiff 7%
+     (declared association rounding). --v3parity = the permanent cell (codes cycle all 256
+     bytes, positional 0.5/1.0 scales, per-element x in [1,2)); it also caught a harness fill
+     bug on bring-up (e4m3 448-class coeffs overflow the fp16 window, relL2 ~5e0 class).
+  Banked V/PV verdicts STAND: on uniform data the fixes are value-invariant (permutation-
+  symmetric sums) — same bits, same op count, same time; runs 2-4 re-measured them anyway.
+
+MEASURED (M=128, die 3 band, xV0 per geometry | relL2 | bitdiff vs V0):
+  run2 V3c <32r,64t,256thr>:  0.97 / 1.05 / 0.96 / 1.11  -> MEAN 1.023x  (all relL2 0.0e0, 0 bitdiff)
+  run3 V3a <64r,32t,256thr>:  0.71 / 0.78 / 0.71 / 0.85  -> MEAN 0.761x
+  run4 V3d <64r,64t,512thr>:  0.81 / 0.85 / 0.79 / 1.00  -> MEAN 0.863x
+  same-run classes: P 0.992/0.989/0.985x | V 1.102/1.096/1.100x | PV 1.030/1.031x (banked
+  verdicts stand).
+  V3 ABSOLUTE GF/s (run2): 2993.0 / 2882.9 / 2999.3 / 2639.0.
+
+VERDICT (pre-registered bars):
+  V3c — KILL at 1.023x (< 1.15). THE CO-RESIDENCY HYPOTHESIS IS FALSIFIED AT THIS REGISTER
+       BUDGET — confirming the primary row's independent falsification (its 3 runs: 1.055/
+       0.990/1.004x; 5 total runs across both desks, spread +-3.3%, every run < 1.15). The
+       occupancy unlock is REAL (measured 2 -> 3 blocks/CU) and the time is FLAT: V beats V3c
+       on every geometry (1.06/1.12/1.05/1.18 vs 0.97/1.05/0.96/1.11). BOUND the desk was sent
+       to measure: essentially ALL of V's 1.10-1.14x decode win is ISSUE-SIDE (the v_perm
+       register decode stream + deleted LDS table reads), NOT co-residency-limited; 1.023x is
+       the number.
+  a  — KILL 0.761x: kS=2 at TN=32 halves the per-thread stripe (90 VGPR) but stays at 2
+       blocks/CU and doubles CTAs in y — codes re-read 2x more per output, half the MAC work
+       per thread. VGPR shrink WITHOUT the occupancy gain is strictly negative. (This is the
+       clean co-residency-attribution control: same decode, same 256-thr shape, no 3rd block,
+       and it LOSES 0.34x — register relief per se is worth negative; the primary row did not
+       bench this arm.)
+  d  — KILL 0.863x: lowest VGPR of the table (70) but 512-thread = 8-wave blocks cap at 1
+       block/CU — register relief buys zero residency, bigger block loses scheduling slack.
+       (b unbenched: same 512-thr cap class, dominated by d's better census.)
+
+WHY (mechanism): at 3 blocks/CU the CU holds 12 waves of a smaller tile (32-row, 2x CTAs in x):
+  more barriers and 2x x-restage traffic per output; the added residency hides latency the V
+  shape already hides at its 2-block/8-wave posture. Co-residency on this GEMM front is
+  SATURATED at V0/V resourcing — the binding variable remains the per-tile access pattern
+  (ksplit limiter kit), which neither registers nor occupancy moves. Remaining v_perm-class
+  upside must come from a DIFFERENT axis (MAC density, decode width), not blocks/CU.
+
+INTEGRATION NOTE: if V integrates (NINFER_TILED_V gate) it MUST carry both fixes (now landed in
+  the banked bench file, commits 67eb41674/e7985fadf; primary desk's copy has them too), and ANY
+  future token-tiled port of the shipped kernel must re-derive the stage-token domain (trap-3
+  twin — resume trap 5 updated accordingly). --v3parity is the permanent guard.
+
+VRAM note: V3 allocates nothing the V arm didn't; nothing refused, nothing estimated.

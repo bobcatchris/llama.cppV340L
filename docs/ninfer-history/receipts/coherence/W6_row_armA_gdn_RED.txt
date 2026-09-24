@@ -1,0 +1,26 @@
+W6 ARM-A row — NINFER_GDN_SIMT=1 — RED BY DEVICE WEDGE (no ms number exists; law: a wedged cell is not timed), 2026-09-18 06:3x, window 6
+bin: /home/chris/artifacts_bin/ninfer-serve_a43312bb9634bef9.bin (same as baseline leg; battery GREEN)
+env: baseline leg env + NINFER_GDN_SIMT=1 (strict-parse arm confirmed by the gate line below)
+serve log: W6_boot_armA_gdn_serve.log; sideband: W6_armA_gdn_clocks.log; probe: TIMEOUT rc=28 at 300 s bounded wait, no response artifact
+ROUTE PROOFS (both fired, exact runbook §4 grammar):
+  [GDN] NINFER_GDN_SIMT='1' -> gfx900 SIMT kernels (prepare_wy_wu_simt/state_passing_simt/output_simt) ...
+  [GDN] NINFER_GDN_SIMT=1 chunked prefill -> gfx900 SIMT kernels: prepare_wy_wu_simt grid=(2,12,4)x256,
+        state_passing_simt grid=(12,8)x256, output_simt grid=(2,12,4)x256 (H_qk=4 H_v=12 T=128 chunks=2 kChunkSize=64)
+OBSERVABLES:
+  - boot self-probe (T=51 tok, chunked, chunks=1) COMPLETED CLEAN on the SIMT route: dn=12.021 ms/call-class
+    (baseline default-off self-probe same shape: dn 11.7-12.3) — single-chunk SIMT trio is fast AND correct-class
+  - probe request (plen-2016, first T=128 chunks=2 trio call): ZERO [PREFILL-BODY] chunk lines in 300 s;
+    GPU 0/2/3 pinned 100% the whole window (rank1 0% — waiting in AR); no fault/abort line (clean device spin)
+  - the dispatch receipt printed = all three simt launchers enqueued; wedge is INSIDE the T=128/chunks=2 kernel trio
+PRIME SUSPECT (for the desk, from the T=51-vs-T=128 delta): the chunks=2 serial state_passing_simt loop or the
+  chunk-2 prepare/output handoff (the notes' "block inversion + Schur with DECLARED barrier/ordering constraints"
+  are the load-bearing candidates); NOT a perf shortfall — a slow kernel completes, this never returned
+RECOVERY (OPS LAW PLOG-047/049 playbook, receipts inline):
+  anchored TERM pid=1649157 IGNORED by wedged process -> KILL (own pid); KFD=0 after; dies 0/2/3 were 100% wedged
+  sudo rocm-smi --gpureset -d 0 -> "Successfully reset GPU 0" (re-verified with visible receipt)
+  sudo rocm-smi --gpureset -d 2 -> "Successfully reset GPU 2"
+  sudo rocm-smi --gpureset -d 3 -> "Successfully reset GPU 3"
+  post: 4/4 dies 0% use, rocminfo enumerates gfx900, box healthy before next boot
+VERDICT: ARM-A RED — dn 510 -> <100 NOT DEMONSTRATED (acceptance <150 / RED >300 moot: no completion).
+  NINFER_GDN_SIMT must NOT be promoted. Desk re-engages with this evidence (GQA runbook §7 discipline: bank, no card iteration).
+  Baseline leg (default-off) is UNAFFECTED and stands; arms B/C/D proceed on the same banked binary.
