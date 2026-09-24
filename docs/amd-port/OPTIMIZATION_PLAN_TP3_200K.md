@@ -4264,3 +4264,22 @@ to Gemini's guard battery, die 3 is the dev cell.
   ~26% within 20 minutes even with crash-class fixed), prefill
   ub1024 flag for prefill-heavy profiles, weight-bit reduction
   (owner-guarded).
+- E-119 (cont.) 06:15 THREE-AGENT FLEET DISPATCHED (Chris: "where are
+  the agents?"): (1) FA40-CODEGEN WORKAROUND desk (wt-fa40-cg on
+  amd/fa40-codegen): the C1/C2/C3 restructure sweep against the
+  hipcc-clang-18 miscompile - attribute/placement variants, per-TU
+  opt levels (optnone as diagnostic), structure splits - oracle-gated
+  per candidate; winning restructure reopens the -38.9% attention
+  lever (386 ms pool at real 200k depth). (2) SOAK-MECHANISM desk
+  (wt-soak on amd/soak-mech, ZERO-GPU phase): mine the banked thermal
+  sideband logs (the E-128 window's decay captured live: 23.30 ->
+  16.32 across 20 min) + full hwmon sensor census (HBM/mem temp
+  channels - HBM refresh escalation fits a bandwidth-decay invisible
+  at junction 85 C) -> mechanism verdict or decisive discriminator;
+  cheap operational fixes wanted. (3) DC-ENGAGEMENT desk
+  (wt-dc-eng on amd/dc-engagement, ZERO-GPU): root-cause why the
+  draft-shape-cache engagement line never printed served (the dc
+  window's E-117-class unproven arm), fix, host-verify via the
+  ggml_log_set capture pattern. All: WIP-commit + CHECKIN laws,
+  receipts W17/W18/W19, ledger E-129/E-130/E-131. GPU contention:
+  only the codegen desk (die 3, lock-arbitrated).
