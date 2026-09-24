@@ -4019,3 +4019,52 @@ to Gemini's guard battery, die 3 is the dev cell.
   cell spread, deltas 100x jitter, direction identical); no ggml-cuda code
   touched -> no build/CI due; bench revisions COMPILE-EXIT:0 each.
   RECEIPT: docs/amd-port/results/W14_widelaunch_receipt_2026-09-23.md.
+- E-124 DEEP-CENSUS DESK: U1 BOUNDED - THE ROUND IS NOT FLAT IN REAL DEPTH;
+  THRESHOLD ~9.4k; 200k DEPTH = ~503 ms/round (3.9x OF-RECORD); Q4_0-DIRECT
+  TILE DESK WARRANTED (92% OF THE DEEP DELTA). One TP4 boot window
+  (wt-deep-census on amd/deep-census; lane 8083, ctx 131072, rocprofv3
+  kernel trace, lock-held 20:45:44-21:32:48; receipt
+  W15_deepcensus_receipt_2026-09-23.md; instruments
+  deepcensus_depth_extract.py + deepcensus_phase_split.py +
+  deepcensus_fit.py + curves W15_deepcensus_depth_extract txt). (1) WINDOW
+  HONEST ACCOUNT: probes intended 64k + 120k depth + decode each; probe A
+  (63.2k prompt) died at its 1500 s CLIENT timeout mid-prefill (thermal
+  -slowed to 34 t/s), server canceled at 48,682; probe B (119.4k,
+  prefix-cache reuse) reached ~66.5k traced KV when teardown SIGTERM'd it;
+  a non-streaming request is NOT canceled by client disconnect mid-prefill
+  (procedure law). NO decode-at-depth captured: the tile/combine/draft
+  depth terms are MODEL anchored at the banked 7.2k census; window ran
+  47:04 vs the ~35 min law (cause chain in receipt, not hidden). THERMAL:
+  all junctions 84-85 C within ~4 min, dies 3/4 throttled to 800-950 MHz,
+  dies 1/2 held ~1300; die-1 channel clean. Pre-window stale-lock removal
+  WITH EVIDENCE (dead pid 60372, 823 s held, GPU idle) also unblocked the
+  coordinator's waiting tsab chain. (2) MEASURED (2.03M dispatches; depth
+  from grid geometry: deq40 GridX/32 = ne11 exactly, 8k bin lands ON the
+  banked 24.9 us anchor): f16-KV-pool DEQUANT IS LINEAR at 3.98 us/1k
+  tokens/launch to 68k (25.0 us @8k -> 264 @68k, die 1) - U1's named
+  unbounded item is now a measured line: 0.82 -> 26.0 ms/round from 8k to
+  200k. PREFILL TILE (T=512 instance) linear early at 5.9 us/token
+  (reproduces W13's 41 ms @7168) with x1.4 late superlinearity beyond 36k
+  (f16 pool leaving L2; not clocks - die 1 held) - if real, the decode
+  tile's deep slope is UNDERSTATED by the model. SERVED PREFILL WALL
+  collapses 218 t/s @4k -> 13.9 @65k: deep context also wrecks prompt
+  processing (minutes-class at 64k, thermally self-reinforcing). (3) MODEL
+  VERDICT (decode tile = wave model: pb=d/192, 3 z, 112-CTA waves, per-CTA
+  192-col scan ~730 us fixed -> tile(d) = 722 us x d/7168, i.e. LINEAR
+  0.102 us/token/launch; prefill-instance evidence (48 waves, 0.54 GB/s
+  effective on unique KV) rules out wave-count rescue): attention/KV class
+  per round/die = 13.0 ms @8k -> 61.7 @32k -> 123.6 @64k -> 386.0 @200k;
+  round = 129 -> ~179 @32k -> ~241 @64k -> ~503 @200k. The class DELTA vs
+  8k crosses 5 ms/round at d ~= 9,400. THE "CONTEXT-INSENSITIVE TO 32k"
+  OF-RECORD CLAIM IS A CACHE-SIZE CLAIM (7-8k prompts), NOT A DEPTH CLAIM -
+  real deep-context serving breaks the 129 ms envelope just past ~10k.
+  BINDING CAVEAT: direct decode-at-depth remains UNMEASURED; the follow-up
+  that converts model to measurement is cheap and windowless - extend the
+  banked bench_attn_real.cu (real launch_fattn host chain, single die) to
+  sweep ne11 7168..200k, thermally gated. (4) LEVER VERDICT: at 200k the
+  deep delta splits tile KV re-read 92% / pool dequant 7% / combine+draft
+  ~5%. The f16-KV-pool tax is real, measured, and the MINOR term; the
+  Q4_0-DIRECT DECODE TILE KERNEL (W11 forward lever) is the desk that
+  attacks both terms - gate it on END-TO-END per-launch wins (the W11
+  wide-arm lesson: kernel-sum wins die on launch latency). Deep prefill
+  tile (sub-1 TF/s latency-bound, W13) joins the same desk umbrella.
