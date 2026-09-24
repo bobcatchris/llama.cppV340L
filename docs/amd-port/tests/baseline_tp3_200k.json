@@ -1,5 +1,5 @@
 {
-  "description": "Baseline gates for llama-server TP4 200k (Qwen3.8-27B-ASCII-P1M, draft-mtp) - re-stamped 2026-09-23 on the TP4 + RCCL serving of record (Chris-approved, E-105, 5/5 GREEN): decode 23.23 @10k-class cell / 23.34 @200k, prefill 217.71, accept 0.66667. SUPERSEDES the 2026-09-22 TP3 stamp (18.72) that let the aln-completion hot-path tax (landed post-TP4-validation) read as -0.73% PASS; with the true anchor the same number is a -20% FAIL.",
+  "description": "Baseline gates for llama-server TP4 200k (Qwen3.8-27B-ASCII-P1M, draft-mtp) - ratcheted 2026-09-24 (E-137) to the fa40 var-11 q4_0-direct serving of record (paired +5.0%/+4.3%, clean pair-1 cell 24.55, oracle bit-exact W17); prior stamp E-105 decode 23.23 @10k / 23.34 @200k, prefill 217.71, accept 0.66667. SUPERSEDES the 2026-09-22 TP3 stamp (18.72) that let the aln-completion hot-path tax (landed post-TP4-validation) read as -0.73% PASS; with the true anchor the same number is a -20% FAIL.",
   "source": "E-105 TP4 validation receipts (TP4-DONE + 10K-DONE guard batteries, 2026-09-23 08:30-08:38 window)",
   "ratchets": 2,
   "config": {
