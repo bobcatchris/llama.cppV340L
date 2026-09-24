@@ -1,0 +1,16 @@
+W6 PROMOTE row — GGATE default flip (env no longer required), 2026-09-18 07:1x-07:2x, window 6
+CHANGE: src/ops/gdn_gating_proj/bf16/bf16_gdn_gating_simt_gate.h — promoted matrix: unset/"1" -> SimtColTile
+  (cols>=9 prefill arm), exact "0"/garbage -> legacy MmaUnsplit rollback; trace-once now fires on EVERY first
+  consult incl. unset (operators always see the live route). Cell tests/ops/gdn_gating_simt_route_host.cpp
+  matrix updated to the promoted grammar — host cell rerun ALL GREEN RC=0 (4/4 matrix, both poisons still
+  RED-capable, parity 7e-8 class unchanged) [GGATE-CELL transcript in W6_ggate_cell_promote_receipt.log]
+NEW BINARY: /home/chris/artifacts_bin/ninfer-serve_93515c1f5854b346.bin (build RC=0 at flip; BANK-BEFORE-RELINK)
+RE-LEG (boot promote_ggate, NO env): PROMOTION ACCEPTANCE PASSED —
+  route proof via DEFAULT: [GGATE] NINFER_GGATE_SIMT=<unset> -> route=gdn_gating_proj.bf16.simt.col_tile
+  (...; promoted default ON, exact "0" rolls back to the mma emulation route)
+  parity: finish=stop content='BLUE' completion=41 (byte-identical class)
+  gate column: 10.8-11.7 ms on ranks 1-3 — the promoted route performing exactly as the arm-B gate, MID-COLLAPSE
+PERF COLUMNS OF THIS LEG DISQUALIFIED (sideband): full throttle collapse — mclk dropped to levels 0/1/2 across
+  cards, sclk 0-3 heavy, edge 84-85C; unbr exploded 666-751 ms, rank0 dn 1010, wall 2551; client 44.8 s.
+  The valid perf evidence for the promoted default IS the arm-B clean-band row (same route+kernel, default only
+  changes selection): gate 80.4 -> 11.31 ms, body 710 -> 626.5, wall 1674.7 -> 1579.0, prefill-class ~76.4 tok/s.
