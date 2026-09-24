@@ -16,12 +16,11 @@
 //   base   ncols2=2  - the shipped instance  flash_attn_tile<256,256,4,2,false>
 //   mid3   ncols2=3  - GGML_CUDA_FATTN_TILE_GQA_WIDE arm, 2 z-blocks
 //   wide6  ncols2=6  - GGML_CUDA_FATTN_TILE_GQA_WIDE arm, 1 z-block
+//   direct           - GGML_CUDA_FATTN_TILE_Q40_DIRECT arm: same <4,2>
+//                      instance shape but the kernel dequantizes the q4_0 KV
+//                      blocks in-kernel (launch_fattn need_f16 = false, false:
+//                      no pool, no dequant launches)
 //   basedup          - base again, in-run determinism control
-//
-// W16 (fa-q40 desk): a Q4_0-direct arm (in-kernel q4_0 KV dequant, no f16
-// pool) was prototyped on branch history (75647c857) and produced WRONG
-// results on gfx900/ROCm 6.2 (see W16 receipt); the arm is NOT present here.
-// The --depth N sweep (W15 follow-up) is retained for future desks.
 // Every arm after base is device-copied and memcmp'd against base BEFORE any
 // timing counts; mismatches are counted and max ulp-class diff reported.
 //
@@ -70,13 +69,26 @@ static constexpr float SCALE   = 0.0625f;
 // q4_0 row: 256 el = 8 blocks x 18 B
 static constexpr long KV_ROW_BYTES = (DKQ / QK4_0) * sizeof(block_q4_0);
 
-enum ArmKind { ARM_BASE, ARM_MID3, ARM_WIDE6, ARM_BASEDUP };
+enum ArmKind { ARM_BASE, ARM_MID3, ARM_WIDE6, ARM_DIRECT,
+               ARM_V1, ARM_V2, ARM_V3, ARM_V4, ARM_V6, ARM_V7, ARM_V8, ARM_V9,
+               ARM_V10, ARM_V11, ARM_BASEDUP };
 
 static const char * arm_name(ArmKind k) {
     switch (k) {
         case ARM_BASE:    return "base";
         case ARM_MID3:    return "mid3";
         case ARM_WIDE6:   return "wide6";
+        case ARM_DIRECT:  return "direct";
+        case ARM_V1:      return "v1_ctl";  // q40 as-of-W16 (negative control)
+        case ARM_V2:      return "v2_c1c";  // C1c: noinline dequant
+        case ARM_V3:      return "v3_c1d";  // C1d: volatile LDS reads in KQ stage
+        case ARM_V4:      return "v4_nlm";  // noinline mad chain
+        case ARM_V6:      return "v6_hk";   // C3b: half-width K chunks
+        case ARM_V7:      return "v7_lb";   // C1a: explicit launch bounds (256,1)
+        case ARM_V8:      return "v8_u1";   // unroll-1 dot chain
+        case ARM_V9:      return "v9_optno";// optnone diagnostic
+        case ARM_V10:     return "v10_st16";// 16B shared-tile stores (f16 granule)
+        case ARM_V11:     return "v11_stsc";// scalar half2 shared-tile stores
         case ARM_BASEDUP: return "basedup";
     }
     return "?";
@@ -93,11 +105,40 @@ static void launch_arm(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     HIP_CHECK(hipGetLastError());
 }
 
+// q4_0-direct arm: identical geometry/config lookup as base, but the kernel
+// reads the q4_0 KV tensor in place and the pool conversion is skipped.
+// VAR selects the codegen-workaround variant (1 = as-of-W16 control).
+template <int VAR>
+static void launch_arm_q40(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
+    const int cc = ggml_cuda_info().devices[ggml_cuda_get_device()].cc;
+    const int nthreads  = ggml_cuda_fattn_tile_get_nthreads (DKQ, DV, 8, cc);
+    const int nbatch_fa = ggml_cuda_fattn_tile_get_nbatch_fa(DKQ, DV, 8, cc);
+    launch_fattn<DV, 4, 2>(ctx, dst,
+        flash_attn_tile<DKQ, DV, 4, 2, false, VAR>,
+        nthreads / 32, 0, nbatch_fa, false, false, false, 32);
+    HIP_CHECK(hipGetLastError());
+}
+
+static void launch_arm_direct(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
+    launch_arm_q40<1>(ctx, dst);
+}
+
 static void run_arm(ArmKind k, ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     switch (k) {
         case ARM_BASE:    launch_arm<4, 2>(ctx, dst); break;
         case ARM_MID3:    launch_arm<4, 3>(ctx, dst); break;
         case ARM_WIDE6:   launch_arm<4, 6>(ctx, dst); break;
+        case ARM_DIRECT:  launch_arm_direct(ctx, dst); break;
+        case ARM_V1:      launch_arm_q40<1>(ctx, dst); break;
+        case ARM_V2:      launch_arm_q40<2>(ctx, dst); break;
+        case ARM_V3:      launch_arm_q40<3>(ctx, dst); break;
+        case ARM_V4:      launch_arm_q40<4>(ctx, dst); break;
+        case ARM_V6:      launch_arm_q40<6>(ctx, dst); break;
+        case ARM_V7:      launch_arm_q40<7>(ctx, dst); break;
+        case ARM_V8:      launch_arm_q40<8>(ctx, dst); break;
+        case ARM_V9:      launch_arm_q40<9>(ctx, dst); break;
+        case ARM_V10:     launch_arm_q40<10>(ctx, dst); break;
+        case ARM_V11:     launch_arm_q40<11>(ctx, dst); break;
         case ARM_BASEDUP: launch_arm<4, 2>(ctx, dst); break;
     }
 }
@@ -292,6 +333,8 @@ int main(int argc, char ** argv) {
     bool probe     = false;
     bool matrix    = false;
     bool allarms   = false;
+    bool oracle_only = false;
+    bool solo        = false; // v11 winner alone (no miscompile-shaped variants in the TU)
     const char * adj_pair = nullptr;
     for (int i = 2; i < argc; ++i) {
         if (strcmp(argv[i], "--served-entry") == 0) served = true;
@@ -299,6 +342,8 @@ int main(int argc, char ** argv) {
         if (strcmp(argv[i], "--probe") == 0)        probe = true;
         if (strcmp(argv[i], "--matrix") == 0)       matrix = true;
         if (strcmp(argv[i], "--allarms") == 0)      allarms = true;
+        if (strcmp(argv[i], "--oracle") == 0)       oracle_only = true;
+        if (strcmp(argv[i], "--solo") == 0)         solo = true;
         if (strcmp(argv[i], "--depth") == 0 && i + 1 < argc) g_ne11 = atol(argv[++i]);
         if (strcmp(argv[i], "--adj") == 0 && i + 1 < argc) adj_pair = argv[++i];
     }
@@ -371,6 +416,23 @@ int main(int argc, char ** argv) {
     const float softcap  = 0.0f;      memcpy(dst_t->op_params + 2, &softcap,  sizeof(float));
     dst_t->src[0] = q_t; dst_t->src[1] = k_t; dst_t->src[2] = v_t; dst_t->src[3] = m_t; dst_t->src[4] = nullptr;
     dst_t->op = GGML_OP_FLASH_ATTN_EXT; // asserted by get_f16_extra_data
+
+    // staged-oracle dump channel (dbg builds only): the kernel receives it via
+    // the sinks arg; the dbg build compiles the sink bias out. Region layout
+    // (float words): [0] magic, [1] variant id, KT @1024 (64x128 half2 as u32),
+    // VT @12288 (32x128), KQ_acc @16384 (256 threads x 4 slots).
+    float * dbg_dev = nullptr;
+    bool dbg_mode = false;
+#ifdef GGML_FATTN_Q40_DBG
+    if (getenv("GGML_FATTN_Q40_DBG")) {
+        dbg_mode = true;
+        HIP_CHECK(hipMalloc(&dbg_dev, 1 << 20));
+        HIP_CHECK(hipMemset(dbg_dev, 0, 1 << 20));
+        ggml_tensor * dbg_t = ggml_new_tensor_1d(gctx, GGML_TYPE_F32, (1 << 20) / 4);
+        dbg_t->data = dbg_dev;
+        dst_t->src[4] = dbg_t;
+    }
+#endif
 
     if (probe) {
         // per-launch event timing of the same arm back-to-back (no sequence
@@ -718,7 +780,11 @@ int main(int argc, char ** argv) {
         ggml_free(gctx); return 0;
     }
 
-    const std::vector<ArmKind> arms = { ARM_BASE, ARM_MID3, ARM_WIDE6, ARM_BASEDUP };
+    const std::vector<ArmKind> arms = allarms ? std::vector<ArmKind>{ ARM_BASE, ARM_MID3, ARM_WIDE6, ARM_DIRECT, ARM_BASEDUP }
+                                      : solo   ? std::vector<ArmKind>{ ARM_BASE, ARM_V11, ARM_BASEDUP }
+                                      : std::vector<ArmKind>{ ARM_BASE, ARM_V1, ARM_V2, ARM_V3, ARM_V4,
+                                                              ARM_V6, ARM_V7, ARM_V8, ARM_V9,
+                                                              ARM_V10, ARM_V11, ARM_BASEDUP };
 
     // warmup + oracle
     std::vector<std::vector<uint8_t>> out(arms.size());
@@ -750,6 +816,43 @@ int main(int argc, char ** argv) {
         printf("ORACLE %s vs base: %s (%d/%zu els differ, max rel %.3e)\n",
                arm_name(arms[a]), mism[a] == 0 ? "BIT-EXACT" : "DUST",
                mism[a], dst_bytes/4, max_rel);
+    }
+
+    // staged oracle: in-kernel shared K/V tile dumps + KQ_acc dump vs base
+    if (dbg_mode) {
+        auto staged_run = [&](ArmKind k, std::vector<uint8_t> & snap) {
+            run_arm(k, ctx, dst_t);
+            HIP_CHECK(hipDeviceSynchronize());
+            snap.resize(1 << 20);
+            HIP_CHECK(hipMemcpy(snap.data(), dbg_dev, 1 << 20, hipMemcpyDeviceToHost));
+        };
+        std::vector<uint8_t> d0, d1;
+        staged_run(ARM_BASE, d0);
+        { FILE * f = fopen("/tmp/fa40_staged_base.bin", "wb"); if (f) { fwrite(d0.data(), 1, d0.size(), f); fclose(f); } }
+        for (size_t a = 1; a < arms.size(); ++a) {
+            staged_run(arms[a], d1);
+            char pth[128]; snprintf(pth, sizeof(pth), "/tmp/fa40_staged_%s.bin", arm_name(arms[a]));
+            { FILE * f = fopen(pth, "wb"); if (f) { fwrite(d1.data(), 1, d1.size(), f); fclose(f); } }
+            if (arms[a] == ARM_BASEDUP) continue;
+            const char * kt = "KT-X", * vt = "VT-X", * kq = "KQ-X";
+            do {
+                const float * b = (const float *) d0.data();
+                const float * t = (const float *) d1.data();
+                if (memcmp(b, t, sizeof(float)) != 0) break; // magic word only (variant ids differ by design)
+                if (memcmp(b + 1024,  t + 1024,  8192*sizeof(float)) != 0) break;
+                kt = "KT=ok";
+                if (memcmp(b + 12288, t + 12288, 4096*sizeof(float)) != 0) break;
+                vt = "VT=ok";
+                if (memcmp(b + 16384, t + 16384, 1024*sizeof(float)) != 0) break;
+                kq = "KQ=ok";
+            } while (false);
+            printf("STAGED %s vs base: %s %s %s\n", arm_name(arms[a]), kt, vt, kq);
+        }
+    }
+
+    if (oracle_only) {
+        ggml_free(gctx);
+        return 0;
     }
 
     // warmup (2500 full 4-arm passes, ~8 s) into the hot-steady DVFS state;
