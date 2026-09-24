@@ -4208,3 +4208,29 @@ to Gemini's guard battery, die 3 is the dev cell.
   mid-window (svm risk residual), cells bank individually and the
   campaign-postreboot unit re-runs the window on the hardened boot.
   Verdicts land ~01:30 for the morning read.
+- E-127 2026-09-24 04:50 OVERNIGHT PREFILL VERDICT: ub1024 PREFILL WIN
+  CONFIRMED, DECODE PENALTY LIKELY - REJECTED AS SERVING DEFAULT (mixed
+  profile note for Chris). Paired interleaved full batteries (all
+  provenance-stamped, binary 938a6999, noretry=1 boot):
+  cell | prefill | decode
+  p0a (ub512, pos 1) | 217.54 | 23.30 PASS
+  p1a (ub1024, pos 2) | 222.84 | 21.31 WARN
+  p0b (ub512, pos 3) | 211.29 | 16.32 FAIL(soak)
+  p1b (ub1024, pos 4) | 222.33 | 16.85 FAIL(soak)
+  PREFILL: both paired deltas POSITIVE (+2.4%, +5.2%) - the W13
+  staging-halving win is REAL and paired-consistent. DECODE: the clean
+  pair (positions 1-2) shows -8.5% (the historical ubatch-decode trade
+  at ub1024 scale); pair 2 contradicts (+3.2%) because positions 3-4
+  are soak-cratered (p0b 16.32 on identical code to p0a's 23.30 - the
+  position decay again). VERDICT: REJECT for the decode-serving
+  default (decode is the campaign metric; an -8.5% clean-pair decode
+  signal for +2.4-5.2% prefill is the wrong trade here). NOTE FOR
+  CHRIS: if any workload is PREFILL-DOMINATED (long prompts, short
+  generations), ub1024 is worth a profile - the flag is one line.
+  Also: this window's position decay (23.30 pos-1 -> 16.32 pos-3) is
+  the steepest yet on a noretry boot - the performance-decay
+  mechanism is INDEPENDENT of the crash class (noretry stopped the
+  hard deaths; the soak/decay continues). serving of record UNCHANGED
+  (b512/ub512). Day close: 9 desks landed, 5 windows run, 2 levers
+  promoted ever (share set + TP4), everything else honestly negative -
+  and every negative banked with instruments.
