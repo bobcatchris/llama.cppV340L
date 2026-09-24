@@ -85,6 +85,19 @@ static void launch_arm(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     HIP_CHECK(hipGetLastError());
 }
 
+// served instance with padded DYNAMIC shared memory: pads the launch's total
+// LDS footprint (static + dynamic) to a target without touching the kernel
+template <int ncols1, int ncols2>
+static void launch_arm_pad(ggml_backend_cuda_context & ctx, ggml_tensor * dst, size_t pad_bytes) {
+    const int cc = ggml_cuda_info().devices[ggml_cuda_get_device()].cc;
+    const int nthreads  = ggml_cuda_fattn_tile_get_nthreads (DKQ, DV, ncols1*ncols2, cc);
+    const int nbatch_fa = ggml_cuda_fattn_tile_get_nbatch_fa(DKQ, DV, ncols1*ncols2, cc);
+    launch_fattn<DV, ncols1, ncols2>(ctx, dst,
+        flash_attn_tile<DKQ, DV, ncols1, ncols2, false>,
+        nthreads / 32, pad_bytes, nbatch_fa, true, true, false, 32);
+    HIP_CHECK(hipGetLastError());
+}
+
 static void run_arm(ArmKind k, ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     switch (k) {
         case ARM_BASE:    launch_arm<4, 2>(ctx, dst); break;
@@ -131,22 +144,45 @@ __global__ void widelaunch_lds_kernel(float * out) {
         buf[i] = 0.0f;
     }
     __syncthreads();
-    uint32_t src = tid, sink = 0;
+    uint32_t sink = 0;
     if (BURN_VGPR) {
-        // force >=128 arch vgpr allocation (real FA tile kernels use 128)
-        asm volatile("v_mov_b32 v127, %1\n\tv_mov_b32 %0, v127\n" : "=v"(sink) : "v"(src));
+        // force >=128 arch vgprs: wrap-around circular dependencies keep the
+        // whole array live; the magic-compare guard defeats constant folding
+        float acc[128];
+        #pragma unroll
+        for (int i = 0; i < 128; ++i) {
+            acc[i] = (float) (i ^ tid) + 1.0f;
+        }
+        #pragma unroll
+        for (int r2 = 0; r2 < 2; ++r2) {
+            #pragma unroll
+            for (int i = 0; i < 128; ++i) {
+                acc[i] = fmaf(acc[i], acc[(i + 1 + r2*64) & 127], 1.0f)
+                         - acc[(i + 32) & 127] * 0.5f;
+            }
+        }
+        float t = 0.0f;
+        #pragma unroll
+        for (int i = 0; i < 128; ++i) {
+            t += acc[i];
+        }
+        sink = (uint32_t) t;
     }
     if (tid == 0) {
         float s = 0.0f;
         for (int i = 0; i < LDS_BYTES/4; i += 128) {
             s += buf[i];
         }
-        out[blockIdx.y] = s + (BURN_VGPR ? (float) sink * 0.0f : 0.0f);
+        out[blockIdx.y] = s;
+        if (sink == 0xdeadbeefu) {
+            out[blockIdx.y] = 2.0f;
+        }
     }
 }
 
-// forced scratch (local-memory spill) kernel: ~1440 B/thread, tiny LDS -
-// discriminates the spill/scratch class (FA<4,6> scr=1432 vs FA<4,2> 1104)
+// forced scratch (local-memory spill) kernels. LIGHT variant: 256 B/thread
+// spill, near-zero traffic, isolates start latency. HEAVY variant: ~1440
+// B/thread (FA<4,6> class) - execution-dominated, kept for reference.
 __global__ void widelaunch_spill_kernel(float * out) {
     float r[360];
     const int tid = threadIdx.x;
@@ -162,8 +198,44 @@ __global__ void widelaunch_spill_kernel(float * out) {
     }
 }
 
-// huge-code kernel: ~4.1k unrolled iterations of dependent math - splits
-// instruction-cache / code-size class from everything else
+__global__ void widelaunch_spill_light_kernel(float * out) {
+    float r[64];
+    const int tid = threadIdx.x;
+    #pragma unroll
+    for (int i = 0; i < 64; ++i) {
+        r[i] = (float) (i ^ tid);
+    }
+    float s = 0.0f;
+    for (int i = 0; i < 64; ++i) {
+        s += r[(i*7 + tid) & 63];
+    }
+    if (tid == 0) {
+        out[blockIdx.y] = s;
+    }
+}
+
+// FA<4,6>-class spill (1456 B/thread local) with CHEAP access: scattered
+// init forces the local allocation, linear reads keep execution tiny -
+// isolates the scr threshold class (FA<4,2> 1104 clean vs FA<4,6> 1432 pays)
+__global__ void widelaunch_spill_lin_kernel(float * out) {
+    float r[364];
+    const int tid = threadIdx.x;
+    for (int i = 0; i < 364; ++i) {
+        r[(i*7 + tid) % 364] = (float) (i ^ tid);
+    }
+    float s = 0.0f;
+    #pragma unroll 4
+    for (int i = 0; i < 364; ++i) {
+        s += r[i];
+    }
+    if (tid == 0) {
+        out[blockIdx.y] = s;
+    }
+}
+
+// huge-code kernels: unrolled dependent math. heavy = 123 KB code, full
+// execution; light = same code volume in guarded 64-iteration chunks, only
+// the first chunk runs (isolate start latency from execution).
 template <int N>
 __global__ void widelaunch_bigcode_kernel(float * out) {
     float a = threadIdx.x * 0.5f + 1.0f;
@@ -173,6 +245,26 @@ __global__ void widelaunch_bigcode_kernel(float * out) {
         a = fmaf(a, b, 1.0001f);
         b = fmaf(b, a, 0.9999f);
         a = sqrtf(a) + 1e-9f;
+    }
+    if (a == 12345.678f) {
+        out[threadIdx.x] = a + b;
+    }
+}
+
+template <int CHUNKS>
+__global__ void widelaunch_bigcode_light_kernel(float * out) {
+    float a = threadIdx.x * 0.5f + 1.0f;
+    float b = 0.5f;
+    #pragma unroll
+    for (int c = 0; c < CHUNKS; ++c) {
+        if (c == 0 || out[0] < -1.0e30f) {
+            #pragma unroll
+            for (int i = 0; i < 64; ++i) {
+                a = fmaf(a, b, 1.0001f);
+                b = fmaf(b, a, 0.9999f);
+                a = sqrtf(a) + 1e-9f;
+            }
+        }
     }
     if (a == 12345.678f) {
         out[threadIdx.x] = a + b;
@@ -494,6 +586,30 @@ int main(int argc, char ** argv) {
         // LDS x grid discriminator: minimal kernels with the base (22528 B)
         // and wide6 (32768 B) static LDS, near-zero work, in both grid shapes
         {
+            // dynamic-LDS padding probe on the REAL served kernel: base
+            // (static 22528) padded to mid3/wide6 total LDS footprints
+            {
+                std::vector<double> v25, v32;
+                for (int i = 0; i < niter; ++i) {
+                    HIP_CHECK(hipEventRecord(e0, st));
+                    launch_arm_pad<4, 2>(ctx, dst_t, 2560);
+                    HIP_CHECK(hipEventRecord(e1, st));
+                    HIP_CHECK(hipEventSynchronize(e1));
+                    float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, e0, e1));
+                    v25.push_back(ms * 1000.0);
+                }
+                for (int i = 0; i < niter; ++i) {
+                    HIP_CHECK(hipEventRecord(e0, st));
+                    launch_arm_pad<4, 2>(ctx, dst_t, 10240);
+                    HIP_CHECK(hipEventRecord(e1, st));
+                    HIP_CHECK(hipEventSynchronize(e1));
+                    float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, e0, e1));
+                    v32.push_back(ms * 1000.0);
+                }
+                report("base_pad_25088", v25);
+                report("base_pad_32768", v32);
+            }
+
             float * lds_out = nullptr;
             HIP_CHECK(hipMalloc(&lds_out, 4096*4));
             const dim3 g_wide(1, 56, 1), g_base(1, 37, 3);
@@ -516,8 +632,9 @@ int main(int argc, char ** argv) {
                 widelaunch_lds_kernel<32768, true><<<g_wide, b_wide, 0, st>>>(lds_out);
                 widelaunch_lds_kernel<22528, true><<<g_wide, b_wide, 0, st>>>(lds_out);
                 widelaunch_lds_kernel<16384, true><<<g_wide, b_wide, 0, st>>>(lds_out);
-                widelaunch_spill_kernel<<<g_wide, b_wide, 0, st>>>(lds_out);
-                widelaunch_bigcode_kernel<4096><<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_spill_light_kernel<<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_spill_lin_kernel<<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_bigcode_light_kernel<80><<<g_wide, b_wide, 0, st>>>(lds_out);
             }
             HIP_CHECK(hipDeviceSynchronize());
             auto lds_scenario = [&](const char * name, auto kern, dim3 g, int b) {
@@ -538,18 +655,27 @@ int main(int argc, char ** argv) {
                 HIP_CHECK(hipFuncGetAttributes(&attr, (const void *) widelaunch_lds_kernel<32768, true>));
                 printf("MATRIX attr lds32k_vg128: numRegs=%d shared=%zu local=%zu\n",
                        attr.numRegs, attr.sharedSizeBytes, attr.localSizeBytes);
+                HIP_CHECK(hipFuncGetAttributes(&attr, (const void *) widelaunch_spill_light_kernel));
+                printf("MATRIX attr spilllight: numRegs=%d shared=%zu local=%zu\n",
+                       attr.numRegs, attr.sharedSizeBytes, attr.localSizeBytes);
+                HIP_CHECK(hipFuncGetAttributes(&attr, (const void *) widelaunch_spill_lin_kernel));
+                printf("MATRIX attr splillin: numRegs=%d shared=%zu local=%zu\n",
+                       attr.numRegs, attr.sharedSizeBytes, attr.localSizeBytes);
                 HIP_CHECK(hipFuncGetAttributes(&attr, (const void *) widelaunch_spill_kernel));
-                printf("MATRIX attr spill: numRegs=%d shared=%zu local=%zu\n",
+                printf("MATRIX attr spillheavy: numRegs=%d shared=%zu local=%zu\n",
                        attr.numRegs, attr.sharedSizeBytes, attr.localSizeBytes);
             }
             // spill and big-code discriminators, wide6-like shape
+            float zero = 0.0f;
+            HIP_CHECK(hipMemcpy(lds_out, &zero, 4, hipMemcpyHostToDevice));
             for (int w = 0; w < 50; ++w) {
-                widelaunch_spill_kernel<<<g_wide, b_wide, 0, st>>>(lds_out);
-                widelaunch_bigcode_kernel<4096><<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_spill_light_kernel<<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_bigcode_light_kernel<80><<<g_wide, b_wide, 0, st>>>(lds_out);
             }
             HIP_CHECK(hipDeviceSynchronize());
-            lds_scenario("spill_gw384", widelaunch_spill_kernel, g_wide, b_wide);
-            lds_scenario("bigcode_gw384", widelaunch_bigcode_kernel<4096>, g_wide, b_wide);
+            lds_scenario("spilllight_gw384", widelaunch_spill_light_kernel, g_wide, b_wide);
+            lds_scenario("splillin_gw384", widelaunch_spill_lin_kernel, g_wide, b_wide);
+            lds_scenario("bigcodelight_gw384", widelaunch_bigcode_light_kernel<80>, g_wide, b_wide);
             // alternate big/small LDS, wide-like shape
             {
                 std::vector<double> vs, vl;
