@@ -4068,3 +4068,53 @@ to Gemini's guard battery, die 3 is the dev cell.
   attacks both terms - gate it on END-TO-END per-launch wins (the W11
   wide-arm lesson: kernel-sum wins die on launch latency). Deep prefill
   tile (sub-1 TF/s latency-bound, W13) joins the same desk umbrella.
+- E-131 DC-ENGAGEMENT DESK (wt-dc-eng, amd/dc-engagement, base e116dbb1d;
+  NOTE: this tree's ledger copy ends at E-124 - E-125..E-130 live in the
+  coordinator tree; this entry answers E-126's dc-window verdict, banked
+  there 2026-09-24 02:30): ROOT CAUSE OF THE ABSENT ENGAGEMENT LINE IS TWO
+  STACKED DEFECTS, BOTH PROVEN, ZERO GPU. (1) LAYER 1 - STALE SERVED BINARY:
+  the dc window launched coordinator build-hip/bin/llama-server
+  (run_combined_window.sh:16) last built 2026-09-23 15:25:48, but the
+  draft-cache merge b72cd1732 landed 20:36:01 - the window ran 00:58-01:06 on
+  the PRE-MERGE binary; strings over llama-server AND every served lib:
+  ZERO "draft shape cache" occurrences - dc1's env WAS delivered (identity
+  block line "extra_env: LLAMA_DRAFT_SHAPE_CACHE=1") but the process had no
+  gate code, so the arm was inert BY CONSTRUCTION and the -0.39/-0.09 paired
+  deltas compared IDENTICAL binaries; E-126's "engagement unproven" was the
+  right call and the "within-noise" reading is void as a statement about the
+  cache. The arm-identity law's own witness was BLIND: the "built from:" git
+  stamp is EMPTY in all 4 dc cells (window ran as root; git refused the
+  chris-owned tree; error swallowed by the $( ) capture) - a non-empty stamp
+  would have shown a pre-merge commit and stopped the window. (2) LAYER 2 -
+  LOG-VISIBILITY: even on a fresh build the line cannot reach the served log:
+  LLAMA_LOG_INFO -> llama_log_internal (src/llama-impl.cpp:55) ->
+  common_log_default_callback installed by the server (tools/server/server.cpp:84
+  common_init -> common/common.cpp:373) maps ggml INFO to LOG_LEVEL_TRACE = 4
+  (common/log.cpp:444) and the server runs at thold 3 ("verbosity = 3", dc1
+  log line 1) -> dropped. Proof: dc1's server log has ZERO library INFO lines
+  while srv/slot/cmn LOG_INF lines print. The same filter hides the W13 A4
+  witnesses ([decode-timeline] reused=, [launch-timeline] meta rebuild) - the
+  verdict protocol was ungreppable served AS SPECIFIED. (3) A2 FIX
+  (d7d2ce398, byte-exact host logic, env-gated default OFF unchanged):
+  engagement line + 4 LLAMA_DECODE_TIMELINE + 2 LLAMA_LAUNCH_TIMELINE sites
+  INFO -> WARN, message text unchanged (offline parsers match text not
+  level). (4) A3 (dcbc873ef + CI): mirror suite extended with an engagement
+  source pin (env name + WARN level + canonical text); NEW
+  test_engagement_routing_host.cpp drives the REAL llama_log_internal ->
+  common_log_default_callback chain at served thold 3 (WARN line ARRIVES,
+  INFO probe does NOT) and FAILS on a stale build-hip - NEGATIVE CONTROL
+  PROVEN against the coordinator's actual served bin dir (exit 1, would have
+  caught E-126 pre-merge); wired as section 2b of run_premerge_ci.sh (note:
+  ROCm 6.2 hip-link driver mis-resolves a second -l flag - libs passed as
+  -Wl inputs). Canonical build CONFIGURE-EXIT:0 BUILD-EXIT:0 zero warnings;
+  CI-VERDICT: PASS 8/8 host suites (log W19_premerge_ci_2026-09-24.txt).
+  (5) CORRECTED SERVED SPEC for the dc re-run: rebuild AFTER the merge, then
+  the launcher MUST strings-grep the served libllama for "draft shape cache
+  enabled" + require a non-empty "built from:" stamp before boot; arm =
+  of-record + LLAMA_DRAFT_SHAPE_CACHE=1; engagement proof NOW at served
+  verbosity: grep -c "draft shape cache enabled (2 slots)" = 2 (target +
+  draft ctx); optional witnesses LLAMA_DECODE_TIMELINE=1 (reused=1 on catchup
+  AND step 1, issue ~1.1 ms) + LLAMA_LAUNCH_TIMELINE=1 (meta rebuild ~2x/round
+  BY DESIGN, recapture tripwire silent); battery + interleaved A/B unchanged;
+  rollback = unset env. Receipt:
+  results/W19_dc_engagement_receipt_2026-09-24.md.
