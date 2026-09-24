@@ -698,6 +698,54 @@ def run_needle_recall_guard(
     }
 
 
+def skip_reason(args: argparse.Namespace) -> str:
+    """Name of the exclusive-mode flag responsible for skipped cells."""
+    for flag, on in (("--decode-only", args.decode_only),
+                     ("--canary-only", args.canary_only),
+                     ("--determinism-only", args.determinism_only),
+                     ("--needle-only", args.needle_only),
+                     ("--prefill-only", args.prefill_only)):
+        if on:
+            return flag.lstrip("-")
+    return "flag"
+
+
+def skip_row(guard: str, cell: str, reason: str) -> Dict[str, Any]:
+    """Row for a cell the flag set skipped (E-145: an absent row is
+    indistinguishable downstream from a voided one; SKIP keeps the skip
+    visible in the table and the receipt)."""
+    return {
+        "guard": guard,
+        "cell": cell,
+        "status": "SKIP",
+        "reason": reason,
+        "notes": f"{guard} SKIP ({reason})"
+    }
+
+
+# canonical summary-table metric per guard, reused on SKIP rows so runner
+# greps keyed on metric names (e.g. text_sha256) still capture them
+SKIP_METRICS = {
+    "prefill_guard": "prompt_tps",
+    "decode_guard": "decode_tps",
+    "mtp_canary": "draft_accept",
+    "determinism_guard": "text_sha256",
+    "needle_recall_guard": "exact_recall",
+}
+
+
+def guard_caps(args: argparse.Namespace) -> Dict[str, int]:
+    """Which guard rows carry a real measurement under this flag set."""
+    decode_cell = not (args.prefill_only or args.determinism_only or args.needle_only)
+    return {
+        "decode": 1 if (decode_cell and not args.canary_only) else 0,
+        "prefill": 1 if not (args.decode_only or args.canary_only or args.determinism_only or args.needle_only) else 0,
+        "determinism": 1 if not (args.prefill_only or args.decode_only or args.canary_only or args.needle_only) else 0,
+        "canary": 1 if (decode_cell and not args.decode_only) else 0,
+        "needle": 1 if not (args.prefill_only or args.decode_only or args.canary_only or args.determinism_only) else 0,
+    }
+
+
 def update_baseline_ratchet(
     baseline_path: Path,
     baseline_cfg: Dict[str, Any],
@@ -799,6 +847,8 @@ def main() -> int:
     print(f"Battery Fingerprint: {fingerprint}")
     print(f"Target Server:       {base_url}")
     print(f"Baseline File:       {baseline_path.name}")
+    caps = guard_caps(args)
+    print("GUARD-CAPS: " + " ".join("%s=%d" % (k, v) for k, v in caps.items()))
 
     if not check_server_health(base_url):
         print(f"ERROR: llama-server at {base_url} is not healthy (/health did not respond ok).", file=sys.stderr)
@@ -845,6 +895,8 @@ def main() -> int:
                 "error": str(e),
                 "notes": f"Request failed: {e}"
             })
+    else:
+        guard_results.append(skip_row("prefill_guard", "prefill_2k", skip_reason(args)))
 
     # (2) Decode Guard & MTP Canary
     if not (args.prefill_only or args.determinism_only or args.needle_only):
@@ -855,8 +907,12 @@ def main() -> int:
             )
             if not args.canary_only:
                 guard_results.append(r_decode)
+            else:
+                guard_results.append(skip_row("decode_guard", "decode_8k_10k", skip_reason(args)))
             if not args.decode_only:
                 guard_results.append(r_canary)
+            else:
+                guard_results.append(skip_row("mtp_canary", "mtp_canary", skip_reason(args)))
         except Exception as e:
             err_entry = {
                 "guard": "decode_guard",
@@ -867,6 +923,8 @@ def main() -> int:
             }
             if not args.canary_only:
                 guard_results.append(err_entry)
+            else:
+                guard_results.append(skip_row("decode_guard", "decode_8k_10k", skip_reason(args)))
             if not args.decode_only:
                 guard_results.append({
                     "guard": "mtp_canary",
@@ -875,6 +933,11 @@ def main() -> int:
                     "error": str(e),
                     "notes": f"Canary evaluation failed: {e}"
                 })
+            else:
+                guard_results.append(skip_row("mtp_canary", "mtp_canary", skip_reason(args)))
+    else:
+        guard_results.append(skip_row("decode_guard", "decode_8k_10k", skip_reason(args)))
+        guard_results.append(skip_row("mtp_canary", "mtp_canary", skip_reason(args)))
 
     # (3) Determinism Guard
     if not (args.prefill_only or args.decode_only or args.canary_only or args.needle_only):
@@ -890,6 +953,8 @@ def main() -> int:
                 "error": str(e),
                 "notes": f"Determinism test failed: {e}"
             })
+    else:
+        guard_results.append(skip_row("determinism_guard", "determinism_greedy", skip_reason(args)))
 
     # (4) Needle Recall Guard
     if not (args.prefill_only or args.decode_only or args.canary_only or args.determinism_only):
@@ -905,6 +970,8 @@ def main() -> int:
                 "error": str(e),
                 "notes": f"Needle recall test failed: {e}"
             })
+    else:
+        guard_results.append(skip_row("needle_recall_guard", "needle_recall_8k", skip_reason(args)))
 
     # Stop Thermal Sampler and gather thermal stats
     thermal_summary = thermal_sampler.stop()
@@ -913,7 +980,7 @@ def main() -> int:
     for r in guard_results:
         r["provenance"] = provenance
 
-    # Compute overall verdict
+    # Compute overall verdict (SKIP rows neither pass nor fail the battery)
     worst = "PASS"
     for r in guard_results:
         st = r.get("status", "FAIL")
@@ -931,6 +998,12 @@ def main() -> int:
         g = r.get("guard", "")
         st = r.get("status", "")
         notes = r.get("notes", "")
+
+        if st == "SKIP":
+            # skipped cell: never measured (m_val/b_val = -); guard and metric
+            # names kept so runner greps still capture the row (E-145)
+            print(f"{st:<8} {g:<18} {SKIP_METRICS.get(g, '-'):<18} {'-':<14} {'-':<14} {notes}")
+            continue
 
         if g == "prefill_guard":
             m_val = f"{r.get('measured_tps', 0):.2f} t/s"
@@ -969,6 +1042,7 @@ def main() -> int:
     receipt = {
         "timestamp": datetime.now().isoformat(),
         "verdict": worst,
+        "guard_caps": caps,
         "battery_version": version_meta,
         "git": provenance,
         "model": get_model_metadata(baseline_cfg.get("config", {}).get("model", "")),
