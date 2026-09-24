@@ -38,7 +38,7 @@
     "decode_8k_10k": {
       "ctx_target": 7857,
       "completion_tokens": 128,
-      "decode_per_second": 23.23,
+      "decode_per_second": 24.55,
       "mtp_accept_ratio": 0.667,
       "mtp_mean_len": 3.0,
       "description": "Decode throughput at 8k-10k primed context with draft-mtp (PLOG-101)"
