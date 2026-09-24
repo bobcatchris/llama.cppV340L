@@ -155,3 +155,15 @@ verify noretry/hogs/dies, run push_backups.sh, re-dispatch per this table
 Liveness law: every desk CHECKIN.log must advance <=45 min or it is a zombie ->
 re-dispatch from its branch tip immediately (3 silent deaths today, zero work
 lost - the law held).
+
+## REVISION 4 - 2026-09-24 16:10 (battery live)
+
+- Binary REBUILT (16:06) to include the W30 arms (mmvq-c4 merge touched mmvq.cu);
+  identity gate correctly forced it - the gate did its job.
+- BATTERY LIVE: campaign-postu1-battery.service (system scope), all 5 windows
+  armed, w23r1 booting 16:06. Results: /home/chris/postu1_window_results.txt +
+  /home/chris/postu1_w*_10k logs. ETA ~8 h (~midnight).
+- On completion: adjudicate per-window verdicts -> ratchet any WIN (E-137
+  procedure) -> then U2 (q40-prefill served window) -> then the U1 v2 deep
+  rerun (REQUIRED, ignore_eos) -> W21 persistent shadow.
+- Next agent wave (post-battery analysis) dispatches when results land.
