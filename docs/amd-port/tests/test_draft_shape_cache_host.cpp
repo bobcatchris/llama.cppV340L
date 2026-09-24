@@ -305,7 +305,7 @@ static void round(UCtx & ctx, Trace & tr) {
     process(ctx, step_shape(), tr);
 }
 
-int main(void) {
+int main(int argc, char ** argv) {
     // 1. DEFECT: single slot thrashes across the 4 -> 1,1,1 alternation
     {
         UCtx ctx; ctx.slots.resize(1);
@@ -439,6 +439,40 @@ int main(void) {
         CHECK(tr.reused.back() == 0); // no wrong reuse
         CHECK(ctx.slots[0].builds + ctx.slots[1].builds == builds_before + 1);
         printf("PREDICATE safety: unseen shape misses (degrades to today's rebuild), no stale hit\n");
+    }
+
+    // 6. ENGAGEMENT wiring source pin (E-126: the dc1 arm's server log had no
+    //    engagement line - the verdict could not distinguish engaged from
+    //    inert, E-117 law). Pins the real call sites: the gate env name, the
+    //    canonical text, and the log level - WARN survives the served filter
+    //    (common_log_default_callback drops ggml INFO at the served verbosity
+    //    3, common/log.cpp common_get_verbosity), INFO does not. The real
+    //    routing chain is exercised by test_engagement_routing_host.
+    {
+        const char * src_path = argc > 1 ? argv[1] : "src/llama-context.cpp";
+        FILE * f = fopen(src_path, "rb");
+        CHECK(f != nullptr);
+        if (f) {
+            std::string s;
+            char buf[65536];
+            size_t n;
+            while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+                s.append(buf, n);
+            }
+            fclose(f);
+            const size_t gate = s.find("getenv(\"LLAMA_DRAFT_SHAPE_CACHE\")");
+            CHECK(gate != std::string::npos);
+            if (gate != std::string::npos) {
+                const size_t window_end = gate + 900 < s.size() ? gate + 900 : s.size();
+                const std::string window = s.substr(gate, window_end - gate);
+                CHECK(window.find("LLAMA_LOG_WARN") != std::string::npos);
+                CHECK(window.find("draft shape cache enabled (%d slots)") != std::string::npos);
+                CHECK(window.find("LLAMA_LOG_INFO") == std::string::npos);
+                // the mechanism witness must be greppable served too (W13 A4 gate 2)
+                CHECK(s.find("LLAMA_LOG_WARN(\"[decode-timeline] n_tokens = %d, reused = %d") != std::string::npos);
+            }
+            printf("ENGAGEMENT source pin: gate env + WARN level + canonical text verified in %s\n", src_path);
+        }
     }
 
     if (n_fail == 0) {
