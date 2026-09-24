@@ -1096,7 +1096,12 @@ void ggml_backend_sched_split_graph(ggml_backend_sched_t sched, struct ggml_cgra
         GGML_ABORT("%s: failed to initialize context\n", __func__);
     }
 
-    graph->uid = ggml_graph_next_uid();
+    // keep the uid of an already-built graph so re-splits of the same graph
+    // are recognized downstream (shape-keyed graph reuse); fresh graphs
+    // start with uid 0
+    if (graph->uid == 0) {
+        graph->uid = ggml_graph_next_uid();
+    }
 
     // pass 1: assign backends to ops with pre-allocated inputs
     for (int i = 0; i < graph->n_leafs; i++) {
@@ -1548,7 +1553,10 @@ void ggml_backend_sched_split_graph(ggml_backend_sched_t sched, struct ggml_cgra
 
     // set ids for all splits
     for (int i = 0; i < sched->n_splits; ++i) {
-        sched->splits[i].graph.uid = ggml_graph_next_uid();
+        // single-split graphs (e.g. a meta backend owning all devices) carry
+        // the graph uid, so a re-split of the same graph is recognized by the
+        // backend; multi-split keeps per-split uids
+        sched->splits[i].graph.uid = sched->n_splits == 1 ? graph->uid : ggml_graph_next_uid();
     }
 }
 

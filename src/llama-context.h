@@ -410,6 +410,17 @@ private:
     llm_graph_result_ptr gf_res_prev;
     llm_graph_result_ptr gf_res_reserve;
 
+    // env: LLAMA_DRAFT_SHAPE_CACHE - extra graph-result slots keyed by the reuse
+    // predicate, so a context alternating decode shapes (draft catchup/steps)
+    // reuses one built graph per shape instead of thrashing the single slot
+    std::vector<llm_graph_result_ptr> gf_res_shape;
+    size_t            gf_res_shape_i     = 0;         // last processed entry
+    llm_graph_result * gf_res_shape_sched = nullptr;  // entry the sched is allocated with
+
+    // the result the output paths must look at (single slot, or the active
+    // shape-cache entry)
+    llm_graph_result * gf_res_active() const;
+
     // host buffer for the model output (logits and embeddings)
     ggml_backend_buffer_ptr buf_output;
 

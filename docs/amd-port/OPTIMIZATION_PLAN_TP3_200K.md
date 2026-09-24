@@ -3911,3 +3911,44 @@ to Gemini's guard battery, die 3 is the dev cell.
   A/B (2 cells left, cells bank as they complete); on completion
   or first hog - whichever first - apply amdgpu.noretry=1 + one
   reboot, then run remaining windows on the hardened boot.
+- E-122 DRAFT-SHAPE-CACHE DESK: W12 LEVER 1 IMPLEMENTED AND CI-REPLICATED
+  (wt-draft-cache on amd/draft-cache, ZERO GPU; commits 8d06dfd35 P0 +
+  68f729074 A1 + 9c229b3ae test + e0839f748 A2 evidence + 47a822aef
+  slot-count fix; receipt W13_draft_shape_cache_receipt_2026-09-23.md).
+  (1) THE FIX (3 layers, env LLAMA_DRAFT_SHAPE_CACHE, default OFF): L1
+  llama-context shape-keyed graph-result slots (scan with the SAME
+  allow_reuse predicate, keep the built graph on shape re-entry, re-split
+  only the sched; memory_update/graph_reserve invalidate all slots); L2
+  sched keeps a built graph's uid across re-splits (single-split views
+  carry it); L3 meta memo of seen uids restores per-die graph uids so the
+  HIP device graphs REPLAY instead of re-capturing (the P0-dominant term).
+  Inert with env unset (gf_res_prev path byte-identical, L2/L3
+  unreachable). (2) A2 CI REPLICATE
+  (docs/amd-port/tests/test_draft_shape_cache_host.cpp, wired into
+  run_premerge_ci.sh host suites): DEFECT replicated - single-slot steady
+  round reused = 0,0,1,1, 20 graph+meta rebuilds/10 rounds, per-die uids
+  churn; FIX proven - reused = 1,1,1,1, each shape built once, per-die
+  uids stable, invalidation + third-shape safety hold. (3) A3: canonical
+  full build BUILD-EXIT:0 zero warnings; CI-VERDICT: PASS (7/7 host
+  suites; die-3 gate-wiring section skipped per the zero-GPU law -
+  CI_SKIP_GPU toggle added, merge gate re-runs it; script also gained
+  CI_TREE so desks stop hand-patching paths). (4) DEFECTS: (a) the dead
+  predecessor session left the committed test file TRUNCATED TO 0 BYTES
+  on disk + a 0-byte CMakeCache.txt (both repaired; committed blob
+  intact); (b) A1 shipped LLAMA_DRAFT_SHAPE_CACHE=1 = ONE slot = the
+  default thrash path verbatim with the engagement line printing (E-117-
+  class inert gate) - fixed 47a822aef: 1 -> the intended 2 slots; (c)
+  honest bound: the 2 shape re-entries/round still re-derive the 49-node
+  meta subgraphs (remap); the eliminated terms are the graph rebuild +
+  HIP recapture - served delta may land under the ~3 ms/round headline.
+  (5) A4 SERVED SPEC for the coordinator: of-record launch script + one
+  env line LLAMA_DRAFT_SHAPE_CACHE=1; engagement line "draft shape cache
+  enabled (2 slots)" REQUIRED; mechanism witness = [decode-timeline]
+  draft decodes reused=1 on catchup AND step 1 at ~1.1 ms issue (vs
+  2.593); NOTE the "[launch-timeline] meta rebuild:" tripwire now fires
+  ~2x/round BY DESIGN (uid alternation re-derives, memo keeps uids,
+  device replays; the ggml-cuda recapture tripwire must stay silent) -
+  do not misread as the W12 steady-rebuild regression; guard battery all
+  5 cells PASS + within-boot determinism unchanged (host-only byte-exact
+  class); ~+2-3% decode expected -> bank only via interleaved A/B (E-119
+  soak law); rollback = unset env.

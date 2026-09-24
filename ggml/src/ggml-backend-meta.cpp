@@ -1671,6 +1671,16 @@ struct ggml_backend_meta_context {
     size_t                      n_subgraphs   = 0;
     uint64_t                    uid           = 0;
 
+    // shape reuse: remember the per-die graph ids of already-seen graph uids,
+    // so a re-split of the same graph keeps them stable and backend device
+    // graphs replay instead of recapturing; 2 slots cover the alternating
+    // 2-shape pattern (draft catchup/step)
+    static constexpr size_t n_seen = 2;
+    uint64_t                seen_uid[n_seen]     = {0, 0};
+    int                     n_nodes_seen[n_seen] = {0, 0};
+    std::vector<uint64_t>   seen_cgraph_uid[n_seen]; // [j*max_subgraphs + i_graph]
+    size_t                  seen_next = 0;
+
     void *                               comm_ctx       = nullptr;
     ggml_backend_comm_allreduce_tensor_t comm_allreduce = nullptr;
 
@@ -2106,6 +2116,22 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend, 
             for (size_t k = 0; k < backend_ctx->nodes_aux.size(); k++) {
                 backend_ctx->nodes_aux[k] = ggml_new_tensor_1d(backend_ctx->ctx.get(), GGML_TYPE_F32, 1);
             }
+
+            // the per-die graphs were recreated, their recorded ids are stale
+            for (size_t s = 0; s < backend_ctx->n_seen; s++) {
+                backend_ctx->seen_uid[s] = 0;
+            }
+        }
+
+        // shape reuse: if this graph uid was seen before, keep its per-die
+        // graph ids so the backends replay their device graphs instead of
+        // recapturing; the rebuild itself runs unchanged
+        int seen_slot = -1;
+        for (size_t s = 0; s < backend_ctx->n_seen; s++) {
+            if (cgraph->uid != 0 && backend_ctx->seen_uid[s] == cgraph->uid && backend_ctx->n_nodes_seen[s] == cgraph->n_nodes) {
+                seen_slot = (int) s;
+                break;
+            }
         }
 
         for (size_t j = 0; j < n_backends; j++) {
@@ -2123,8 +2149,27 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend, 
                     const size_t hash_pos_ij = ggml_hash_insert(&cgraph_ij->visited_hash_set, node_ij);
                     cgraph_ij->use_counts[hash_pos_ij] = cgraph->use_counts[hash_pos_orig];
                 }
-                cgraph_ij->uid = ggml_graph_next_uid();
+                if (seen_slot >= 0) {
+                    cgraph_ij->uid = backend_ctx->seen_cgraph_uid[seen_slot][j*backend_ctx->max_subgraphs + i_graph];
+                } else {
+                    cgraph_ij->uid = ggml_graph_next_uid();
+                }
             }
+        }
+
+        if (seen_slot < 0) {
+            // record the new graph's per-die ids
+            const size_t s = backend_ctx->seen_next;
+            backend_ctx->seen_uid[s]     = cgraph->uid;
+            backend_ctx->n_nodes_seen[s] = cgraph->n_nodes;
+            backend_ctx->seen_cgraph_uid[s].resize(n_backends*backend_ctx->max_subgraphs);
+            for (size_t j = 0; j < n_backends; j++) {
+                auto & bcj = backend_ctx->backend_configs[j];
+                for (size_t i_graph = 0; i_graph < n_subgraphs; i_graph++) {
+                    backend_ctx->seen_cgraph_uid[s][j*backend_ctx->max_subgraphs + i_graph] = bcj.cgraphs[i_graph].cgraph_main->uid;
+                }
+            }
+            backend_ctx->seen_next = (s + 1) % backend_ctx->n_seen;
         }
     }
 
