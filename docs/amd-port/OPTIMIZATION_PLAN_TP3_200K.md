@@ -4304,3 +4304,15 @@ to Gemini's guard battery, die 3 is the dev cell.
   (fa40-cg die-3 benches; soak zero-GPU log mining; dc-eng zero-GPU
   code audit). Everything else: banked, snapshotted (origin current),
   CI green, tree clean.
+- E-132 (cont.) ZCODE AUTO-LAUNCH WIRED (Chris: "zcode has to be
+  launched as if it was from the app drawer"): 
+  ~/.config/autostart/zcode.desktop installed mirroring the app-drawer
+  Exec exactly ("/home/chris/.local/opt/ZCode/zcode" %U). The machine
+  auto-logins (gdm-autologin), so every boot - crash-reboots included -
+  now launches ZCode as a proper desktop app with full session env
+  (DISPLAY/DBUS), the pinger timer wakes the campaign, and
+  campaign-postreboot.service runs the hardened GPU queue. FULL
+  AUTONOMOUS CHAIN: crash -> reboot -> autologin -> ZCode (app-drawer
+  context) + pinger wakes agents + postreboot queue verifies noretry
+  and runs queued windows. No human step required for progress to
+  resume.
