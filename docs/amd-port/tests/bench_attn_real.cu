@@ -152,11 +152,13 @@ int main(int argc, char ** argv) {
     bool occupancy = false;
     bool probe     = false;
     bool matrix    = false;
+    const char * adj_pair = nullptr;
     for (int i = 2; i < argc; ++i) {
         if (strcmp(argv[i], "--served-entry") == 0) served = true;
         if (strcmp(argv[i], "--occupancy") == 0)    occupancy = true;
         if (strcmp(argv[i], "--probe") == 0)        probe = true;
         if (strcmp(argv[i], "--matrix") == 0)       matrix = true;
+        if (strcmp(argv[i], "--adj") == 0 && i + 1 < argc) adj_pair = argv[++i];
     }
     if (occupancy) {
         occ_arm(ARM_BASE); occ_arm(ARM_MID3); occ_arm(ARM_WIDE6);
@@ -241,6 +243,51 @@ int main(int argc, char ** argv) {
             float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, pe0, pe1));
             printf("PROBE %s launch %2d: %.1f us\n", arm_name(pk), i, ms * 1000.0f);
         }
+        ggml_free(gctx);
+        return 0;
+    }
+
+    if (adj_pair != nullptr) {
+        // adjacency probe for rocprof decomposition: niter x ([pre step] +
+        // event-bracketed fattn launch), stream drained between steps.
+        // pair: ww bb wb bw (pre = that arm), nw nb (pre = tiny noop kernel),
+        // idleb idlew (pre = 2 ms idle). The event print gives per-launch
+        // elapsed; the rocprof trace gives per-kernel-boundary gaps.
+        hipEvent_t e0, e1;
+        HIP_CHECK(hipEventCreate(&e0)); HIP_CHECK(hipEventCreate(&e1));
+        hipStream_t st = ctx.stream();
+        int * noop_dev = nullptr;
+        HIP_CHECK(hipMalloc(&noop_dev, 4));
+        for (int w = 0; w < 100; ++w) {
+            run_arm(ARM_BASE, ctx, dst_t);
+            run_arm(ARM_WIDE6, ctx, dst_t);
+        }
+        HIP_CHECK(hipDeviceSynchronize());
+        const bool pre_w = strcmp(adj_pair, "ww") == 0 || strcmp(adj_pair, "wb") == 0;
+        const bool pre_b = strcmp(adj_pair, "bw") == 0 || strcmp(adj_pair, "bb") == 0;
+        const bool pre_n = strcmp(adj_pair, "nw") == 0 || strcmp(adj_pair, "nb") == 0;
+        const bool pre_i = strcmp(adj_pair, "idlew") == 0 || strcmp(adj_pair, "idleb") == 0;
+        const bool run_w = strcmp(adj_pair, "ww") == 0 || strcmp(adj_pair, "bw") == 0 ||
+                           strcmp(adj_pair, "nw") == 0 || strcmp(adj_pair, "idlew") == 0;
+        const ArmKind k  = run_w ? ARM_WIDE6 : ARM_BASE;
+        for (int i = 0; i < niter; ++i) {
+            if (pre_w) { run_arm(ARM_WIDE6, ctx, dst_t); HIP_CHECK(hipDeviceSynchronize()); }
+            if (pre_b) { run_arm(ARM_BASE, ctx, dst_t); HIP_CHECK(hipDeviceSynchronize()); }
+            if (pre_n) {
+                widelaunch_noop_kernel<<<1, 64, 0, st>>>(noop_dev);
+                HIP_CHECK(hipGetLastError());
+                HIP_CHECK(hipEventRecord(e0, st));
+            } else {
+                if (pre_i) { HIP_CHECK(hipDeviceSynchronize()); usleep(2000); }
+                HIP_CHECK(hipEventRecord(e0, st));
+            }
+            run_arm(k, ctx, dst_t);
+            HIP_CHECK(hipEventRecord(e1, st));
+            HIP_CHECK(hipEventSynchronize(e1));
+            float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, e0, e1));
+            printf("ADJ %s launch %2d: %.1f us\n", adj_pair, i, ms * 1000.0f);
+        }
+        HIP_CHECK(hipFree(noop_dev));
         ggml_free(gctx);
         return 0;
     }
