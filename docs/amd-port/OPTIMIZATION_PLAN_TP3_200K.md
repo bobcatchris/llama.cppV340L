@@ -3952,3 +3952,24 @@ to Gemini's guard battery, die 3 is the dev cell.
   5 cells PASS + within-boot determinism unchanged (host-only byte-exact
   class); ~+2-3% decode expected -> bank only via interleaved A/B (E-119
   soak law); rollback = unset env.
+- E-119 (cont.) 20:55 DRAFT-SHAPE-CACHE DESK COMPLETE (merged
+  b72cd1732): A2 host replicate-test PASS - the defect class is now
+  REPLICATED IN CI (single-slot steady round reused=0,0,1,1 = 2
+  misses/round, 20 graph+meta rebuilds/10 rounds; shape-cache gives
+  reused=1,1,1,1, one build per shape, replay-class uids). The desk
+  also CAUGHT AN E-117-CLASS INERT-GATE DEFECT in its own A1
+  (env allocated 1 slot = re-derives the thrash path verbatim while
+  printing the engagement line) - fixed to the intended 2 slots
+  (47a822aef); the A4-spec review + engagement-line discipline is
+  working as designed. A3: fresh configure + full build
+  BUILD-EXIT:0; CI wired with the new suite + two additive toggles
+  (CI_TREE for desk worktrees, CI_SKIP_GPU for zero-GPU desks with
+  the merge gate re-running the die-3 wiring section) - CI PASS
+  7/7 host suites. A4 SERVED SPEC: of-record script + 
+  LLAMA_DRAFT_SHAPE_CACHE=1 (engagement line "draft shape cache
+  enabled (2 slots)" REQUIRED in the verdict); expected up to ~3
+  ms/round with the honest bound that the 2 re-entries still
+  re-derive meta subgraphs (only graph rebuild + HIP recapture are
+  eliminated) - so the served delta may land under the headline;
+  bank only via interleaved A/B; rollback = unset env. QUEUED:
+  dc0/dc1 paired window after the split A/B completes.
