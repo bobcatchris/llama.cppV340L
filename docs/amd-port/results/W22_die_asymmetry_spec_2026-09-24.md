@@ -148,3 +148,162 @@ Reading:
    probe logs' floors re-verified
    (tp4_boundary_probe_d3_20260923_142626.log: KLAUNCH ~11-12 us
    size-flat, RING1K n=4 80 KB 69.5 us, n=2 51.5 us).
+
+## 3. A3 - ranked candidates (prize x cheapness x risk)
+
+Mission bar for reference: pulling the slow-die boundary cost
+halfway to the fast die's is ~5-6 ms/round (~+10 pct short-prompt
+decode on the 24.55 of-record). The only surviving mechanism class
+that can pay that bar is C1's.
+
+### C1 - PER-DIE CLOCK FLOORS (root-gated). RANK 1
+
+- Mechanism: remove the low-sclk latch band on the far dies
+  (0d:00/10:00) so the per-die compute-rate spread t_d cannot open
+  mid-window. Two independently priced effects:
+  (i) arrival compression - if t_d compresses toward the fast die's
+  rate, W10's wall-compute model prices full equalization at
+  579.4 -> 534.2 us/boundary = ~45.2 us x 136 = ~6.1 ms/round
+  (~+4.8 pct decode); a partial (spread halved) ~3 ms/round
+  (~+2.4 pct);
+  (ii) anti-decay - W18: decode decays -26 pct through chained
+  cells as far-die sclk latches; a floored window keeps every cell
+  decision-grade (instrument repair, compounds with every future
+  window).
+- Exact ops (root, once per boot BEFORE the window; resolve card
+  from die PCI via the runner's die_cards() pattern):
+    primary, per die card c:
+      echo high > /sys/class/drm/$c/device/power_dpm_force_performance_level
+      (revert: echo auto > ...)
+    finer variant (Vega10 powerplay; ppfeaturemask already 0xffffffff):
+      echo "s 0 1200" > /sys/class/drm/$c/device/pp_od_clk_voltage
+      echo "c"     > /sys/class/drm/$c/device/pp_od_clk_voltage
+      (sets OD_SCLK min = 1200 MHz, boost above still allowed;
+       revert: echo "r" then "c")
+  power_dpm_force_performance_level=high is the documented,
+  simply-reversible knob; use the pp_od min-sclk floor only if
+  level=high trips a thermal artifact.
+- A/B served (paired interleaved per the campaign law):
+  arms F (floored) vs R (regular regress), 10k decode-only cells,
+  order R F F R (2 pairs minimum), position-1 law + void_gate.py on
+  every cell; then ONE 200k pair (F vs R) for the anti-decay claim
+  (the 200k needle cell is the soak source - the floored arm should
+  hold through it). Mechanism witness per cell: hwmon freq1_input
+  for all four dies >= 1100 MHz during decode cells (the 18-col
+  sideband covers die 4 since E-136(e)); stamp the four
+  power_dpm_force_performance_level values into the arm-identity
+  header.
+- Kill criteria (any one closes C1): paired 10k delta < +0.5 t/s at
+  matched position; OR clocks verified pinned but a traced cell's
+  t_d spread does not compress; OR mem/junction emergencies or new
+  throttle artifacts appear. On a mechanism kill, cause (c) is
+  refuted at serve state and the die-asymmetry lever CLOSES
+  entirely (C3 becomes the closing post-mortem, no further arms).
+- Risk: root-gated system state (not process env); the 110 W/die
+  PPT cap is already at max (W18) - floors do not raise power, they
+  prevent DOWN-clocking; watch HBM/mem temps (crit 95 C).
+
+### C2 - HOST P-CORE PINNING (zero code, one runner line). RANK 2
+
+- Mechanism: keep the 8 server threads + httplib workers + RCCL
+  proxy/spin threads off the 4 E-cores (cpu 16-19). Constant-class
+  jitter term only - it cannot produce the observed per-die
+  gradient (A1 verdict), but decode at 24.55 t/s is 40.7 ms/token
+  and the test is nearly free. Primary mask 0-15 (P-cores with HT);
+  variant 0-7 (8 threads on 8 physical cores, HT siblings free) if
+  0-15 shows anything.
+- Exact delta (runner is coordinator-owned; EXTRA_ENV cannot
+  express affinity): in cell(), wrap the binary:
+    env HIP_VISIBLE_DEVICES=0,1,2,3 $BASEENV $EXTRA taskset -c 0-15 "$BIN" ...
+  (numactl is a no-op on this single-node host - do not bother).
+- A/B: paired interleaved 10k cells T vs R, order R T T R, 2 pairs.
+- Kill criteria: paired 10k delta < +0.5 t/s. Risk ~zero.
+- GPU-to-die affinity of the server process: NOT APPLICABLE in the
+  served shape - one process owns all four dies (ncclCommInitAll,
+  ggml-cuda.cu:1421); the only affinity axis is host CPUs (this
+  candidate). Recorded so it is not re-derived.
+
+### C3 - SERVE-STATE RATE RE-MEASUREMENT (analysis-only). RANK 3
+
+- The E-125 post-mortem and the gate for ever reopening a rebalance
+  arm. From the next traced window (or a 60 s rocprof cap on one
+  battery): recompute t_d at SERVE state, correlate with the sclk
+  sideband, and diagnose the model-to-served failure. Candidates to
+  discriminate: (i) soak drift of t_d (cool-trace vector stale),
+  (ii) tile quantization at changed row widths (per-byte time is
+  not constant across slice widths), (iii) +0.35 GB VRAM on die 1,
+  (iv) rotation lumping. Tensor-split stays CLOSED (E-125) unless
+  the owner reopens it on this evidence.
+- Kill/exit: if serve-state t_d matches the cool-trace vector
+  within a few percent, the rebalance failure is structural (not
+  rate drift) and ratio-based rebalancing is permanently closed.
+
+### C4 - CLOSED, DO NOT RE-RUN (record)
+
+- RCCL env class: ch4 probe win -11 pct did NOT transfer served
+  (E-119: -12.64 pct @200k, -6.16 pct @10k, prefill -10.12 pct,
+  mtp canary tripped); Tree worse + reintroduces a gradient (W9);
+  SHM_DISABLE +85 pct (W9); PROTO LL/LL128/Simple, NTHREADS, MSCCL,
+  P2P-off, IGNORE_CPU_AFFINITY all neutral (W9, 27 configs). The
+  env lever on this lever-family is exhausted.
+- Tensor-split rebalance: E-125 REJECTED (paired -1.92 / -2.33).
+- Boundary count + clustering: W8 A2/A3 NEGATIVE (do not revisit).
+
+### C5 - OBSERVATION, NO ARM
+
+- P2P does not exist on this stack; SHM is the transport and its
+  wire term (+34 us over the 69.5 us ring floor) is UNIFORM - not
+  an asymmetry term. If a future ROCm/RCCL stack enables P2P across
+  the PM8533 pairs (and fixes the multi-process init defect, W9
+  defect 1), that uniform term becomes attackable separately.
+  Coordinator note only.
+
+## 4. A4 - served-arm spec: exact window deltas, in run order
+
+Run order when the GPUs free (after the depth chain releases the
+lock, fresh boot, position-1 law applies):
+
+1. WINDOW 1 = C1 clock-floor pair (the first experiment).
+   Pre-window root step (once per boot):
+     for c in die_cards:  # die_cards() resolves DIE_PCIS via /sys/class/drm
+       echo high > /sys/class/drm/$c/device/power_dpm_force_performance_level
+   Arm sequence (COMBO_CELLS=10k): R F F R, then one 200k pair
+   (F then R). run_combined_window.sh deltas:
+     - arms "cf" (with root step) and "regress" (without) - the
+       root step is system state, NOT EXTRA_ENV; EXTRA_ENV stays
+       empty for both arms;
+     - add to the cell() identity block: `cat /sys/class/drm/*/device/power_dpm_force_performance_level` output + per-die freq1_input, so the arm's system state is stamped.
+   Decision: paired deltas per E-119/E-125 convention; ratchet only
+   on GREEN (E-137 law); kill criteria per C1 above.
+2. WINDOW 2 = C2 taskset pair (independent of Window 1's verdict).
+   Runner delta: the taskset -c 0-15 wrap of $BIN in cell();
+   arms "ts" vs "regress", R T T R, COMBO_CELLS=10k.
+   Kill: paired < +0.5 t/s.
+3. CONTINUOUS = C3: the sideband + a 60 s trace cap on any one cell
+   of Window 1; verdict into the ledger.
+
+Gates that apply to every cell: provenance stamps (E-112),
+arm-identity freshness gate (E-133(c), already in the runner),
+void_gate.py adjudication + position-1 law (E-133/E-135),
+180 s inter-cell settle (E-134). Numerics class: C1 and C2 are
+numerics-NEUTRAL (clock/affinity state changes no kernel order, no
+ring order, no sum order) - no owner sign-off beyond the standard
+battery; C3 changes nothing (read-only).
+
+Prize table (honest, on the 24.55 of-record):
+
+| candidate | mechanism | expected delta | cost | risk |
+|-----------|-----------|----------------|------|------|
+| C1 full | floors collapse t_d spread | ~6.1 ms/round ~ +4.8 pct; anti-decay up to W18's -26 pct class on late cells | root step | med (thermal watch) |
+| C1 partial | spread halves | ~3 ms/round ~ +2.4 pct | root step | med |
+| C2 | E-core avoidance | 0-1 pct class | 1 runner line | ~zero |
+| C3 | diagnosis only | 0 direct; gates reopening | trace cap | zero |
+| C4 (closed) | - | chan4 -12.64 pct / split -2.1 t/s measured | - | - |
+
+## 5. Identity
+
+No runtime code touched; docs-only desk. Host reads were passive
+sysfs/lspci files; no GPU process launched; /tmp/campaign_gpu_boot.lock
+untouched (held by the depth chain); guard_battery.py and the
+/home/chris runner scripts read-only (their deltas are specified
+here for the coordinator, not applied).
