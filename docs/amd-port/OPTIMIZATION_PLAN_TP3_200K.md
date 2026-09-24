@@ -4283,3 +4283,24 @@ to Gemini's guard battery, die 3 is the dev cell.
   ggml_log_set capture pattern. All: WIP-commit + CHECKIN laws,
   receipts W17/W18/W19, ledger E-129/E-130/E-131. GPU contention:
   only the codegen desk (die 3, lock-arbitrated).
+- E-132 2026-09-24 06:40 PRE-COMPACTION STATE GUARD #2 (Chris: compact;
+  pinger appended per instruction - nothing removed). REBOOT
+  AUTHORIZATION GRANTED (Chris 06:30): reboots permitted via sudo
+  (password via stdin only); ZCode auto-starts on boot and the pinger
+  timer wakes the campaign; campaign-postreboot.service self-fires
+  the hardened queue within 10 min of any boot. DECISION: no reboot
+  NOW - the desks just started, this boot already has noretry=1
+  (runtime) and only 1 svm hog; reboot if hogs escalate past ~6 or a
+  death occurs (the crash path is self-healing: modprobe.d hardens
+  the next boot, the queue self-fires, re-dispatch briefs live in
+  this ledger + branch history). OPEN LEADS (the answer to "didn't
+  we have leads yesterday"): L1 RUNNING fa40-codegen workaround sweep
+  (reopens the -38.9% q4_0-direct attention lever; 386 ms deep pool);
+  L2 RUNNING soak-mechanism (26%/20-min decay; HBM refresh suspect);
+  L3 RUNNING dc-engagement root-cause (reopens ~3 ms shape cache);
+  L4 prefill ub1024 flag (confirmed +4-5% prefill; decode -14.9%);
+  L5 U1 decode-at-depth retry; L6 parked paired re-runs (iq4xs/s2r5/
+  chan4); L7 weight-bit reduction (owner-guarded). FLEET: 3 agents
+  (fa40-cg die-3 benches; soak zero-GPU log mining; dc-eng zero-GPU
+  code audit). Everything else: banked, snapshotted (origin current),
+  CI green, tree clean.
