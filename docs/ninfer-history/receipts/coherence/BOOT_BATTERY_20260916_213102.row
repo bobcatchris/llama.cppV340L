@@ -1,0 +1,63 @@
+=== BOOT_BATTERY ts=20260916_213102 port=8100 host=chris-MS-7D28 repo=/home/chris/worktrees/amd-tp4-cure
+commit: 6a108da4b E1 ORACLE: RED — MTP arm token stream diverges from deterministic non-MTP arm (graphs-OFF count600: 486 vs 1472+220 at ~token 30; control repeat-fire on non-MTP boot byte-identical 268B) — MTP-arm-specific, hypotheses open (verify-batch T=3/T=1 geometry numerics vs mis-accept), falsifiers named, NO fix per banking law; WO_MTP_1 byte-identity bar failed on 07ad7ecc. E1 procedure documented in guards README. PLOG-022
+step 0c: clocks sideband sampling -> /home/chris/worktrees/amd-tp4-cure/results/amd/coherence/BOOT_BATTERY_20260916_213102_clocks.log (pid 2535044, 5 s interval)
+---- step 0: host CI guard (check_bf16_low_guard.py)
+== ninfer bf16-low guard suite (host CI class, BUGTRACK E-13/E-14/E-15) ==
+[G1] OK  src/common/hip_shim/cuda_bf16.h — shim correction present, ninfer_low2bfloat16 :89, ninfer_low2bfloat162 :93
+[G2] OK  src/ops/kernel/causal_conv1d.cuh — __low2bfloat16{,2} code occurrences: 0 (comment mentions exempt)
+[G3] OK  src/ops/launcher/causal_conv1d.h — kCausalConvSequenceMaxTokens=64, kCausalConvParallelMaxTokens=16
+[G3] OK  src/ops/wrapper/causal_conv1d_silu.cpp — 3/3 dispatch chains compare->sequence->else prefill; no literal 64/16
+[G5] OK  src/runtime/tp2/tp_engine.cpp — draft_vocab site present (env->exe-relative->CWD resolution, tp_engine.cpp:1080)
+[G4] OK  tests/CMakeLists.txt — both device cells registered, sources on disk
+GUARD RESULT: GREEN — all 5 guards clean; exit 0
+step 0: GUARD GREEN
+step 0b: draft-vocab present at CWD (/home/chris/worktrees/amd-tp4-cure) — MTP remap will load
+step 1: ninfer_causal_conv_route_parity_test not compiled at /home/chris/worktrees/amd-tp4-cure/build-hip-amd/tests/ninfer_causal_conv_route_parity_test — SKIP
+step 1: ninfer_bf16_halves_contract_test not compiled at /home/chris/worktrees/amd-tp4-cure/build-hip-amd/tests/ninfer_bf16_halves_contract_test — SKIP
+step 2: server up on 8100 — coherence ladder fast arm (--max-tokens 64)
+leg w56: prompt=56 gen=64 fin=length -> PASS
+        content='Water is a chemical compound made of hydrogen and oxygen, with the for'
+        reason ='We need answer user: "What is water?" Simple. Need final answer. Provi'
+leg a60: prompt=60 gen=26 fin=stop -> PASS
+        content='4'
+        reason ='We need answer user\'s simple question "What is 2 plus 2?" Need final a'
+leg b61: prompt=60 gen=50 fin=stop -> PASS
+        content='1\n2\n3\n4\n5'
+        reason ='We need answer to user: "Count from 1 to 5." Simple. Need final likely'
+leg c62: prompt=61 gen=58 fin=stop -> PASS
+        content='1\n2\n3\n4\n5\n6\n7\n8\n9\n10'
+        reason ='We need answer user\'s request: "Count from 1 to 10." Simple. Need fina'
+leg d64: prompt=64 gen=35 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need answer user\'s request: "Reply with exactly the single word BLU'
+leg e66: prompt=66 gen=43 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need to reply with exactly single word BLUE. User says: "Reply with'
+leg f68: prompt=68 gen=38 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need to reply with exactly single word BLUE. User says reply with e'
+leg g72: prompt=72 gen=36 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need to reply with exactly single word BLUE. User says reply with e'
+leg h80: prompt=80 gen=45 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need to reply with exactly single word BLUE. User asks: "Reply with'
+leg i96: prompt=96 gen=31 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need to reply with exactly single word BLUE. User says reply with e'
+leg j128: prompt=128 gen=40 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need reply to user: "Reply with exactly the single word BLUE. Conte'
+leg k160: prompt=160 gen=39 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need reply to user: "Reply with exactly the single word BLUE. Conte'
+leg l224: prompt=224 gen=40 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need reply to user: "Reply with exactly the single word BLUE. Conte'
+leg m288: prompt=288 gen=40 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need reply to user: "Reply with exactly the single word BLUE. Conte'
+== 14/14 legs PASS ==
+step 2: LADDER PASS (exit 0)
+step 0c: clocks sideband banked: /home/chris/worktrees/amd-tp4-cure/results/amd/coherence/BOOT_BATTERY_20260916_213102_clocks.log (56 samples)
+=== BOOT_BATTERY OVERALL: GREEN — row: /home/chris/worktrees/amd-tp4-cure/results/amd/coherence/BOOT_BATTERY_20260916_213102.row

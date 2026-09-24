@@ -1,0 +1,41 @@
+W7 ROW — FIX-C (NINFER_GQA_SPLITK) PROMOTED default-ON, 2026-09-18, window 7 (lane amd/wo-w7-body)
+bin: /home/chris/artifacts_bin/ninfer-serve_a943225ad6da661e.bin (built from lane HEAD 0573d4665;
+  ggate promotion + gqa promotion both default-ON; banked per BANK-BEFORE-RELINK)
+CHANGE: gqa_prompt_splitk.h — unset env now parses to AUTO ("1"-class); "0"/garbage = rollback
+  (byte-identical OFF), explicit 2..16 unchanged. Same promotion shape as W6's GGATE flip.
+
+EVIDENCE STACK (why promotion is justified without a new clean perf leg — W6 ggate precedent:
+  default changes SELECTION only, the kernel is the W6-measured one):
+  1. Correctness cell (was the blocking defect): W7_gqa_cell_red_green_row.txt — harness Rng
+     unsigned-wraparound root cause, RED 29/29 -nan (5cd11fae257efc01) -> GREEN ALL PASS
+     (8f19b93a0c0d66cd), shipped kernel oracle-validated 1.6e-3, comparator falsifier trips 1.6e-1.
+  2. W6 serve legs: armC 57.2 -> 29.26 ms x1.95 (splits=4 auto), parity byte-identical,
+     pre-registered S=2 A/B lost (31.35) — W6_row_armC_gqa_AMBER.txt + W6_row_armC2_gqaS2_AB.txt.
+  3. W7 default-route leg (this row): boot a943225ad with GDN/GGATE/GQA env ALL UNSET —
+     [GQA] splitk=on splits=4 ctas=4x6x4=96 (base 4x6=24) width=128 geom=q6/kv1 br=32 fires
+     FROM DEFAULT (the exact W6 armC route line); width=27 warmup consults auto to splits=1
+     (policy width-adaptive as designed). Probe plen-2075 first+only mt 64 temp 0:
+     finish=stop content='BLUE' completion=41 (baseline-class parity; the composed
+     ggate+gqa armD-leg-1 class also read completion=40 on a 41-class — decode-trajectory
+     margin, not a text change).
+  4. BOOT_BATTERY_20260918_112525: OVERALL GREEN — host guard GREEN, coherence ladder PASS
+     (fast arm, --max-tokens 64, 4 ranks), clocks sideband banked (9 samples). Device cells
+     SKIP (not compiled in this lane build tree).
+  PERF OBSERVATION (band-uncontrolled, NOT a clean-band claim): this leg's BODYSUM n=17
+     (plen-2075 = 17 chunks, NOT comparable to W6's n=16 plen-2016 columns): gqa mean
+     33.3-34.2 ms/chunk (W6 armC: 29.26 at its band), wall mean 1521.8 ms/chunk ->
+     2075/(17x1.5218) = 80.1 tok/s prefill class. Chunk-wall class improves over the W6
+     armB 76.4-class figure; absolute cross-band comparison is NOT claimed (PLOG-043 law).
+
+OPS NOTES (both filed, both fixed in the leg script):
+  - pgrep -x 'ninfer-serve' matches NOTHING (comm truncated to 15 chars:
+    'ninfer-serve_409...') — leg-1 retired nothing, booted into 828 MiB free, and the
+    probe unknowingly hit the OLD certified server. RETIRE MUST pgrep -f the bank PATH.
+  - pgrep -f without a ^ anchor matches the caller's own script args — leg-2 TERMed itself.
+    Anchored '^/home/chris/artifacts_bin/ninfer-serve' is the safe form.
+
+SERVING CUTOVER: a943225ad IS the :8100 server as of this row (battery-verified in posture);
+  serve_10k.sh BIN line flipped to the new bank (one-line rollback = point it back at
+  409450b83ffa4be8). The owed 93515c1f battery-re-verify is SUPERSEDED (a943225ad contains
+  its change set plus gqa).
+VERDICT: FIX-C PROMOTED. Rollback: NINFER_GQA_SPLITK=0 (or garbage) = byte-identical OFF.
