@@ -77,20 +77,130 @@ The prize is collectable only if the ggml sched + meta layers also recognize the
 
 ## 2. A1 - implementation (3 layers, all inert with LLAMA_DRAFT_SHAPE_CACHE unset)
 
-(to be filled at A1 completion)
+Committed 68f729074 (A1) on amd/draft-cache, one amendment 47a822aef (A3, defect 2 below).
+
+- L1 llama-context (src/llama-context.cpp/h): `gf_res_shape` (2-4 extra `llm_graph_result`
+  slots, env LLAMA_DRAFT_SHAPE_CACHE, default OFF), `gf_res_active()` routes
+  process_ubatch/wait_outputs/fetch_nextn_outputs/opt_epoch_iter to the active slot;
+  process_ubatch scans the other slots with the SAME reuse predicate
+  (`cand->can_reuse(gparams)`), keeps the built graph on a shape re-entry and only
+  re-splits the sched (`gf_res_shape_sched` tracks which entry the sched is allocated
+  with); full misses rebuild into the LRU slot. memory_update + graph_reserve reset all
+  slots (invalidation mirrors 1c b/d).
+- L2 ggml-backend (ggml-backend.cpp): `ggml_backend_sched_split_graph` keeps a built
+  graph's uid (fresh uid only when uid == 0); single-split views carry the graph uid.
+- L3 ggml-backend-meta (ggml-backend-meta.cpp): 2-slot memo of seen graph uids ->
+  per-die cgraph uids; on a re-seen uid the rebuild restores the recorded per-die uids
+  so the HIP device graphs replay (ggml-cuda.cu uid-keyed
+  ggml_cuda_graph_update_required) instead of re-scanning + re-capturing.
+- Inert with the env unset: `gf_res_shape` empty -> `gf_res_active()` returns
+  `gf_res_prev` and process_ubatch takes the unchanged single-slot path; fresh graphs
+  never repeat uids, so L2/L3 code paths never fire.
 
 ## 3. A2 - host-level verification
 
-(to be filled at A2 completion)
+Instrument: docs/amd-port/tests/test_draft_shape_cache_host.cpp (committed
+9c229b3ae; CI replicate for the defect class, no GPU, no ggml linkage - it mirrors the
+exact host decision chain: allow_reuse predicate fields, single-slot vs shape-keyed
+process_ubatch policy incl. the scan/LRU/sched_is_res branches, sched split uid rule
+with the L2 change, and the meta needs_rebuild + per-die uid memo with the L3 change;
+every mirrored rule cites file:line). Transcript:
+results/W13_draft_shape_cache_a2_host_test_2026-09-24.txt. hipcc COMPILE-EXIT:0,
+RUN-EXIT:0, ALL PASS first run:
+
+1. DEFECT replicated: single-slot steady round reused = 0,0,1,1 - 2 misses/round,
+   20 graph + meta rebuilds in 10 rounds, per-die uids churn every round (HIP
+   recapture class). Matches the W12 capture (issue 2.593 ms reused=0 vs 1.108
+   reused=1).
+2. FIX proven: shape-cache steady round reused = 1,1,1,1 from round 2 on - each shape
+   built exactly once (2 builds total), 18 cached re-splits, per-die uids stable after
+   warmup (HIP replay class).
+3. Schedule identity: the cached re-entry sees the identical params signature as the
+   fresh build ("t4_st4_sq1_o4_g1") - identical schedule decisions by construction
+   (same predicate).
+4. Invalidation mirrors: memory update resets both slots -> both shapes rebuild, then
+   reuse resumes (0,0,1,1 warmup).
+5. Predicate safety: an unseen third shape never gets a stale hit - degrades to
+   today's rebuild.
+
+Mirror-vs-real fidelity re-audited this session against 68f729074 (scan order, LRU
+victim, sched_is_res gating, `params.res` used only at build time, meta
+`needs_rebuild = uid == 0 || uid != cur`) - faithful for the exercised decisions.
 
 ## 4. A3 - build + pre-merge CI
 
-(to be filled at A3 completion)
+- WORKTREE DAMAGE FOUND + REPAIRED (both from the dead predecessor session, both
+  uncommitted): the committed test file was truncated to 0 bytes on disk (restored
+  from HEAD 9c229b3ae) and build-hip/CMakeCache.txt was 0 bytes (tree wiped, fresh
+  configure).
+- Configure: /home/chris/opt/cmake/bin/cmake -B build-hip -DCMAKE_BUILD_TYPE=Release
+  -DGGML_HIP=ON -DGGML_NATIVE=ON -DCMAKE_HIP_ARCHITECTURES=gfx900 -DGGML_HIP_RCCL=ON
+  -DLLAMA_CURL=OFF -> CONFIGURE-EXIT:0.
+- Full build: BUILD-EXIT:0, zero compiler warnings (only deprecation-warning.cpp
+  source filenames match "warning"). Incremental rebuild after 47a822aef:
+  BUILD-EXIT:0.
+- CI wiring: test_draft_shape_cache_host added to the host-suite list of
+  /home/chris/run_premerge_ci.sh; the script gained two additive, default-preserving
+  toggles: CI_TREE (run against a desk worktree; default stays the coordinator
+  checkout - supersedes W12's path-patched-copy hack) and CI_SKIP_GPU=1 (skips the
+  die-3 gate-wiring section for zero-GPU desk runs; the merge gate re-runs it; the
+  skip prints a loud CI-SKIP line). rpath follows CI_TREE.
+- CI verdict (this tree @ 47a822aef, zero GPU): CI-VERDICT: PASS - tree clean, 7/7
+  host suites (incl. test_draft_shape_cache_host), gate-wiring section CI-SKIP
+  (log: results/W13_premerge_ci_2026-09-24.txt). The coordinator-side merge gate
+  re-runs the full CI including the die-3 wiring section on the merged tree.
 
 ## 5. A4 - served spec for the coordinator
 
-(to be filled at A4 completion)
+Arm (copy of the of-record /home/chris/launch_tp3_200k.sh, ONE line added to the env
+block next to the other LLAMA_DRAFT_* envs, binary from the draft-cache build or the
+merged tree, everything else identical):
+
+    LLAMA_DRAFT_SHAPE_CACHE=1 \   # -> 2 slots (catchup/step pair), engagement line:
+                                  #    "llama_context: draft shape cache enabled (2 slots)"
+
+Gates for the verdict (E-117 law: engagement REQUIRED; E-119 law: interleaved A/B for
+sub-5% claims):
+
+1. Engagement: the INFO line above present in the server log.
+2. Mechanism witness (free, same boot): [decode-timeline] draft-ctx decodes read
+   reused=1 on the catchup AND step 1 in steady rounds, issue medians ~1.1 ms
+   (vs 2.593 reused=0 in W12). NOTE: "[launch-timeline] meta rebuild:" now fires
+   ~2x/round by design (the uid alternation still re-derives the per-die subgraphs;
+   the memo keeps their uids stable so the device graphs REPLAY) - do not misread it
+   as the W12 steady-state-rebuild regression; the recapture tripwire
+   (ggml-cuda.cu warmup reset) must stay SILENT after boot.
+3. Battery: provenance-gated guard_battery.py vs baseline_tp3_200k.json, all 5 cells
+   PASS (decode 23.23/23.34, prefill 217.71, accept 0.66667, needle recall,
+   determinism_greedy byte-identical within boot - the change is host-only byte-exact
+   class).
+4. Expected delta: up to ~3 ms/round on a ~123-129 ms round = ~+2-3% decode - at the
+   edge of the instrument; bank only via interleaved A/B (E-119 soak law) plus the
+   mechanism witness in (2), which is decisive on its own.
+5. Rollback: unset the env - default OFF path is untouched (single-slot behavior
+   byte-identical; L2/L3 unreachable).
 
 ## 6. Defects of record
 
-(to be filled at D)
+1. Predecessor session left two 0-byte truncations in this worktree (test file on
+   disk, build-hip/CMakeCache.txt); both repaired (git checkout / fresh configure).
+   The committed test blob itself was intact.
+2. A1 DEFECT (found in the A4 spec review, fixed 47a822aef): LLAMA_DRAFT_SHAPE_CACHE=1
+   allocated ONE slot - with one slot the scan always skips itself and the LRU wrap
+   returns to the same slot, i.e. the default single-slot thrash path verbatim: the
+   served arm would print the engagement INFO line yet deliver ~0 ms (E-117-class
+   inert gate). Fix: 1 -> the default 2 slots (the block's own stated intent);
+   2-4 remain explicit slot counts.
+3. Residual cost (honest bound): the two shape re-entries per round still re-derive
+   the meta per-die subgraphs (remap, 49-node draft graph - small); the eliminated
+   terms are the graph rebuild and the HIP recapture (the P0-dominant term). Served
+   delta may therefore land under the ~3 ms headline; the [decode-timeline] witness
+   decides.
+4. Cached-params lifetime note: a shape-cache hit reads the SAVED ubatch params from
+   the previous round (samplers output[]/seq_id content compares) - the same
+   one-round lifetime class the target ctx exercises cross-round today on the
+   single-slot path; no new lifetime class introduced.
+5. CI gap closed this session: the suite list edit + CI_TREE/CI_SKIP_GPU toggles live
+   in /home/chris/run_premerge_ci.sh (outside the repo); the die-3 gate-wiring section
+   did NOT run on this desk tree (zero-GPU law, served window in flight) - the merge
+   gate must run the full CI.
