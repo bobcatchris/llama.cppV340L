@@ -4144,3 +4144,33 @@ to Gemini's guard battery, die 3 is the dev cell.
   W15 follow-up instrument). No served change of any kind. The desk
   outcome is a rigorous negative: the traffic prize is real and measured,
   the blocker is toolchain-level, and the re-attempt path is documented.
+- E-126 2026-09-24 02:30 FA-Q40 MERGED + DC WINDOW VERDICT + HARDENING
+  STAGED. (1) FA-Q40 DESK MERGED (61faf5185): fail-closed A2 negative
+  - the q4_0-direct prototype's dequant math is bit-exact three ways
+  and its -38.9% end-to-end signal is real ON WRONG VALUES; the
+  wrongness is a CODEGEN-CLASS DEFECT (hipcc-clang-18/gfx900 around
+  that template instantiation: shared tiles, K_k, Q_k all bit-exact
+  while KQ_acc diverges 64/64; error class shifts per binary; not a
+  race, not -O3, not combine) - open item fa-q40-codegen; prototype
+  REVERTED from the served tree; instrumented harness preserved for
+  a toolchain-cleared re-attempt (the 5.1x DRAM-byte model stands).
+  (2) DRAFT-CACHE DC WINDOW: all 4 paired cells banked - dc0 23.64 /
+  dc1 23.25 / dc0b 23.32 / dc1b 23.23. Paired deltas -0.39 and
+  -0.09: no promotable served win under EITHER reading (engaged-
+  with-no-effect, or - ENGAGEMENT UNPROVEN: dc1's server log has NO
+  "draft shape cache enabled" line, so the arm may be an inert env
+  again). VERDICT: draft-cache stays default-OFF; any future claim
+  requires the engagement line first (E-117 law, third enforcement).
+  Serving of record UNCHANGED through every window today.
+  (3) HARDENING STAGED: /etc/modprobe.d/amdgpu-noretry.conf
+  (options amdgpu noretry=1) - applies at next boot, complementing
+  the runtime set that has held hogs at 3 for ~5 h (a 4th hog fired
+  ~02:00 - the runtime set suppresses but does not eliminate; the
+  boot-time set + fresh SVM state is the full fix). REBOOT
+  RECOMMENDED at Chris's convenience - post-reboot queue: the
+  split A/B lesson stands (chained 200k windows are soak-bound),
+  draft-cache engagement-verified re-run if ever needed, prefill
+  ub1024 arm (decode-guard mandatory), U1 decode-at-depth capture
+  retry (the deep-census window's decode phase did not fit - the
+  depth table's decode column is model-anchored, only the dequant
+  line is directly measured at depth).
