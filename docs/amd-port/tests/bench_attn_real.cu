@@ -16,11 +16,12 @@
 //   base   ncols2=2  - the shipped instance  flash_attn_tile<256,256,4,2,false>
 //   mid3   ncols2=3  - GGML_CUDA_FATTN_TILE_GQA_WIDE arm, 2 z-blocks
 //   wide6  ncols2=6  - GGML_CUDA_FATTN_TILE_GQA_WIDE arm, 1 z-block
-//   direct           - GGML_CUDA_FATTN_TILE_Q40_DIRECT arm: same <4,2>
-//                      instance shape but the kernel dequantizes the q4_0 KV
-//                      blocks in-kernel (launch_fattn need_f16 = false, false:
-//                      no pool, no dequant launches)
 //   basedup          - base again, in-run determinism control
+//
+// W16 (fa-q40 desk): a Q4_0-direct arm (in-kernel q4_0 KV dequant, no f16
+// pool) was prototyped on branch history (75647c857) and produced WRONG
+// results on gfx900/ROCm 6.2 (see W16 receipt); the arm is NOT present here.
+// The --depth N sweep (W15 follow-up) is retained for future desks.
 // Every arm after base is device-copied and memcmp'd against base BEFORE any
 // timing counts; mismatches are counted and max ulp-class diff reported.
 //
@@ -69,14 +70,13 @@ static constexpr float SCALE   = 0.0625f;
 // q4_0 row: 256 el = 8 blocks x 18 B
 static constexpr long KV_ROW_BYTES = (DKQ / QK4_0) * sizeof(block_q4_0);
 
-enum ArmKind { ARM_BASE, ARM_MID3, ARM_WIDE6, ARM_DIRECT, ARM_BASEDUP };
+enum ArmKind { ARM_BASE, ARM_MID3, ARM_WIDE6, ARM_BASEDUP };
 
 static const char * arm_name(ArmKind k) {
     switch (k) {
         case ARM_BASE:    return "base";
         case ARM_MID3:    return "mid3";
         case ARM_WIDE6:   return "wide6";
-        case ARM_DIRECT:  return "direct";
         case ARM_BASEDUP: return "basedup";
     }
     return "?";
@@ -93,24 +93,11 @@ static void launch_arm(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     HIP_CHECK(hipGetLastError());
 }
 
-// q4_0-direct arm: identical geometry/config lookup as base, but the kernel
-// reads the q4_0 KV tensor in place and the pool conversion is skipped
-static void launch_arm_direct(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
-    const int cc = ggml_cuda_info().devices[ggml_cuda_get_device()].cc;
-    const int nthreads  = ggml_cuda_fattn_tile_get_nthreads (DKQ, DV, 8, cc);
-    const int nbatch_fa = ggml_cuda_fattn_tile_get_nbatch_fa(DKQ, DV, 8, cc);
-    launch_fattn<DV, 4, 2>(ctx, dst,
-        flash_attn_tile<DKQ, DV, 4, 2, false, true>,
-        nthreads / 32, 0, nbatch_fa, false, false, false, 32);
-    HIP_CHECK(hipGetLastError());
-}
-
 static void run_arm(ArmKind k, ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     switch (k) {
         case ARM_BASE:    launch_arm<4, 2>(ctx, dst); break;
         case ARM_MID3:    launch_arm<4, 3>(ctx, dst); break;
         case ARM_WIDE6:   launch_arm<4, 6>(ctx, dst); break;
-        case ARM_DIRECT:  launch_arm_direct(ctx, dst); break;
         case ARM_BASEDUP: launch_arm<4, 2>(ctx, dst); break;
     }
 }
@@ -731,8 +718,7 @@ int main(int argc, char ** argv) {
         ggml_free(gctx); return 0;
     }
 
-    const std::vector<ArmKind> arms = allarms ? std::vector<ArmKind>{ ARM_BASE, ARM_MID3, ARM_WIDE6, ARM_DIRECT, ARM_BASEDUP }
-                                      : std::vector<ArmKind>{ ARM_BASE, ARM_DIRECT, ARM_BASEDUP };
+    const std::vector<ArmKind> arms = { ARM_BASE, ARM_MID3, ARM_WIDE6, ARM_BASEDUP };
 
     // warmup + oracle
     std::vector<std::vector<uint8_t>> out(arms.size());
