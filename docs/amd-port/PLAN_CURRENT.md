@@ -198,3 +198,20 @@ all other state banked through E-144/rev4. oomd disabled (stays disabled).
   per owner constraint).
 - Liveness law active: any desk CHECKIN stalled >45 min = zombie -> re-dispatch
   from branch tip.
+
+## REVISION 7 - 2026-09-24 16:55 (U2 script ready; merge-order law)
+
+- U2 PREP LANDED: /home/chris/run_u2_prefill_window.sh (dry-run verified, 7/7
+  verdict paths tested; SHORT 10k promote cell ~0.8 h; --long full curve ~7 h;
+  ignore_eos + cross-arm sha + engagement greps + void-gate built in).
+- CRITICAL SEQUENCE (U2 desk's catch): amd/q40-prefill is NOT merged to main -
+  the served binary lacks the PREFILL arm. AFTER the battery completes and
+  BEFORE U2 fires: git merge amd/q40-prefill -> rebuild build-hip -> CI ->
+  then bash /home/chris/run_u2_prefill_window.sh (SHORT first; --long after).
+  DO NOT merge mid-battery: a code merge without rebuild fails later cells'
+  freshness gates; a merge+rebuild mid-battery swaps binaries between arms
+  and confounds the paired design.
+- Post-battery order: (1) bank E-145 from the analyst's W32; (2) ratchet any
+  WIN per window; (3) merge q40-prefill + rebuild + CI; (4) U2 SHORT; (5) U2
+  --long; (6) U1 v2 deep rerun; (7) re-enable campaign-postreboot.service;
+  (8) W21 persistent shadow.
