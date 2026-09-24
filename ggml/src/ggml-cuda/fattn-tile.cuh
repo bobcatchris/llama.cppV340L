@@ -577,9 +577,21 @@ static __device__ __forceinline__ void flash_attn_tile_load_tile_q40(
             }
         }
 
+        if constexpr (var == 10) { // W17 fa40-codegen: 16B stores, f16 loader granule
 #pragma unroll
-        for (int l = 0; l < QK4_0/2; l += 4) {
-            ggml_cuda_memcpy_1<8>(dst + l, vals + l);
+            for (int l = 0; l < QK4_0/2; l += 8) {
+                ggml_cuda_memcpy_1<16>(dst + l, vals + l);
+            }
+        } else if constexpr (var == 11) { // W17 fa40-codegen: scalar half2 stores
+#pragma unroll
+            for (int l = 0; l < QK4_0/2; ++l) {
+                dst[l] = vals[l];
+            }
+        } else {
+#pragma unroll
+            for (int l = 0; l < QK4_0/2; l += 4) {
+                ggml_cuda_memcpy_1<8>(dst + l, vals + l);
+            }
         }
     }
 }
@@ -802,6 +814,16 @@ static __device__ __forceinline__ void flash_attn_tile_iter(
         }
     }
 
+#ifdef GGML_FATTN_Q40_DBG
+    // staged oracle: dump the raw KQ accumulators right after the K loop
+    if (dbg && k_VKQ_0 == 0) {
+#pragma unroll
+        for (int a = 0; a < nbatch_fa/(np*warp_size)*cpw; ++a) {
+            dbg[16384 + (threadIdx.y*warp_size + threadIdx.x)*4 + a] = KQ_acc[a];
+        }
+    }
+#endif
+
     // Apply logit softcap + mask, update KQ_max:
 #pragma unroll
     for (int jc0 = 0; jc0 < cpw; ++jc0) {
@@ -921,7 +943,7 @@ static __device__ __forceinline__ void flash_attn_tile_iter(
                 const int r = idx / (DV/2), c = idx % (DV/2);
                 const half2 h = ((const half2 *) KV_tmp)[r*(DV/2) + c];
                 float f; memcpy(&f, &h, 4);
-                dbg[8192 + idx] = f;
+                dbg[12288 + idx] = f;
             }
 #endif
         }
@@ -1592,7 +1614,11 @@ static void launch_fattn_tile_switch_ncols2(ggml_backend_cuda_context & ctx, ggm
             const int nwarps    = ggml_cuda_fattn_tile_get_nthreads (DKQ, DV, 8, cc) / warp_size;
             const int nbatch_fa = ggml_cuda_fattn_tile_get_nbatch_fa(DKQ, DV, 8, cc);
             GGML_LOG_INFO("ggml-cuda: GGML_CUDA_FATTN_TILE_Q40_DIRECT=1, fattn tile ncols1=4 ncols2=2 q4_0 KV in-kernel (gqa_ratio %d, T %d)\n", gqa_ratio, (int) Q->ne[1]);
-            launch_fattn<DV, 4, 2>(ctx, dst, flash_attn_tile<DKQ, DV, 4, 2, use_logit_softcap, true>,
+            // W17 fa40-codegen: variant 11 (scalar half2 shared-tile stores).
+            // The int2/int4 copy-store granules of ggml_cuda_memcpy_1 corrupt
+            // the tile in this instantiation on gfx900 (hipcc clang 18) at
+            // every -O level; scalar stores are bit-exact (W17 receipt).
+            launch_fattn<DV, 4, 2>(ctx, dst, flash_attn_tile<DKQ, DV, 4, 2, use_logit_softcap, 11>,
                 nwarps, nbytes_shared, nbatch_fa, false, false, false, warp_size);
             return;
         }
