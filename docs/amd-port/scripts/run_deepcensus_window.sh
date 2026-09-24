@@ -27,14 +27,14 @@ die_temps_ok() {
 # --- lock check-and-hold ---
 waited=0
 while [ -f "$LOCK" ]; do
-  [ "$waited" -ge 5400 ] && { echo "LOCK-TIMEOUT"; exit 1; }
-  sleep 150; waited=$((waited+150))
+  [ "$waited" -ge 10800 ] && { echo "LOCK-TIMEOUT"; exit 1; }
+  sleep 5; waited=$((waited+5))
 done
 printf '{"desk":"deep-census","arm":"W15-u1-deepctx","ts":"%s","pid":%d}\n' \
   "$(date +%Y%m%d_%H%M%S)" "$$" > "$LOCK"
-# race guard: if we lost the grab, back off and retry once per 150 s
+# race guard: if we lost the grab, back off and retry once per 5 s
 if ! grep -q '"desk":"deep-census"' "$LOCK"; then
-  while [ -f "$LOCK" ]; do sleep 150; done
+  while [ -f "$LOCK" ]; do sleep 5; done
   printf '{"desk":"deep-census","arm":"W15-u1-deepctx","ts":"%s","pid":%d}\n' \
     "$(date +%Y%m%d_%H%M%S)" "$$" > "$LOCK"
   grep -q '"desk":"deep-census"' "$LOCK" || { echo "LOCK-LOST"; exit 1; }
