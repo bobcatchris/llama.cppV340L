@@ -307,3 +307,31 @@ sysfs/lspci files; no GPU process launched; /tmp/campaign_gpu_boot.lock
 untouched (held by the depth chain); guard_battery.py and the
 /home/chris runner scripts read-only (their deltas are specified
 here for the coordinator, not applied).
+
+## LOG (append-only, newest last)
+
+- 2026-09-24 11:07 CDT desk opened on amd/v340-port-v2 @ 5ad25e902;
+  ZERO-GPU behind the depth window's lock (polled, not touched).
+  Foundations read: W8 + W9 + W10 receipts, W18 (git 9761f0821,
+  amd/soak-mech - not in this branch's tree), round map, ledger
+  E-119..E-138. Banked-served-facts list extracted first: chan4
+  arm served FAILED (combowin_chan4 cells, E-119); tensor-split
+  rebalance served REJECTED (E-125 paired cells) - both closed,
+  not re-litigated.
+- 11:12 A1 census (lspci -t -v, sysfs numa_node/local_cpulist/
+  links, lscpu -e, /proc/cmdline, ACS check): single NUMA, hybrid
+  8P+4E, symmetric 2+2 fabric under twin roots with PM8533
+  fanouts; ppfeaturemask=0xffffffff already set (C1 surfaces
+  live). Thread-affinity hypothesis refuted as primary cause.
+- 11:20 A2 decomposition: W10 END-calibrated waits + rate law +
+  W18 sclk correlation name (c) clock/power state; W9 flat
+  isolation excludes transport; combowin_chan4_thermal.log shows
+  560-1500 MHz oscillation served; W14 traces checked (kernel
+  matrices, no per-die NCCL artifact); W8 probe floors
+  re-verified from the session log.
+- 11:24 part 1 commit 67b75992b (sections 0-2).
+- 11:30 part 2 commit 2e27d757b (sections 3-5: C1/C2/C3 ranked,
+  C4 closed-record, C5 observation, window deltas + kill
+  criteria). Desk deliverable complete: the coordinator's first
+  run is the C1 clock-floor paired window (R F F R 10k + one
+  200k pair) with the 4-die sclk sideband as mechanism witness.
