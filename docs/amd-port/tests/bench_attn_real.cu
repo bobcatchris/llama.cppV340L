@@ -37,6 +37,7 @@
 #include "ggml-cuda/fattn-tile.cu"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -84,6 +85,19 @@ static void launch_arm(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     HIP_CHECK(hipGetLastError());
 }
 
+// served instance with padded DYNAMIC shared memory: pads the launch's total
+// LDS footprint (static + dynamic) to a target without touching the kernel
+template <int ncols1, int ncols2>
+static void launch_arm_pad(ggml_backend_cuda_context & ctx, ggml_tensor * dst, size_t pad_bytes) {
+    const int cc = ggml_cuda_info().devices[ggml_cuda_get_device()].cc;
+    const int nthreads  = ggml_cuda_fattn_tile_get_nthreads (DKQ, DV, ncols1*ncols2, cc);
+    const int nbatch_fa = ggml_cuda_fattn_tile_get_nbatch_fa(DKQ, DV, ncols1*ncols2, cc);
+    launch_fattn<DV, ncols1, ncols2>(ctx, dst,
+        flash_attn_tile<DKQ, DV, ncols1, ncols2, false>,
+        nthreads / 32, pad_bytes, nbatch_fa, true, true, false, 32);
+    HIP_CHECK(hipGetLastError());
+}
+
 static void run_arm(ArmKind k, ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     switch (k) {
         case ARM_BASE:    launch_arm<4, 2>(ctx, dst); break;
@@ -114,9 +128,152 @@ static void occ_arm(ArmKind k) {
            nm, attr.numRegs, attr.sharedSizeBytes, nthreads, blocks);
 }
 
+// W14 wide-launch desk probe kernels: minimal instances that isolate the
+// ~210 us wide-launch GPU idle gap from the fattn kernel complexity.
+__global__ void widelaunch_noop_kernel(int * p) {
+    if (threadIdx.x == 0 && p != nullptr) {
+        *p = 1;
+    }
+}
+
+template <int LDS_BYTES, bool BURN_VGPR = false>
+__global__ void widelaunch_lds_kernel(float * out) {
+    __shared__ float buf[LDS_BYTES/4];
+    const int tid = threadIdx.x;
+    for (int i = tid; i < LDS_BYTES/4; i += blockDim.x) {
+        buf[i] = 0.0f;
+    }
+    __syncthreads();
+    uint32_t sink = 0;
+    if (BURN_VGPR) {
+        // force >=128 arch vgprs: wrap-around circular dependencies keep the
+        // whole array live; the magic-compare guard defeats constant folding
+        float acc[128];
+        #pragma unroll
+        for (int i = 0; i < 128; ++i) {
+            acc[i] = (float) (i ^ tid) + 1.0f;
+        }
+        #pragma unroll
+        for (int r2 = 0; r2 < 2; ++r2) {
+            #pragma unroll
+            for (int i = 0; i < 128; ++i) {
+                acc[i] = fmaf(acc[i], acc[(i + 1 + r2*64) & 127], 1.0f)
+                         - acc[(i + 32) & 127] * 0.5f;
+            }
+        }
+        float t = 0.0f;
+        #pragma unroll
+        for (int i = 0; i < 128; ++i) {
+            t += acc[i];
+        }
+        sink = (uint32_t) t;
+    }
+    if (tid == 0) {
+        float s = 0.0f;
+        for (int i = 0; i < LDS_BYTES/4; i += 128) {
+            s += buf[i];
+        }
+        out[blockIdx.y] = s;
+        if (sink == 0xdeadbeefu) {
+            out[blockIdx.y] = 2.0f;
+        }
+    }
+}
+
+// forced scratch (local-memory spill) kernels. LIGHT variant: 256 B/thread
+// spill, near-zero traffic, isolates start latency. HEAVY variant: ~1440
+// B/thread (FA<4,6> class) - execution-dominated, kept for reference.
+__global__ void widelaunch_spill_kernel(float * out) {
+    float r[360];
+    const int tid = threadIdx.x;
+    for (int i = 0; i < 360; ++i) {
+        r[i] = (float) (i ^ tid);
+    }
+    float s = 0.0f;
+    for (int i = 0; i < 360; ++i) {
+        s += r[(i*7 + tid) % 360];
+    }
+    if (tid == 0) {
+        out[blockIdx.y] = s;
+    }
+}
+
+__global__ void widelaunch_spill_light_kernel(float * out) {
+    float r[64];
+    const int tid = threadIdx.x;
+    #pragma unroll
+    for (int i = 0; i < 64; ++i) {
+        r[i] = (float) (i ^ tid);
+    }
+    float s = 0.0f;
+    for (int i = 0; i < 64; ++i) {
+        s += r[(i*7 + tid) & 63];
+    }
+    if (tid == 0) {
+        out[blockIdx.y] = s;
+    }
+}
+
+// FA<4,6>-class spill (1456 B/thread local) with CHEAP access: scattered
+// init forces the local allocation, linear reads keep execution tiny -
+// isolates the scr threshold class (FA<4,2> 1104 clean vs FA<4,6> 1432 pays)
+__global__ void widelaunch_spill_lin_kernel(float * out) {
+    float r[364];
+    const int tid = threadIdx.x;
+    for (int i = 0; i < 364; ++i) {
+        r[(i*7 + tid) % 364] = (float) (i ^ tid);
+    }
+    float s = 0.0f;
+    #pragma unroll 4
+    for (int i = 0; i < 364; ++i) {
+        s += r[i];
+    }
+    if (tid == 0) {
+        out[blockIdx.y] = s;
+    }
+}
+
+// huge-code kernels: unrolled dependent math. heavy = 123 KB code, full
+// execution; light = same code volume in guarded 64-iteration chunks, only
+// the first chunk runs (isolate start latency from execution).
+template <int N>
+__global__ void widelaunch_bigcode_kernel(float * out) {
+    float a = threadIdx.x * 0.5f + 1.0f;
+    float b = 0.5f;
+    #pragma unroll
+    for (int i = 0; i < N; ++i) {
+        a = fmaf(a, b, 1.0001f);
+        b = fmaf(b, a, 0.9999f);
+        a = sqrtf(a) + 1e-9f;
+    }
+    if (a == 12345.678f) {
+        out[threadIdx.x] = a + b;
+    }
+}
+
+template <int CHUNKS>
+__global__ void widelaunch_bigcode_light_kernel(float * out) {
+    float a = threadIdx.x * 0.5f + 1.0f;
+    float b = 0.5f;
+    #pragma unroll
+    for (int c = 0; c < CHUNKS; ++c) {
+        if (c == 0 || out[0] < -1.0e30f) {
+            #pragma unroll
+            for (int i = 0; i < 64; ++i) {
+                a = fmaf(a, b, 1.0001f);
+                b = fmaf(b, a, 0.9999f);
+                a = sqrtf(a) + 1e-9f;
+            }
+        }
+    }
+    if (a == 12345.678f) {
+        out[threadIdx.x] = a + b;
+    }
+}
+
 int main(int argc, char ** argv) {
     if (argc < 2) {
-        printf("usage: %s <gguf> [niter=30] [reps=5] [--served-entry] [--occupancy]\n", argv[0]);
+        printf("usage: %s <gguf> [niter=30] [reps=5] [--served-entry] [--occupancy] [--probe] [--matrix]\n", argv[0]);
         return 1;
     }
     const char * gguf_path = argv[1];
@@ -125,10 +282,14 @@ int main(int argc, char ** argv) {
     bool served    = false;
     bool occupancy = false;
     bool probe     = false;
+    bool matrix    = false;
+    const char * adj_pair = nullptr;
     for (int i = 2; i < argc; ++i) {
         if (strcmp(argv[i], "--served-entry") == 0) served = true;
         if (strcmp(argv[i], "--occupancy") == 0)    occupancy = true;
         if (strcmp(argv[i], "--probe") == 0)        probe = true;
+        if (strcmp(argv[i], "--matrix") == 0)       matrix = true;
+        if (strcmp(argv[i], "--adj") == 0 && i + 1 < argc) adj_pair = argv[++i];
     }
     if (occupancy) {
         occ_arm(ARM_BASE); occ_arm(ARM_MID3); occ_arm(ARM_WIDE6);
@@ -213,6 +374,322 @@ int main(int argc, char ** argv) {
             float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, pe0, pe1));
             printf("PROBE %s launch %2d: %.1f us\n", arm_name(pk), i, ms * 1000.0f);
         }
+        ggml_free(gctx);
+        return 0;
+    }
+
+    if (adj_pair != nullptr) {
+        // adjacency probe for rocprof decomposition: niter x ([pre step] +
+        // event-bracketed fattn launch), stream drained between steps.
+        // pair: ww bb wb bw (pre = that arm), nw nb (pre = tiny noop kernel),
+        // idleb idlew (pre = 2 ms idle). The event print gives per-launch
+        // elapsed; the rocprof trace gives per-kernel-boundary gaps.
+        hipEvent_t e0, e1;
+        HIP_CHECK(hipEventCreate(&e0)); HIP_CHECK(hipEventCreate(&e1));
+        hipStream_t st = ctx.stream();
+        int * noop_dev = nullptr;
+        HIP_CHECK(hipMalloc(&noop_dev, 4));
+        for (int w = 0; w < 100; ++w) {
+            run_arm(ARM_BASE, ctx, dst_t);
+            run_arm(ARM_WIDE6, ctx, dst_t);
+        }
+        HIP_CHECK(hipDeviceSynchronize());
+        const bool pre_w = strcmp(adj_pair, "ww") == 0 || strcmp(adj_pair, "wb") == 0;
+        const bool pre_b = strcmp(adj_pair, "bw") == 0 || strcmp(adj_pair, "bb") == 0;
+        const bool pre_n = strcmp(adj_pair, "nw") == 0 || strcmp(adj_pair, "nb") == 0;
+        const bool pre_i = strcmp(adj_pair, "idlew") == 0 || strcmp(adj_pair, "idleb") == 0;
+        const bool run_w = strcmp(adj_pair, "ww") == 0 || strcmp(adj_pair, "bw") == 0 ||
+                           strcmp(adj_pair, "nw") == 0 || strcmp(adj_pair, "idlew") == 0;
+        const ArmKind k  = run_w ? ARM_WIDE6 : ARM_BASE;
+        for (int i = 0; i < niter; ++i) {
+            if (pre_w) { run_arm(ARM_WIDE6, ctx, dst_t); HIP_CHECK(hipDeviceSynchronize()); }
+            if (pre_b) { run_arm(ARM_BASE, ctx, dst_t); HIP_CHECK(hipDeviceSynchronize()); }
+            if (pre_n) {
+                widelaunch_noop_kernel<<<1, 64, 0, st>>>(noop_dev);
+                HIP_CHECK(hipGetLastError());
+                HIP_CHECK(hipEventRecord(e0, st));
+            } else {
+                if (pre_i) { HIP_CHECK(hipDeviceSynchronize()); usleep(2000); }
+                HIP_CHECK(hipEventRecord(e0, st));
+            }
+            run_arm(k, ctx, dst_t);
+            HIP_CHECK(hipEventRecord(e1, st));
+            HIP_CHECK(hipEventSynchronize(e1));
+            float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, e0, e1));
+            printf("ADJ %s launch %2d: %.1f us\n", adj_pair, i, ms * 1000.0f);
+        }
+        HIP_CHECK(hipFree(noop_dev));
+        ggml_free(gctx);
+        return 0;
+    }
+
+    if (matrix) {
+        // W14 wide-launch desk: probe matrix isolating WHEN the ~210 us
+        // pre-fattn GPU idle gap appears. Every scenario times per-launch
+        // with device-event brackets on ctx.stream() (probe discipline);
+        // kernel sums (rocprof, W11): base 751.5 mid3 727.2 wide6 585.8 us,
+        // so elapsed - kernel_sum = launch overhead incl. the gap.
+        hipEvent_t e0, e1;
+        HIP_CHECK(hipEventCreate(&e0)); HIP_CHECK(hipEventCreate(&e1));
+        hipStream_t st = ctx.stream();
+
+        auto launch_timed = [&](ArmKind k) -> double {
+            HIP_CHECK(hipEventRecord(e0, st));
+            run_arm(k, ctx, dst_t);
+            HIP_CHECK(hipEventRecord(e1, st));
+            HIP_CHECK(hipEventSynchronize(e1));
+            float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, e0, e1));
+            return ms * 1000.0;
+        };
+        auto report = [](const char * name, std::vector<double> v) {
+            std::sort(v.begin(), v.end());
+            const double med = v[v.size()/2];
+            const double spread = (v.back() - v.front()) / med * 100.0;
+            printf("MATRIX %-18s n=%2d med=%8.1f us  min=%8.1f  max=%8.1f  spread=%.2f%%%s\n",
+                   name, (int) v.size(), med, v.front(), v.back(), spread,
+                   spread <= 1.05 ? "" : "  SPREAD>1.05");
+        };
+        auto run_scenario = [&](const char * name, int n, ArmKind k) {
+            std::vector<double> v;
+            for (int i = 0; i < n; ++i) v.push_back(launch_timed(k));
+            report(name, v);
+        };
+
+        // warm all instances into steady state
+        for (int w = 0; w < 300; ++w) {
+            run_arm(ARM_BASE, ctx, dst_t);
+            run_arm(ARM_MID3, ctx, dst_t);
+            run_arm(ARM_WIDE6, ctx, dst_t);
+        }
+        HIP_CHECK(hipDeviceSynchronize());
+
+        // (a) same-kernel back-to-back
+        run_scenario("a_solo_base",    niter, ARM_BASE);
+        run_scenario("a_solo_mid3",    niter, ARM_MID3);
+        run_scenario("a_solo_wide6",   niter, ARM_WIDE6);
+
+        // (b) alternate two kernels, per-launch brackets
+        std::vector<double> vb, vw;
+        for (int i = 0; i < niter; ++i) {
+            vb.push_back(launch_timed(ARM_BASE));
+            vw.push_back(launch_timed(ARM_WIDE6));
+        }
+        report("b_alt_base", vb);
+        report("b_alt_wide6", vw);
+
+        // (c) wide-then-served: does a completed wide launch poison the next
+        // base launch (immediately after sync)?
+        std::vector<double> vpb;
+        for (int i = 0; i < niter; ++i) {
+            run_arm(ARM_WIDE6, ctx, dst_t);
+            HIP_CHECK(hipDeviceSynchronize());
+            vpb.push_back(launch_timed(ARM_BASE));
+        }
+        report("c_after_wide_base", vpb);
+
+        // (d) served-after-a-small-kernel (NCCL-boundary adjacency class):
+        // tiny kernel enqueued immediately before the bracketed fattn launch
+        int * noop_dev = nullptr;
+        HIP_CHECK(hipMalloc(&noop_dev, 4));
+        {
+            std::vector<double> vwb, vww;
+            for (int i = 0; i < niter; ++i) {
+                widelaunch_noop_kernel<<<1, 64, 0, st>>>(noop_dev);
+                HIP_CHECK(hipGetLastError());
+                vwb.push_back(launch_timed(ARM_BASE));
+                widelaunch_noop_kernel<<<1, 64, 0, st>>>(noop_dev);
+                HIP_CHECK(hipGetLastError());
+                vww.push_back(launch_timed(ARM_WIDE6));
+            }
+            report("d_noop_base", vwb);
+            report("d_noop_wide6", vww);
+        }
+
+        // sparse launches (2 ms host sleep + full drain before each launch):
+        // power-state / clock-ramp discriminator
+        {
+            std::vector<double> vwb, vww;
+            for (int i = 0; i < niter; ++i) {
+                HIP_CHECK(hipDeviceSynchronize());
+                usleep(2000);
+                vwb.push_back(launch_timed(ARM_BASE));
+                HIP_CHECK(hipDeviceSynchronize());
+                usleep(2000);
+                vww.push_back(launch_timed(ARM_WIDE6));
+            }
+            report("sparse_base", vwb);
+            report("sparse_wide6", vww);
+        }
+
+        // double launch inside one bracket (second launch overlaps first):
+        // fixed per-launch cost vs execution overlap discriminator
+        {
+            std::vector<double> vd, vd2;
+            for (int i = 0; i < niter; ++i) {
+                HIP_CHECK(hipEventRecord(e0, st));
+                run_arm(ARM_WIDE6, ctx, dst_t);
+                run_arm(ARM_WIDE6, ctx, dst_t);
+                HIP_CHECK(hipEventRecord(e1, st));
+                HIP_CHECK(hipEventSynchronize(e1));
+                float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, e0, e1));
+                vd.push_back(ms * 1000.0 / 2.0);
+            }
+            for (int i = 0; i < niter; ++i) {
+                HIP_CHECK(hipEventRecord(e0, st));
+                run_arm(ARM_BASE, ctx, dst_t);
+                run_arm(ARM_BASE, ctx, dst_t);
+                HIP_CHECK(hipEventRecord(e1, st));
+                HIP_CHECK(hipEventSynchronize(e1));
+                float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, e0, e1));
+                vd2.push_back(ms * 1000.0 / 2.0);
+            }
+            report("double_wide6/2", vd);
+            report("double_base/2", vd2);
+        }
+
+        // pipelined window (A3 protocol discipline): events only around the
+        // whole loop - distinguishes empty-queue vs full-queue gap behavior
+        {
+            std::vector<double> vpb, vpw;
+            for (int w = 0; w < 6; ++w) {
+                HIP_CHECK(hipEventRecord(e0, st));
+                for (int i = 0; i < niter; ++i) run_arm(ARM_BASE, ctx, dst_t);
+                HIP_CHECK(hipEventRecord(e1, st));
+                HIP_CHECK(hipEventSynchronize(e1));
+                float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, e0, e1));
+                vpb.push_back(ms * 1000.0 / niter);
+                HIP_CHECK(hipEventRecord(e0, st));
+                for (int i = 0; i < niter; ++i) run_arm(ARM_WIDE6, ctx, dst_t);
+                HIP_CHECK(hipEventRecord(e1, st));
+                HIP_CHECK(hipEventSynchronize(e1));
+                float ms2 = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms2, e0, e1));
+                vpw.push_back(ms2 * 1000.0 / niter);
+            }
+            report("pipe_base", vpb);
+            report("pipe_wide6", vpw);
+        }
+
+        // host enqueue rate (no sync inside): bounds the host contribution
+        {
+            HIP_CHECK(hipDeviceSynchronize());
+            auto t0 = std::chrono::steady_clock::now();
+            for (int i = 0; i < 30; ++i) run_arm(ARM_BASE, ctx, dst_t);
+            auto t1 = std::chrono::steady_clock::now();
+            for (int i = 0; i < 30; ++i) run_arm(ARM_WIDE6, ctx, dst_t);
+            auto t2 = std::chrono::steady_clock::now();
+            HIP_CHECK(hipDeviceSynchronize());
+            printf("MATRIX hostrate        base %6.1f us/launch  wide6 %6.1f us/launch (host enqueue only)\n",
+                   std::chrono::duration<double, std::micro>(t1 - t0).count() / 30.0,
+                   std::chrono::duration<double, std::micro>(t2 - t1).count() / 30.0);
+        }
+
+        // LDS x grid discriminator: minimal kernels with the base (22528 B)
+        // and wide6 (32768 B) static LDS, near-zero work, in both grid shapes
+        {
+            // dynamic-LDS padding probe on the REAL served kernel: base
+            // (static 22528) padded to mid3/wide6 total LDS footprints
+            {
+                std::vector<double> v25, v32;
+                for (int i = 0; i < niter; ++i) {
+                    HIP_CHECK(hipEventRecord(e0, st));
+                    launch_arm_pad<4, 2>(ctx, dst_t, 2560);
+                    HIP_CHECK(hipEventRecord(e1, st));
+                    HIP_CHECK(hipEventSynchronize(e1));
+                    float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, e0, e1));
+                    v25.push_back(ms * 1000.0);
+                }
+                for (int i = 0; i < niter; ++i) {
+                    HIP_CHECK(hipEventRecord(e0, st));
+                    launch_arm_pad<4, 2>(ctx, dst_t, 10240);
+                    HIP_CHECK(hipEventRecord(e1, st));
+                    HIP_CHECK(hipEventSynchronize(e1));
+                    float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, e0, e1));
+                    v32.push_back(ms * 1000.0);
+                }
+                report("base_pad_25088", v25);
+                report("base_pad_32768", v32);
+            }
+
+            float * lds_out = nullptr;
+            HIP_CHECK(hipMalloc(&lds_out, 4096*4));
+            const dim3 g_wide(1, 56, 1), g_base(1, 37, 3);
+            const int b_wide = 384, b_base = 256;
+            HIP_CHECK(hipDeviceSynchronize());
+            auto lds_timed = [&](auto kern, dim3 g, int b) -> double {
+                HIP_CHECK(hipEventRecord(e0, st));
+                kern<<<g, b, 0, st>>>(lds_out);
+                HIP_CHECK(hipGetLastError());
+                HIP_CHECK(hipEventRecord(e1, st));
+                HIP_CHECK(hipEventSynchronize(e1));
+                float ms = 0.0f; HIP_CHECK(hipEventElapsedTime(&ms, e0, e1));
+                return ms * 1000.0;
+            };
+            for (int w = 0; w < 50; ++w) {
+                widelaunch_lds_kernel<22528><<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_lds_kernel<32768><<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_lds_kernel<22528><<<g_base, b_base, 0, st>>>(lds_out);
+                widelaunch_lds_kernel<32768><<<g_base, b_base, 0, st>>>(lds_out);
+                widelaunch_lds_kernel<32768, true><<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_lds_kernel<22528, true><<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_lds_kernel<16384, true><<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_spill_light_kernel<<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_spill_lin_kernel<<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_bigcode_light_kernel<80><<<g_wide, b_wide, 0, st>>>(lds_out);
+            }
+            HIP_CHECK(hipDeviceSynchronize());
+            auto lds_scenario = [&](const char * name, auto kern, dim3 g, int b) {
+                std::vector<double> v;
+                for (int i = 0; i < niter; ++i) v.push_back(lds_timed(kern, g, b));
+                report(name, v);
+            };
+            lds_scenario("lds22k_gw384", widelaunch_lds_kernel<22528>, g_wide, b_wide);
+            lds_scenario("lds32k_gw384", widelaunch_lds_kernel<32768>, g_wide, b_wide);
+            lds_scenario("lds22k_gb256", widelaunch_lds_kernel<22528>, g_base, b_base);
+            lds_scenario("lds32k_gb256", widelaunch_lds_kernel<32768>, g_base, b_base);
+            lds_scenario("lds32k_vg128", widelaunch_lds_kernel<32768, true>, g_wide, b_wide);
+            lds_scenario("lds22k_vg128", widelaunch_lds_kernel<22528, true>, g_wide, b_wide);
+            lds_scenario("lds16k_vg128", widelaunch_lds_kernel<16384, true>, g_wide, b_wide);
+            // print dummy attributes once (vgpr check for the burn variants)
+            {
+                hipFuncAttributes attr{};
+                HIP_CHECK(hipFuncGetAttributes(&attr, (const void *) widelaunch_lds_kernel<32768, true>));
+                printf("MATRIX attr lds32k_vg128: numRegs=%d shared=%zu local=%zu\n",
+                       attr.numRegs, attr.sharedSizeBytes, attr.localSizeBytes);
+                HIP_CHECK(hipFuncGetAttributes(&attr, (const void *) widelaunch_spill_light_kernel));
+                printf("MATRIX attr spilllight: numRegs=%d shared=%zu local=%zu\n",
+                       attr.numRegs, attr.sharedSizeBytes, attr.localSizeBytes);
+                HIP_CHECK(hipFuncGetAttributes(&attr, (const void *) widelaunch_spill_lin_kernel));
+                printf("MATRIX attr splillin: numRegs=%d shared=%zu local=%zu\n",
+                       attr.numRegs, attr.sharedSizeBytes, attr.localSizeBytes);
+                HIP_CHECK(hipFuncGetAttributes(&attr, (const void *) widelaunch_spill_kernel));
+                printf("MATRIX attr spillheavy: numRegs=%d shared=%zu local=%zu\n",
+                       attr.numRegs, attr.sharedSizeBytes, attr.localSizeBytes);
+            }
+            // spill and big-code discriminators, wide6-like shape
+            float zero = 0.0f;
+            HIP_CHECK(hipMemcpy(lds_out, &zero, 4, hipMemcpyHostToDevice));
+            for (int w = 0; w < 50; ++w) {
+                widelaunch_spill_light_kernel<<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_bigcode_light_kernel<80><<<g_wide, b_wide, 0, st>>>(lds_out);
+            }
+            HIP_CHECK(hipDeviceSynchronize());
+            lds_scenario("spilllight_gw384", widelaunch_spill_light_kernel, g_wide, b_wide);
+            lds_scenario("splillin_gw384", widelaunch_spill_lin_kernel, g_wide, b_wide);
+            lds_scenario("bigcodelight_gw384", widelaunch_bigcode_light_kernel<80>, g_wide, b_wide);
+            // alternate big/small LDS, wide-like shape
+            {
+                std::vector<double> vs, vl;
+                for (int i = 0; i < niter; ++i) {
+                    vs.push_back(lds_timed(widelaunch_lds_kernel<22528>, g_wide, b_wide));
+                    vl.push_back(lds_timed(widelaunch_lds_kernel<32768>, g_wide, b_wide));
+                }
+                report("lds_alt_22k", vs);
+                report("lds_alt_32k", vl);
+            }
+            HIP_CHECK(hipFree(lds_out));
+        }
+        HIP_CHECK(hipFree(noop_dev));
+
         ggml_free(gctx);
         return 0;
     }
