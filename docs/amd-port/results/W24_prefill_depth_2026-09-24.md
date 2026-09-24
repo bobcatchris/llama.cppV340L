@@ -71,20 +71,30 @@ MODEL GEOMETRY OF RECORD (GGUF header re-parsed this desk):
 
 1.4 Expected prefill(D) curve (fresh-thermal) vs measurements
 
-  depth M   model wall   model avg t/s   measured          status
-  ------    ----------   -------------   --------          ------
-    4096      18.9 s        217           218 (E-124)      EXACT
-   10235      60.3 s        170           170.35 (u1_10k)  EXACT
-   51200     ~759 s        ~67            (u1_50k landing) PREDICTION
-  102400    ~2642 s        ~38            (u1_100k queued) PREDICTION
-  153600    ~5285 s        ~28            (u1_150k queued) PREDICTION
-  199000    ~9058 s        ~22            (u1_199k queued) PREDICTION
+  depth M   model wall   model avg t/s   measured             status
+  ------    ----------   -------------   --------             ------
+    4096      18.9 s        217           218 (E-124)         EXACT
+   10235      60.3 s        170           170.35 (u1_10k)     EXACT
+   51203     ~759 s        ~67           1741.0 s  29.41 t/s  MEASURED x2.29
+  102400    ~2642 s        ~38            (u1_100k queued)    PREDICTION
+  153600    ~5285 s        ~28            (u1_150k queued)    PREDICTION
+  199000    ~9058 s        ~22            (u1_199k queued)    PREDICTION
 
   (Predictions banked BEFORE the cells land; deltas = thermal multiplier.
-  W15 served points already show that multiplier: 46 t/s @34k vs model
-  55 = 1.2x, 15 t/s @62k vs model 33 = 2.2x - thermally self-reinforcing,
-  NOT a second mechanism. The runner's D^1.5 wall model embeds it: at 10k
-  it predicts 35 t/s vs 170.35 fresh - 4.9x pessimistic.)
+  u1_50k landed 12:07: 1741 s = 2.29x model, VOID-gated (die3 duty 100%
+  at 991 MHz, max junc 96C, max mem 98C over 349 samples). The clock
+  ratio alone (1269 -> 991 MHz = 1.28x) does NOT close 2.29x: add mem
+  throttle at 98C + the W15 x1.4 late superlinearity beyond 36k (part of
+  the scan) -> consistent. W15 served points showed the same shape:
+  1.2x @34k, 2.2x @62k. The runner's D^1.5 wall model embeds thermal:
+  at 10k it predicts 35 t/s vs 170.35 fresh - 4.9x pessimistic.)
+- u1_50k window observation: its decode_guard glitched (tps=1000000.00,
+  law delta -100%) - the 50k decode point is NOT banked; prefill
+  29.41 t/s stands (VOID-labeled). Watch for recurrence at 100k+.
+- Second-order prize (thermals): the arm shortens the 50k prefill from
+  ~29 min toward ~13 min - less time in the 96C state, so the served
+  multiplier itself shrinks. Paired cells capture this automatically;
+  fresh-thermal bench (2.3) isolates the pure kernel win.
 
 1.5 VERDICT: how much of the collapse is EXCESS?
 - The quadratic term (tile scan, q) is 0% of the wall at D->0, 39% of
@@ -102,7 +112,9 @@ MODEL GEOMETRY OF RECORD (GGUF header re-parsed this desk):
   0.35 s @50k, 5.2 s @199k = 0.02-0.6% of wall. NEGLIGIBLE but free.
 - EXCESS at depth: the W15 x1.4 late superlinearity beyond 36k (f16 pool
   leaving L2) is pool-byte-specific - direct q4_0 reads shrink it.
-- NOT this arm's: thermal multiplier (W22 desk: clock floors).
+- NOT this arm's: thermal multiplier (W22 desk: clock floors). Measured
+  here at 50k: 2.29x (section 1.4) - on served walls it is the LARGEST
+  single multiplier at depth, and it is thermal-state, not algorithm.
 - RESIDUAL (the optimization target) = f16-pool tax inside tile
   (est -37.5% of tile) + conversion launches + late superlinearity.
   At fresh-thermal walls: 8.8 s of 60.3 @10k, ~213 of 759 @50k,
@@ -173,8 +185,11 @@ MODEL GEOMETRY OF RECORD (GGUF header re-parsed this desk):
   Q rows) and non-multiple-of-256 n_kv boundaries; the causal mask must
   zero oob J after q40 dequant exactly as the f16 path does. Include an
   oracle case at used=10235 (n_kv pads to 10496) and M=268.
-- Bench recipe (extends W17 bench_attn_real.cu, already carries the
-  q40_kv template + depth CLI):
+- Bench recipe (extends docs/amd-port/tests/bench_attn_real.cu, already
+  carries the q40_kv template + --depth CLI): one instrument change
+  first - T is compile-time 4 (:64); make it runtime (static long g_T=4
+  + --M N flag like --depth) so Q can be shaped 512 (prefill ubatch) and
+  268 (tail). Mask tensor m_t (:410) already follows T.
     arms: base = f16-pool prefill instance <256,256,8,2> (served today),
           v11p = <256,256,8,2,.,11>, basedup x2 determinism control
     M:    512 and 268 (tail)
@@ -183,6 +198,12 @@ MODEL GEOMETRY OF RECORD (GGUF header re-parsed this desk):
     memcmp vs base, then timing (niter sized so a 199k launch ~90 ms
     still gets 10 iters, rep 0 discarded, W17 protocol)
     record: pb printed from occupancy, per-launch med us, oracle class.
+  First commands (after rebuild of /tmp/fa40_bench + _dbg per W17 A2;
+  /tmp binaries from W17 are gone - rebuild required):
+    HIP_VISIBLE_DEVICES=3 /tmp/fa40_bench_dbg <gguf-path> 10 3 \
+      --oracle --depth 10240 --M 512
+    HIP_VISIBLE_DEVICES=3 /tmp/fa40_bench <gguf-path> 20 5 \
+      --solo --depth 10240 --M 512
 - Acceptance: oracle EXACT-or-DUST at all cells AND v11p >= 30% faster
   per launch at 10k+ -> proceed to served window. GARBAGE anywhere ->
   stop, file codegen characterization, do NOT sweep more variants (W17
@@ -196,7 +217,7 @@ MODEL GEOMETRY OF RECORD (GGUF header re-parsed this desk):
    10235     60.3 s (170)     51.5 s (199)   +17%           ~74%
    51200    759 s   ( 67)    546 s   ( 94)   +39%           (vs model)
   102400   2642 s   ( 38)   1795 s   ( 57)   +51%
-  199000   9058 s   ( 22)   6048 s   ( 33)   +50%
+  199000   9058 s   ( 22)   5882 s   ( 34)   +54%
 
   Post-arm law: c'(D) = 3.73 + 0.26*D/1000 ms/token. Upside NOT counted:
   the L2 superlinearity recovery beyond 36k and any latency relief from
@@ -215,7 +236,10 @@ MODEL GEOMETRY OF RECORD (GGUF header re-parsed this desk):
 - Metric: prompt_tps per cell, paired vs U1 baseline (same recipe,
   cache_prompt=false, void-gate adjudicated); decode_guard per cell must
   hold the E-137 ratchet (decode arm untouched = canary).
-- Model expectation: +17% @10k, +39% @50k, +51% @100k. Kill criteria:
+- Model expectation: +17% @10k, +39% @50k, +51% @100k (fresh-model
+  ratios; served paired deltas may EXCEED them at 50k+ because the
+  shorter prefill also spends less wall time in the 96C thermal state -
+  see 1.4 second-order note). Kill criteria:
   < +5% @10k, or any oracle/GARBAGE regression, or decode_guard breach.
 - Provenance: stamp every cell (arm-identity gate as U1 does).
 
@@ -224,7 +248,13 @@ MODEL GEOMETRY OF RECORD (GGUF header re-parsed this desk):
   E-124 anchors + u1_10k; model closes with zero free parameters
   (25.2 vs 24.7 ns/row-KV-token decode vs prefill; L matches the W13
   linear census to 0.1 ms).
+- 12:10 u1_50k landed: 1741 s / 29.41 t/s = 2.29x the fresh model,
+  VOID-gated (die3 duty 100%, junc 96C, mem 98C) - thermal multiplier
+  banked, folded into 1.4/1.5; decode_guard glitch noted (not banked).
 - A3 closed: template coverage verified (J-pipeline only), gate + env
   split + oracle + bench specified; prize banked.
-- Open: u1_50k/100k/150k/199k land every ~40-90 min - update section 1.4
-  measured column before the final commit of this receipt.
+- Open: u1_100k (runner est 2.7 h + 780 s settle) lands after this desk
+  closes - section 1.4 carries falsifiable predictions (2642 s fresh;
+  expect x2-2.3 served if the thermal state matches 50k); any desk
+  touching this receipt next updates the measured column from
+  /home/chris/u1_window_console.log.
