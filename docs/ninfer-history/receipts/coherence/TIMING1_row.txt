@@ -1,0 +1,47 @@
+== MANIFEST 2026-09-17T00:54:59Z night TIMING1 bin 07ad7eccc0b97cc0 (sha256 07ad7eccc0b97cc0cf9dd304ec4dcb8b0121c63ecca2d56ca15e8cfcda5bcab1, verified sha256sum pre-boot)
+grant: user order "start on it now, full velocity" (blanket GPU grant 2026-09-16 stands)
+config: TP4 --devices 0,1,2,3 --spec mtp --draft-tokens 2 GRAPHS-ON port=8100 NINFER_TP2_TIMING=1 NINFER_WORKSPACE_MIB=96 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16
+parent: commit d32e6c53 (env-gated B1 8-phase round breakdown); mission: price the 286 ms/round (SPEED_PLAN §3.1/3.3)
+KFD precondition: 0. serial TP4 boot, sole GPU user.
+== BOOT+HEALTH: setsid spawn ok, /health {"status":"ok"} after 10s
+== PROBE 1: count600 (max_tokens=600, temp=0, greedy) — client wall 46.30s, finish=length, content coherent 1..200
+[tp2] single-seq lane 0: acceptance=0.97 tok/round=2.94 rounds=204 gen=600 prefill=3.03s decode=43.26s  (TIMING1_serve.log:124)
+   decode 43.26s/600 tok = 13.87 tok/s engine-side (12.96 tok/s client wall incl prefill 3.03s)
+first-miss: rk=2 rounds=204 m=1.941 p_full=0.961 E[saved_steps]=0.020 | a0=4 a1=4 a2=196 (TIMING1_serve.log:123)
+
+== B1 PHASE BREAKDOWN (count600, Mean over 203 rounds, total = 211.95 ms/round) — TIMING1_serve.log:111-122
+  1. Target Verify (T=k+1):     195.34 ms (92.2%)
+  2. Accept & D2H Sync:           0.06 ms ( 0.0%)
+  3. GDN State Rebase:            0.01 ms ( 0.0%)
+  4. Prepare Next Round:          0.08 ms ( 0.0%)
+  5. MTP Alignment Forward:       8.56 ms ( 4.0%)
+  6. Select Accepted Hidden:      0.01 ms ( 0.0%)
+  7. MTP Propose (d0):            0.29 ms ( 0.1%)
+  8. AR Draft Chain (d1..d_k):    7.61 ms ( 3.6%)
+
+== VERDICT (the decisive read, SPEED_PLAN §3.1/§3.3)
+- TARGET VERIFY OWNS THE ROUND: 195.34 of 211.95 ms = 92.2%. The draft side is NOT the owner:
+  AR Draft Chain 7.61 ms (3.6%) + MTP Alignment Forward 8.56 ms (4.0%) + Propose 0.29 ms
+  together = 16.46 ms = 7.8% ceiling for any draft-side lever. AR does NOT dominate ->
+  AR-batching lever priced by direct measurement, not RTT math: batching the draft chain can
+  recover AT MOST ~7.6 ms/round. (For the record at the 98-101 us RTT law, 7.61 ms ≈ 76-78
+  serialized collectives — consistent with an unbatched per-layer chain — but even zeroing it
+  moves the round <4%.)
+- ROUND-BOOKKEEPING STRUCTURE IS EXONERATED: phases 2+3+4+6+7 sum to 0.45 ms (0.2%). No D2H
+  stall, no host serialization between draft and verify at this granularity. The ~200 ms
+  graphs-off -> graphs-on win (SPEED_PLAN §3.3) already removed the launch overhead that lived
+  there; what remains is NOT inter-phase sync.
+- The owner is the verify FORWARD ITSELF: 195.34 ms for T=k+1=3 tokens vs ~125 ms single-step
+  reference (SPEED_PLAN §3.3) — i.e. +56% time for 3x tokens: poor intra-forward amortization,
+  and the single-step base is itself 10-30x above the eager AR floor (~13 ms, PLOG-005).
+  The lever that matters is the TARGET-MODEL step cost (launch/AR structure inside the TP4
+  target forward), NOT the MTP round plumbing. Confirmatory: this round (211.95 ms) vs
+  non-MTP single step ~300 ms/step carrying 1 tok/step vs 2.94 tok/round.
+- RUN-TO-RUN ANCHOR: same shape on MTP2 (bin b864220912aec151) measured 286 ms/round /
+  10.28 tok/s; tonight (bin 07ad7eccc0b97cc0, timing instrumentation only, flags-only diff)
+  211.95 ms/round / 13.87 tok/s = 1.35x faster wall. Both measured; not averaged. Plausible
+  causes (cooler machine, variance) unnamed — noted, phase-axis clean, both rows cited.
+
+== PROBE 2: BLUE coherence spot (mt=64): finish=stop, content='BLUE' exact, no CJK/Cyrillic/Arabic mojibake -> PASS (blue leg: TIMING1_serve.log:155-157, acc=0.66 t/r=2.37 rounds=19 gen=45)
+== GRADE: TIMING1 PASS — instrument boot healthy, breakdown captured, coherence intact under NINFER_TP2_TIMING=1
+== RELEASE 2026-09-17T01:00:03Z: exact-PID kill 2365876 (anchored pgrep ^/home/chris/artifacts_bin/ninfer-serve, sole match); no serve remains; KFD=0 verified after release

@@ -1,0 +1,12 @@
+== MANIFEST 2026-09-17T03:09:08Z night REALK23 (C2: real-prompt k=2 vs k=3 head-to-head, prose acceptance pair) bin 07ad7eccc0b97cc0
+grant: user order continuation (blanket GPU grant 2026-09-16 stands)
+design: SAME prose prompt (sky-blue mt=300 temp=0) fired FIRST on each of two fresh boots; ~3 min idle before boot A (THARM1 recovery), boot load itself idles before boot B; clocks sideband (sysfs, 2 s) each arm; phase=DECODE only
+purpose: close SPEED_PLAN §6-2 — counting-shape k-table does not transfer to prose (PLOG-014 was k=3 only); does k=3 still beat k=2 at real acceptance?
+== HYGIENE LOG: second VOID spawn of the night — k2 boot #1 spawned at KFD=1 (C1b audit server never released; boot clean-failed on VRAM). Both kills now done, KFD=0 verified, k2 respawned. Rule tightened: EVERY cycle ends with anchored kill + KFD=0 verification, no exceptions, before the next manifest.
+== ARM k=2 (first probe on boot, edge 45-46C): wall 21.17s; [tp2] acceptance=0.65 tok/round=2.31 rounds=87 gen=201 prefill=2.52s decode=18.64s -> 10.79 tok/s; finish=stop 692 chars clean (REALK2_serve.log)
+== ARM k=3 (first probe on boot, edge 54-56C): wall 21.62s; [tp2] acceptance=0.51 tok/round=2.55 rounds=73 gen=186 prefill=2.54s decode=19.07s -> 9.75 tok/s; finish=stop 623 chars clean (REALK3_serve.log)
+== VERDICT (C2, closes SPEED_PLAN §6-2): k=2 WINS on real prose (10.79 vs 9.75 tok/s, +10.7%) — the counting-shape k-table (k3 best, 14.86 tok/s) does NOT transfer; at real acceptance (~0.5-0.65) the k=3 chain's extra draft/alignment cost is not paid back. RECOMMENDED serving k for real workloads: 2 (the shipped default stands).
+== THERMAL FAIRNESS: both probes FIRST-on-boot, ~19 s decode each (well under the ~60 s knee), start temps 45-46 vs 54-56 C (k3 booted right after k2's leg — small asymmetry, noted); sidebands REALK2_clocks.log + REALK3_clocks.log banked
+== GRADE: REALK23 PASS — pair banked, k=2 recommended
+== RELEASE 2026-09-17T03:15:17Z: sampler + serve killed (anchored, verified no serve), KFD=0
+== CORRECTION (logged 2026-09-17 ~07:1x UTC): the REALK2 sysfs sampler loop outlived its parent kill (orphaned child; same failure mode as THARM1's first sampler — kill by $! hits nohup, not the loop bash) and kept sampling after the k2 arm ended; REALK2_clocks.log therefore contains post-window samples. The k2 arm's own window is bounded by REALK2_serve.log timestamps (probe 21:5x); only samples inside that window speak for the k2 arm. REALK3_clocks.log is unaffected (its loop was killed by direct PID). All samplers verified dead as of this note.

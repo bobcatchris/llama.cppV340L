@@ -1,0 +1,15 @@
+diff --git a/tools/ops/gate_pg1_whitelist.sh b/tools/ops/gate_pg1_whitelist.sh
+index bb9479ad..df14dbb2 100755
+--- a/tools/ops/gate_pg1_whitelist.sh
++++ b/tools/ops/gate_pg1_whitelist.sh
+@@ -95,6 +95,10 @@ REGISTERED_EXCEPTIONS=(
+   "src/ops/kernel/gqa_attention_kvarn_decode_packed.inc"
+   "src/ops/kernel/gqa_attention_prefill_common.cuh"
+   "src/ops/kernel/vision_attention.cuh"
++  "src/HipSources.cmake"
++  "src/ops/gdn_gating_proj/bf16/bf16_gdn_gating_proj_kernels.cu"
++  "src/ops/gdn_gating_proj/bf16/bf16_gdn_gating_proj_plan.cpp"
++  "src/runtime/tp2/tp_engine.cpp"
+ )
+ 
+ is_registered_exception() {
