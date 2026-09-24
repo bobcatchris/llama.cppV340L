@@ -182,3 +182,19 @@ battery), then: re-enable campaign-postreboot.service, relaunch the battery:
 After the battery completes: re-enable campaign-postreboot.service.
 State at reboot: w23env window in flight (no completed cells - restarts clean);
 all other state banked through E-144/rev4. oomd disabled (stays disabled).
+
+## REVISION 6 - 2026-09-24 16:30 (post-reboot: battery relaunched clean, fleet re-dispatched)
+
+- Fresh boot verified: noretry=1, hogs=0, fsck clean, HEAD 1560e872b intact,
+  postreboot queue disabled as planned (re-enable AFTER the battery),
+  systemd-oomd stays disabled.
+- BATTERY RELAUNCHED 16:25 on cool dies (30 C): campaign-postu1-battery,
+  identity OK, all 5 windows armed, first cell w23r1 booting. ETA ~8 h.
+- FLEET RE-DISPATCHED: battery-analyst (mines windows as they land, maintains
+  W32, drafts E-145, anomaly watch incl. w19 crash-watch - if the shape-cache
+  arm crashes served, the E-138 heal failed and that is critical news) and
+  U2-prep desk (run_u2_prefill_window.sh: paired prefill cells with the
+  q40-prefill arm; SHORT 10k default, --long for 50k/100k; deferred execution
+  per owner constraint).
+- Liveness law active: any desk CHECKIN stalled >45 min = zombie -> re-dispatch
+  from branch tip.
