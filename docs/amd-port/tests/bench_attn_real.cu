@@ -17,8 +17,16 @@
 //   mid3   ncols2=3  - GGML_CUDA_FATTN_TILE_GQA_WIDE arm, 2 z-blocks
 //   wide6  ncols2=6  - GGML_CUDA_FATTN_TILE_GQA_WIDE arm, 1 z-block
 //   basedup          - base again, in-run determinism control
+//
+// W16 (fa-q40 desk): a Q4_0-direct arm (in-kernel q4_0 KV dequant, no f16
+// pool) was prototyped on branch history (75647c857) and produced WRONG
+// results on gfx900/ROCm 6.2 (see W16 receipt); the arm is NOT present here.
+// The --depth N sweep (W15 follow-up) is retained for future desks.
 // Every arm after base is device-copied and memcmp'd against base BEFORE any
 // timing counts; mismatches are counted and max ulp-class diff reported.
+//
+// W16 depth sweep: --depth N overrides ne11 (default 7168; N must be a
+// multiple of 256 so use_gqa_opt and the no-oob scan stay valid).
 //
 // The served env entry (ggml_cuda_flash_attn_ext_tile -> switch_ncols2 ->
 // GQA_WIDE arm) is checked in --served-entry mode: run once with the env set
@@ -56,7 +64,7 @@ static constexpr int   DV      = 256;
 static constexpr int   T       = 4;      // Q rows per die (decode verify)
 static constexpr int   HEADS_Q = 6;      // per die (24/4)
 static constexpr int   HEADS_KV= 1;      // per die (4/4)
-static constexpr int   NE11    = 7168;   // padded KV length at serve
+static long           g_ne11  = 7168;   // padded KV length at serve (--depth overrides)
 static constexpr float SCALE   = 0.0625f;
 
 // q4_0 row: 256 el = 8 blocks x 18 B
@@ -85,6 +93,15 @@ static void launch_arm(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     HIP_CHECK(hipGetLastError());
 }
 
+static void run_arm(ArmKind k, ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
+    switch (k) {
+        case ARM_BASE:    launch_arm<4, 2>(ctx, dst); break;
+        case ARM_MID3:    launch_arm<4, 3>(ctx, dst); break;
+        case ARM_WIDE6:   launch_arm<4, 6>(ctx, dst); break;
+        case ARM_BASEDUP: launch_arm<4, 2>(ctx, dst); break;
+    }
+}
+
 // served instance with padded DYNAMIC shared memory: pads the launch's total
 // LDS footprint (static + dynamic) to a target without touching the kernel
 template <int ncols1, int ncols2>
@@ -96,15 +113,6 @@ static void launch_arm_pad(ggml_backend_cuda_context & ctx, ggml_tensor * dst, s
         flash_attn_tile<DKQ, DV, ncols1, ncols2, false>,
         nthreads / 32, pad_bytes, nbatch_fa, true, true, false, 32);
     HIP_CHECK(hipGetLastError());
-}
-
-static void run_arm(ArmKind k, ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
-    switch (k) {
-        case ARM_BASE:    launch_arm<4, 2>(ctx, dst); break;
-        case ARM_MID3:    launch_arm<4, 3>(ctx, dst); break;
-        case ARM_WIDE6:   launch_arm<4, 6>(ctx, dst); break;
-        case ARM_BASEDUP: launch_arm<4, 2>(ctx, dst); break;
-    }
 }
 
 static void occ_arm(ArmKind k) {
@@ -273,7 +281,7 @@ __global__ void widelaunch_bigcode_light_kernel(float * out) {
 
 int main(int argc, char ** argv) {
     if (argc < 2) {
-        printf("usage: %s <gguf> [niter=30] [reps=5] [--served-entry] [--occupancy] [--probe] [--matrix]\n", argv[0]);
+        printf("usage: %s <gguf> [niter=30] [reps=5] [--served-entry] [--occupancy] [--probe] [--matrix] [--depth N] [--allarms]\n", argv[0]);
         return 1;
     }
     const char * gguf_path = argv[1];
@@ -283,13 +291,20 @@ int main(int argc, char ** argv) {
     bool occupancy = false;
     bool probe     = false;
     bool matrix    = false;
+    bool allarms   = false;
     const char * adj_pair = nullptr;
     for (int i = 2; i < argc; ++i) {
         if (strcmp(argv[i], "--served-entry") == 0) served = true;
         if (strcmp(argv[i], "--occupancy") == 0)    occupancy = true;
         if (strcmp(argv[i], "--probe") == 0)        probe = true;
         if (strcmp(argv[i], "--matrix") == 0)       matrix = true;
+        if (strcmp(argv[i], "--allarms") == 0)      allarms = true;
+        if (strcmp(argv[i], "--depth") == 0 && i + 1 < argc) g_ne11 = atol(argv[++i]);
         if (strcmp(argv[i], "--adj") == 0 && i + 1 < argc) adj_pair = argv[++i];
+    }
+    if (g_ne11 % FATTN_KQ_STRIDE != 0 || g_ne11 % 64 != 0) {
+        printf("depth %ld must be a multiple of 256\n", g_ne11);
+        return 1;
     }
     if (occupancy) {
         occ_arm(ARM_BASE); occ_arm(ARM_MID3); occ_arm(ARM_WIDE6);
@@ -305,7 +320,7 @@ int main(int argc, char ** argv) {
 
     // read KV bytes from the GGUF (token_embd region, offset-delta law) and
     // sanitize the q4_0 block scales to a fixed positive half
-    const long kv_bytes = (long) NE11 * HEADS_KV * KV_ROW_BYTES;
+    const long kv_bytes = g_ne11 * HEADS_KV * KV_ROW_BYTES;
     int fd = open(gguf_path, O_RDONLY);
     if (fd < 0) { printf("cannot open gguf\n"); return 1; }
     const long src_off = 4637536L + 100000000L; // inside token_embd q6_K bytes
@@ -332,8 +347,8 @@ int main(int argc, char ** argv) {
     }
     void * q_dev = nullptr; HIP_CHECK(hipMalloc(&q_dev, q_host.size()*4));
     HIP_CHECK(hipMemcpy(q_dev, q_host.data(), q_host.size()*4, hipMemcpyHostToDevice));
-    void * m_dev = nullptr; HIP_CHECK(hipMalloc(&m_dev, (size_t) NE11*T*2));
-    HIP_CHECK(hipMemset(m_dev, 0, (size_t) NE11*T*2));
+    void * m_dev = nullptr; HIP_CHECK(hipMalloc(&m_dev, (size_t) g_ne11*T*2));
+    HIP_CHECK(hipMemset(m_dev, 0, (size_t) g_ne11*T*2));
 
     // dst f32 [256 x 4 x 6] + slack for the F16 KV pools that launch_fattn
     // appends after dst (fattn-common.cuh get_f16_extra_data)
@@ -345,9 +360,9 @@ int main(int argc, char ** argv) {
     ggml_init_params ip = { /*mem_size*/ 4u<<20, /*mem_buffer*/ nullptr, /*no_alloc*/ true };
     ggml_context * gctx = ggml_init(ip);
     ggml_tensor * q_t   = ggml_new_tensor_4d(gctx, GGML_TYPE_F32,  DKQ, T, HEADS_Q, 1);
-    ggml_tensor * k_t   = ggml_new_tensor_4d(gctx, GGML_TYPE_Q4_0, DKQ, NE11, HEADS_KV, 1);
-    ggml_tensor * v_t   = ggml_new_tensor_4d(gctx, GGML_TYPE_Q4_0, DKQ, NE11, HEADS_KV, 1);
-    ggml_tensor * m_t   = ggml_new_tensor_4d(gctx, GGML_TYPE_F16,  NE11, T, 1, 1);
+    ggml_tensor * k_t   = ggml_new_tensor_4d(gctx, GGML_TYPE_Q4_0, DKQ, g_ne11, HEADS_KV, 1);
+    ggml_tensor * v_t   = ggml_new_tensor_4d(gctx, GGML_TYPE_Q4_0, DKQ, g_ne11, HEADS_KV, 1);
+    ggml_tensor * m_t   = ggml_new_tensor_4d(gctx, GGML_TYPE_F16,  g_ne11, T, 1, 1);
     ggml_tensor * dst_t = ggml_new_tensor_4d(gctx, GGML_TYPE_F32,  DKQ, T, HEADS_Q, 1);
     q_t->data = q_dev; k_t->data = kv_dev; v_t->data = v_dev; m_t->data = m_dev;
     dst_t->data = dst_dev;
@@ -769,8 +784,8 @@ int main(int argc, char ** argv) {
             if (r > 0) t[a].push_back(ms * 1000.0 / niter);
         }
     }
-    printf("\nper-launch us (niter=%d, reps=%d), served geometry T=%d gqa=6 ne11=%d q4_0 KV:\n",
-           niter, reps, T, NE11);
+    printf("\nper-launch us (niter=%d, reps=%d), served geometry T=%d gqa=6 ne11=%ld q4_0 KV:\n",
+           niter, reps, T, g_ne11);
     for (size_t a = 0; a < arms.size(); ++a) {
         std::vector<double> s = t[a];
         std::sort(s.begin(), s.end());

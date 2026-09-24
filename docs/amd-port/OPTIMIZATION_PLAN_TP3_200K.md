@@ -4101,3 +4101,46 @@ to Gemini's guard battery, die 3 is the dev cell.
   be measured and flagged for owner. Wide-launch desk ALSO complete
   (merged 5797678ec, E-123): 221-225 us per-instance start latency
   sealed (E1/E2), wide6 not viable, probe-matrix instrument banked.
+- E-125 FA-Q40 DIRECT DESK: NUMERICS-GATE NEGATIVE (FAIL-CLOSED) + THE
+  Q4_0-DIRECT TRAFFIC MODEL CONFIRMED AT KERNEL LEVEL. Desk wt-fa-q40 on
+  amd/fa-q40 (base e116dbb1d; receipt W16_fa_q40_receipt_2026-09-24.md;
+  artifacts W16_fa_q40_s1_7168 + W16_fa_q40_final_validation txt). (1) P0
+  KV-FLOW TRUTH (code, zero GPU): the served -ctk/-ctv q4_0 path hands the
+  q4_0 K/V views DIRECTLY to flash_attn_ext (no graph-level cast); on gfx900
+  the T=4 decode geometry falls through fattn.cu:503-521 to
+  BEST_FATTN_KERNEL_TILE, which hard-sets need_f16_K/V=true (fattn.cu:538) ->
+  launch_fattn converts the FULL K and V tensors via to_fp16_cuda
+  (dequantize_row_q4_0_cuda -> dequantize_block_q4_0, convert.cu:529/85) into
+  the f16 "pool" = dst-append scratch reserved by
+  flash_attn_ext_get_alloc_size (fattn.cu:532) - 2 full-depth launches per
+  layer per step, the W15-measured 3.98 us/1k item. T<=2 quantized already
+  has a native q4_0 vec path (fattn.cu:239/559) - the gap is T>2 only. (2)
+  A1: q40_kv tile prototype (75647c857): in-kernel block dequant to the SAME
+  shared half2 tiles (dequant math proven bit-exact vs the pool kernel three
+  ways, incl. in-kernel shared-tile dumps for every K and V tile of block
+  (0,0)); env-gated GGML_CUDA_FATTN_TILE_Q40_DIRECT. FIRST SESSION: direct
+  479.0 us vs base 792.7 us = -38.9% END-TO-END per launch at 7168 (spread
+  0.85% PASS) - the traffic model (5.1x fewer DRAM bytes for the
+  attention+dequant class) is directionally CONFIRMED. (3) A2 VERDICT:
+  FAIL - NUMERICS GATE. The direct arm's attention output is wrong on
+  gfx900/ROCm 6.2: oracle 6144/6144 differ every session, error class shifts
+  with innocuous build changes (3.7e2 / 0.63 / 1.6e6 / all-NaN) while
+  basedup stays bit-exact (deterministic per binary, NOT a race; 100
+  fault-hunt launches clean). Staged forensics: shared K/V tiles, consumer
+  K_k (both chunks) and Q_k (all k_KQ_1) registers ALL bit-exact vs the
+  pool path, yet KQ_acc diverges 64/64 from the first chunk; invariant to
+  -O2/-O3, __restrict__ removal, and a full loader rewrite in the f16
+  loader's loop shape. Codegen-class defect around this template
+  instantiation (gfx900/hipcc clang 18) - E-110-family device-vs-toolchain
+  gap, root cause NOT localized in-desk: OPEN ITEM fa-q40-codegen with the
+  instrumented harness preserved at 75647c857. (4) A3 DISPOSITION
+  (FAIL-CLOSED): the prototype is REVERTED from the served tree
+  (fatnn-tile.cuh/fatnn-common.cuh restored to e116dbb1d); engaging a
+  silently-wrong attention arm is unlandable per the E-117
+  engagement-identity lesson. Final validation on the reverted tree
+  reproduces the W11 anchors exactly (base 789.0 us, wide6 +8.40%, mid3
+  +25.93%, basedup +0.84% PASS); canonical build BUILD-EXIT:0;
+  run_premerge_ci.sh CI-VERDICT PASS. Bench keeps the --depth sweep (the
+  W15 follow-up instrument). No served change of any kind. The desk
+  outcome is a rigorous negative: the traffic prize is real and measured,
+  the blocker is toolchain-level, and the re-attempt path is documented.
