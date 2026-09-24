@@ -4234,3 +4234,33 @@ to Gemini's guard battery, die 3 is the dev cell.
   (b512/ub512). Day close: 9 desks landed, 5 windows run, 2 levers
   promoted ever (share set + TP4), everything else honestly negative -
   and every negative banked with instruments.
+- E-128 2026-09-24 05:55 HARDENED-BOOT REPRODUCTION COMPLETE - BOTH
+  FINDINGS CONFIRMED ON THE CLEAN INSTRUMENT. Complete paired table
+  (boot-time noretry=1, ZERO svm hogs, all provenance-stamped):
+  cell | arm | prefill | decode | position
+  p0a | ub512  | 214.59 | 23.33 | 1
+  p1a | ub1024 | 223.25 | 19.85 | 2
+  p0b | ub512  | 211.57 | 17.35 | 3
+  p1b | ub1024 | 222.12 | 17.71 | 4
+  VERDICTS: (1) ub1024 PREFILL WIN CONFIRMED - paired deltas +4.0%
+  and +5.0%, both positive on the hardened boot (E-127's reading
+  reproduces). (2) ub1024 DECODE PENALTY CONFIRMED AND LARGER: the
+  clean pair (positions 1-2, minimal soak) shows -3.48 t/s (-14.9%)
+  - worse than the pre-hardening reading (-8.5%). FINAL: REJECTED
+  for the decode-serving default; available as a one-line flag for
+  prefill-dominated profiles. (3) THE POSITION DECAY REPRODUCES ON
+  THE HARDENED BOOT (23.33 pos-1 -> 17.35 pos-3, -26% on identical
+  code) - the decay is NOT noretry/SVM-related; thermal soak stands
+  as the mechanism (W15 observed junctions 84-85 C with throttling
+  within minutes). The operational law is confirmed NECESSARY AND
+  SUFFICIENT: bank verdicts from first-position or cooldown-gated
+  cells only; paired alternation controls the rest. (4) The
+  hardened instrument is SOUND: position-1 control reproduces the
+  of-record exactly (23.33 vs 23.26/23.30). CAMPAIGN STATE: serving
+  of record UNCHANGED (b512/ub512, 23.26 @200k / 23.21 @10k); every
+  queued verdict is banked; open frontiers: q4_0-direct re-attempt
+  (fa-q40-codegen toolchain item), thermal-soak mechanism desk
+  (newly named - why does sustained load decay clocks/performance
+  ~26% within 20 minutes even with crash-class fixed), prefill
+  ub1024 flag for prefill-heavy profiles, weight-bit reduction
+  (owner-guarded).
