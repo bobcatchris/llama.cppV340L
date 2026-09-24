@@ -206,3 +206,47 @@ owner executes):
 - Verdict repro (read-only, exact adjudicator regex + logs): all four
   det=None -> EXACT-VOID; paired +0.11/+0.05 t/s.
 - Zero-GPU: no lock touch, no card work, guard_battery.py untouched.
+
+## 7. Co-desk adjudication + errata (W33a, parallel dispatch, 17:1x)
+
+A parallel instance of this desk traced the same cells independently. Its
+contrary hypothesis ("second E-117-class gap: the split-op entry hardcodes
+s2r=false") was refuted on its own code read, and its confirmation pass
+verifies this receipt's two load-bearing claims. Errata to sections 1-3,
+none verdict-changing:
+
+- ERRATUM 1 (sec. 1, grep claim): the .jsonl witnesses DO contain sha256
+  strings - battery_version fingerprints (guard_battery e2303301...,
+  baseline 782fb510..., probe_prompts ff5d8ecb...), binary 0d5eb814...,
+  cmake c2c56561... - identical in all four cells and unrelated to output
+  text. The correct statement is "no output-text sha exists anywhere",
+  not "zero sha256 matches".
+- ERRATUM 2 (sec. 1, repeat-spread label): r1's 24.41 vs 24.69 is a
+  CROSS-BOOT same-binary repeat, not within-boot: the 24.41 record is the
+  pre-reboot battery instance (16:07, commit 3a7b208e; reboot 16:22-16:25),
+  24.41 vs 24.69 share binary 0d5eb814b0653589 and config c2c5656128f0d531
+  (both jsonl records). Same yardstick, same conclusion: +0.05/+0.11 paired
+  deltas are not a promotion case.
+- VERIFIED (sec. 3, meta topology): independent line-level trace agrees.
+  LLAMA_SPLIT_MODE_TENSOR builds the meta device (src/llama.cpp:131-176);
+  meta buffer init_tensor_impl hands each per-die shard a SIMPLE per-device
+  buffer, `t_ij->buffer = simple_buf` (ggml/src/ggml-backend-meta.cpp:1207),
+  and ggml_backend_meta_graph_compute runs per-device subgraphs on each
+  device's own backend (ggml-backend-meta.cpp:2250/2298/2322). On the
+  served MUL_MAT path src0 is therefore NOT a cuda split buffer:
+  split=false (ggml/src/ggml-cuda/ggml-cuda.cu:2675) routes to
+  ggml_cuda_mul_mat_vec_q (ggml-cuda.cu:2748), which derives and forwards
+  mmvq_s2r (mmvq.cu:1686, 1740). The s2r gates are engageable served.
+- HYGIENE (not a served defect): the legacy split-buffer op entry
+  ggml_cuda_op_mul_mat_vec_q does hardcode `/*s2r=*/ false` at
+  mmvq.cu:1769 - reachable only when src0 sits in a cuda split buffer
+  (legacy -sm row class / non-meta splits), not this campaign's serving
+  config. The E-118 wiring test cannot see that line: it enters at
+  mul_mat_vec_q_switch_type directly (test_mmvq_gate_wiring.cu:76,130,138
+  with s2r=true), one level below the entry points. If any future window
+  ever serves via split buffers, re-check this line first.
+- Engagement caveat sharpened (agrees with sec. 2): with zero ggml INFO
+  lines in the battery capture, in-window arm engagement rests on the code
+  path above plus the W7 A4 host oracle; the +0.20/+0.45 percent paired
+  deltas are direction-consistent with an engaged-but-small iq4_xs share
+  effect and are not, by themselves, engagement evidence.
