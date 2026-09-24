@@ -167,3 +167,18 @@ lost - the law held).
   procedure) -> then U2 (q40-prefill served window) -> then the U1 v2 deep
   rerun (REQUIRED, ignore_eos) -> W21 persistent shadow.
 - Next agent wave (post-battery analysis) dispatches when results land.
+
+## REVISION 5 - 2026-09-24 16:30 (PROACTIVE REBOOT for a clean battery run)
+
+The battery hit hog counter 7 (death zone) within 2 cells - 20 server cycles
+per battery churns the SVM class fast on a worn boot. DECISION: clean reboot
+NOW (no crash risk), postreboot queue DISABLED for the next boot only (its hb
+cells are the soak source and would degrade the fresh boot before the
+battery), then: re-enable campaign-postreboot.service, relaunch the battery:
+  echo <pw> | sudo -S systemd-run --collect --unit=campaign-postu1-battery \
+    -p User=chris -p Environment=HOME=/home/chris -p WorkingDirectory=/home/chris \
+    /home/chris/run_post_u1_battery.sh
+(dies will be cool; position-1 cells = clean conditions; counter = 0).
+After the battery completes: re-enable campaign-postreboot.service.
+State at reboot: w23env window in flight (no completed cells - restarts clean);
+all other state banked through E-144/rev4. oomd disabled (stays disabled).
