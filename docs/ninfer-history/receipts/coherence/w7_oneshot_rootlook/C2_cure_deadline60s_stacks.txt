@@ -1,0 +1,27 @@
+=== stacks for C2_cure_deadline60s pid=292783 verdict=WEDGED_SILENT at t+150s 2026-09-19T12:07:12,097131485-05:00 ===
+--- tid=292783 wchan=0 stat=R
+--- tid=292790 wchan=kfd_wait_on_events stat=S
+--- tid=292800 wchan=hrtimer_nanosleep stat=S
+--- tid=292802 wchan=futex_do_wait stat=S
+--- tid=292803 wchan=futex_do_wait stat=S
+--- tid=292804 wchan=futex_do_wait stat=S
+--- tid=292805 wchan=futex_do_wait stat=S
+--- tid=292831 wchan=poll_schedule_timeout.constprop.0 stat=S
+--- tid=292832 wchan=poll_schedule_timeout.constprop.0 stat=S
+--- tid=292833 wchan=poll_schedule_timeout.constprop.0 stat=S
+--- tid=292834 wchan=poll_schedule_timeout.constprop.0 stat=S
+--- tid=292835 wchan=poll_schedule_timeout.constprop.0 stat=S
+--- tid=292836 wchan=poll_schedule_timeout.constprop.0 stat=S
+--- tid=292837 wchan=poll_schedule_timeout.constprop.0 stat=S
+--- tid=292838 wchan=poll_schedule_timeout.constprop.0 stat=S
+--- tid=292839 wchan=futex_do_wait stat=S
+--- tid=292840 wchan=futex_do_wait stat=S
+--- tid=292841 wchan=futex_do_wait stat=S
+--- tid=292842 wchan=futex_do_wait stat=S
+--- tid=293272 wchan=kfd_wait_on_events stat=S
+--- tid=293281 wchan=0 stat=R
+--- tid=293282 wchan=0 stat=R
+--- tid=293283 wchan=futex_do_wait stat=S
+Could not attach to process.  If your uid matches the uid of the target
+process, check the setting of /proc/sys/kernel/yama/ptrace_scope, or try
+again as the root user.  For more details, see /etc/sysctl.d/10-ptrace.conf

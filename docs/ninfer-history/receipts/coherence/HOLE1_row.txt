@@ -1,0 +1,35 @@
+== MANIFEST 2026-09-17T11:20Z G-AMD-HOLE1 bin 5735aaf3e9ddd410 (sha256 5735aaf3e9ddd410..., full at boot stamp) TP4 MTP k=2 GRAPHS-ON port=8100
+grant: coordinator work order "decompose the INSIDE of the MTP verify forward on TP4" (this session's tasking; one boot per discriminating step authorized)
+purpose: HOLE1 — find the owner of the ~140 ms/round unaccounted verify time (VERIFY_LAUNCH_AUDIT_2026-09-17 §4); discriminate H1 skew / H2 AR-in-round / H3 fat op / H4 graph-replay
+instrument: NEW env arms, built on amd/tp4-cure @ ebad7e1c7+
+  NINFER_TP2_OPTRACE=1   per-rank per-round B1 phase lines "[OPTRACE] rank= round= phase= ms= t=" (PhaseTimer made per-rank — was rank0-only, shared-instance race fixed)
+  NINFER_VERIFY_LAYER_TRACE=1 per-layer body/AR cudaEvent ring in the verify layer loop ("[LTRACE] rank= layer= kind=body|ar n= mean_us=", stderr, every 64 passes)
+bank: /home/chris/artifacts_bin/ninfer-serve_5735aaf3e9ddd410.bin (banked BEFORE relink; build-hip-amd relinked after bank)
+config: /media/chris/EMTEC256/qwen3_8_27b_nvfp4.ninfer (stat -c %s == 18324067840 verified) --port 8100 --devices 0,1,2,3 --spec mtp --draft-tokens 2 NINFER_WORKSPACE_MIB=96 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16 NINFER_TP2_TIMING=1 NINFER_TP2_OPTRACE=1 NINFER_VERIFY_LAYER_TRACE=1
+KFD precondition pre: dmesg kfd count = 0; rocm-smi --showpids = "No KFD PIDs currently running"; GPUs 0-3 idle 27C 0% 0% VRAM; df / = 15G avail (>= 12G gate)
+probe: count600 (max_tokens=600, temp=0, greedy); expect ~204 rounds @ t/r=2.94 anchor (TIMING1: verify 195.34 ms of 211.95)
+serial discipline: sole GPU process; anchored exact-PID kill (pgrep -f "^/home/chris/artifacts_bin/ninfer-serve") at release; KFD-0 post required
+
+== BOOT 1 (instrumented, remap BROKEN — CWD=results/amd/coherence, draft-vocab fallback): 11:15Z
+health ok 55s; count600 (prompt=93 tok, max=600, greedy): client wall 111.3s, decode 5.6 tok/s, t/r=2.10 acc=0.55 (54.9%), rounds=286
+B1 (285 rounds): round=375.96 — verify 216.66 (57.7%), ar 80.74, propose 69.50, align 8.83, small 0.34
+OPTRACE analyzer: VERDICT=COMPUTE — sum-skew 0.019 ms mean (verify per-rank 216.657/216.665/216.662/216.664), no laggard, phases fill the wall (unaccounted ~0)
+LTRACE: layer-loop 141.0 ms/pass (AR 15.1, nonAR 125.9 = ~1.97 ms/layer UNIFORM, FULL layers only +0.15)
+== BOOT 1b (A/B, banked certified e341a2072c6f5078, NO new arms, same prompt/shape): 11:29Z
+B1 (285 rounds): round=418.95 — verify 224.07, ar 99.03, propose 84.82 — SAME explosion without my instrumentation -> tree/boot property, instrument exonerated; acceptance profile byte-identical (a0=92 a1=74 a2=120)
+ROOT CAUSE (both logs): "[tp2] WARNING: draft-vocab remap file not readable ... falls back to the FULL lm_head (~3x per MTP round)" — TIMING1-era boots resolved tests/multi_gpu/data/qwen38_draft_vocab_ids.json from repo-root CWD; my boots ran with CWD inside results/. Remap-off adds +~142 ms/round of draft-side full-vocab logits GEMV and craters acceptance (0.97->0.55 on the TIMING1-style prompt class).
+== BOOT 2 (instrumented, remap FORCED ON via NINFER_DRAFT_VOCAB=<abs>): 11:37Z
+health ok; count600 same prompt: wall 72.3s, decode 8.8 tok/s, t/r=2.06 acc=0.55 (prompt-dependent, NOT remap-dependent), rounds=290
+B1 (290 rounds): round=233.40 — verify 215.03 (92.1%), ar 8.83, propose 0.34, align 8.92, small 0.29  [TIMING1 parity: 0.29/7.61]
+OPTRACE analyzer: sum-skew 0.017 ms — H1 (cross-rank skew) ACQUITTED AGAIN; propose/ar per-rank identical to 0.001 ms
+LTRACE: layer-loop 138.9 ms/pass (AR 14.5 ms = 128 x ~114 us = RTT law; nonAR 124.4 ms = ~1.94 ms/layer uniform; FULL +0.15)
+clocks mid-load (HOLE1REMAP_clocks_t12.txt): SCLK 1269-1350 MHz, MCLK 945 MHz, POWER 106-113 W AT THE 110 W CAP, GPU 100%, VRAM 89%
+== VERDICTS (doc: docs/amd/VERIFY_LAUNCH_AUDIT_2026-09-17.md MEASURED section)
+- H1 cross-rank skew: ACQUITTED by measurement (per-rank phase times identical to <0.1 ms across 4 ranks, both arms). dev0-display jitter does NOT gate the ARs.
+- H2 AR-in-round cost: verify interior ARs measure 15.1 ms/round (~RTT law) — acquitted as the hole's owner; draft-side AR chain 8.8 ms as TIMING1 said.
+- H3 one fat op class: REFUTED in the "single op" form — the verify interior is a UNIFORM ~1.9-2.0 ms/layer across all 64 layers; full-attention layers cost only +0.15 ms vs GDN. No single op owns it.
+- H4 graph-replay occupancy: MOOT — the TP2/TP4 round loop is EAGER (no cudaStreamBeginCapture on this path; the only capture site is the single-process program path the TP4 backend does not use). Audit §1's "one captured graph" premise does not apply to TIMING1-style TP4 boots.
+- THE HOLE, decomposed (remap-on, verify phase = 203 ms p50): layer loop 138.9 (of which TP ARs 14.5, non-AR kernels+intra-layer gaps 124.4) + outside-loop ~64 ms (embedding, finalnorm, full-vocab lm_head GEMV, argmax, prepare, 3 logits allgathers, allreduce_argmax). Effective weight-stream rate ~33 GB/s/rank vs 265 GB/s isolated-GEMV ceiling = the ~8x kernel-exec gap IS the hole; power pinning at the 110 W cap during decode is measured context. Width check: NIGHT_HANDOFF T-sweep intercept 126.5 ms @T=1 -> the gap is width-independent (not a T=3 verify-width effect).
+- SECOND FINDING (round-level, +142 ms/round, NOT part of TIMING1's hole): the draft-vocab remap CWD trap. Guarded since B3 by a loud WARNING; the trap fires on any boot whose CWD/exe path cannot see tests/multi_gpu/data/qwen38_draft_vocab_ids.json. Fix path: always set NINFER_DRAFT_VOCAB=<abs> (or boot from repo root). Banked evidence: HOLE1_serve.log vs HOLE1REMAP_serve.log vs HOLE1AB_e341_serve.log.
+== RELEASE 11:44Z: anchored exact-PID kills (117982, 128386, 137682 — each sole match of ^/home/chris/artifacts_bin/ninfer-serve); no serve remains; KFD=0 after each release; disk 15G
+artifacts: HOLE1_serve.log boot1 (OPTRACE 11440 + LTRACE 2064 lines) · HOLE1AB_e341_serve.log · HOLE1REMAP_serve.log · HOLE1_ltrace_table.txt · HOLE1REMAP_clocks_t12.txt · analyzer: tools/optrace_analyze.py (feeder agent, ebad7e1c7)
