@@ -4320,3 +4320,68 @@ to Gemini's guard battery, die 3 is the dev cell.
 - E-133 (cont.) (b) SOAK MECHANISM NAMED (W18, amd/soak-mech 9761f0821+9ea4dd0c4, zero-GPU): FAR-DIE SOAK - thermal sclk power-management throttling of dies 3/4 (0D:00/10:00). Evidence: across 18 banked cells decode 23.2-23.6 iff die-3 sclk act-mean >= ~1190 (<=991 MHz duty 0-20%) while decode 17.3-17.7 iff act-mean 1068-1135 (duty 44-53%); hot-but-unthrottled 10k cells (mem 84-88 C, full clocks) still decode 21.8-22.5 - hot alone is not slow, throttled is slow; junction FLAT 83-85 C on ALL four dies while clocks split (junction does not discriminate); recovery by ~13 min idle (driver-state decay refuted, passive cooling suffices, no reboot needed); decode decays -26% while prefill moves only -1.4% (decode is paced by the throttled slowest die; compute-bound prefill is not). Trigger sensor is NOT junction (105 C crit identical everywhere), likely an unexposed VRM/board sensor (edge crit 85 matches die-3 pin onset but is not causal across dies); PPT never logged (cap 110 W/die at cap_max, unraisable). DISCRIMINATORS queued: 1 s-cadence 4-die log (mclk-at-max-while-sclk-pins = clock policy; PPT-pinned = power limit; mclk-down = bandwidth term) + root-gated clock-floor arm (~1200 MHz floor in a decayed window: t/s restores to ~23 = confirmed). OPERATIONAL FIXES ADOPTED: decision cells at position-1 or after >= 5-10 min idle (the 96 s inter-cell gap measured INSUFFICIENT); VOID gate computable from the existing sideband (cell VOID if die-3 sclk act-mean < ~1150 or <=991 duty > 20%) - retroactively applicable to every banked cell; shorten/reorder the end-of-battery 200k needle guard (it is the soak source); physical airflow on the far dies is the real cure. INSTRUMENT GAP NAMED: the thermal sampler logs only cards 0/1/2 - die 4 (10:00) is never sampled (fix queued).
 - E-133 (cont.) (c) DC-ENGAGEMENT ROOT CAUSE PROVEN, BOTH LAYERS (amd/dc-engagement d7d2ce398 + dcbc873ef): layer 1 STALE SERVED BINARY - the dc window launched build-hip/bin/llama-server built 15:24 while draft-cache merged 20:36; strings showed zero feature occurrences; the arm was GUARANTEED-INERT and the E-126 dc verdict is VOID (-0.39/-0.09 were identical-binary noise); the "(built from: )" stamp was EMPTY in all 4 dc cells (git stamp failed under the root-run window) - the arm-identity law was BLIND. layer 2 LOG-VISIBILITY - ggml/llama-context LLAMA_LOG_INFO maps to LOG_LEVEL_TRACE=4 (common/log.cpp:444) and is dropped at served thold 3; the engagement and timeline witness lines could never print served. FIXES: INFO -> WARN on the env-gated lines (d7d2ce398); host test pinning the wiring + real routing-chain test (dcbc873ef). GAP CLOSED coordinator-side: run_combined_window.sh + run_postreboot_hardened.sh now FAIL LOUD (exit 2) on empty git stamp or binary-older-than-HEAD before serving any arm.
 - E-133 (cont.) (d) FLEET RECONCILE 06:28: the 06:1x desk agents SURVIVED session compaction and kept working; a duplicate re-dispatch at 06:25 was stopped within 3 minutes (one orphaned GPU lock cleared; no tree damage). Fleet state: fa40-codegen ACTIVE (variant-pack WIP 66679ceac: q40_var 1-9 oracle modes - noinline dequant, volatile LDS, mad chain, half-K, launch bounds, unroll-1, optnone - plus --oracle mode and staged K/V-tile + KQ_acc dump hooks); dc-engagement finishing host-verify; soak-mechanism COMPLETE (verdict above). svm hog watch this boot: 1 (stable). Serving of record UNCHANGED (23.26 @200k / 23.21 @10k, binary 938a6999 lineage).
+- E-131 (authored in-desk on amd/dc-engagement; landed via the keep-both merge after E-133 - numbering preserved, nothing rewritten)
+- E-131 DC-ENGAGEMENT DESK (wt-dc-eng, amd/dc-engagement, base e116dbb1d;
+  NOTE: this tree's ledger copy ends at E-124 - E-125..E-130 live in the
+  coordinator tree; this entry answers E-126's dc-window verdict, banked
+  there 2026-09-24 02:30): ROOT CAUSE OF THE ABSENT ENGAGEMENT LINE IS TWO
+  STACKED DEFECTS, BOTH PROVEN, ZERO GPU. (1) LAYER 1 - STALE SERVED BINARY:
+  the dc window launched coordinator build-hip/bin/llama-server
+  (run_combined_window.sh:16) last built 2026-09-23 15:25:48, but the
+  draft-cache merge b72cd1732 landed 20:36:01 - the window ran 00:58-01:06 on
+  the PRE-MERGE binary; strings over llama-server AND every served lib:
+  ZERO "draft shape cache" occurrences - dc1's env WAS delivered (identity
+  block line "extra_env: LLAMA_DRAFT_SHAPE_CACHE=1") but the process had no
+  gate code, so the arm was inert BY CONSTRUCTION and the -0.39/-0.09 paired
+  deltas compared IDENTICAL binaries; E-126's "engagement unproven" was the
+  right call and the "within-noise" reading is void as a statement about the
+  cache. The arm-identity law's own witness was BLIND: the "built from:" git
+  stamp is EMPTY in all 4 dc cells (window ran as root; git refused the
+  chris-owned tree; error swallowed by the $( ) capture) - a non-empty stamp
+  would have shown a pre-merge commit and stopped the window. (2) LAYER 2 -
+  LOG-VISIBILITY: even on a fresh build the line cannot reach the served log:
+  LLAMA_LOG_INFO -> llama_log_internal (src/llama-impl.cpp:55) ->
+  common_log_default_callback installed by the server (tools/server/server.cpp:84
+  common_init -> common/common.cpp:373) maps ggml INFO to LOG_LEVEL_TRACE = 4
+  (common/log.cpp:444) and the server runs at thold 3 ("verbosity = 3", dc1
+  log line 1) -> dropped. Proof: dc1's server log has ZERO library INFO lines
+  while srv/slot/cmn LOG_INF lines print. The same filter hides the W13 A4
+  witnesses ([decode-timeline] reused=, [launch-timeline] meta rebuild) - the
+  verdict protocol was ungreppable served AS SPECIFIED. (3) A2 FIX
+  (d7d2ce398, byte-exact host logic, env-gated default OFF unchanged):
+  engagement line + 4 LLAMA_DECODE_TIMELINE + 2 LLAMA_LAUNCH_TIMELINE sites
+  INFO -> WARN, message text unchanged (offline parsers match text not
+  level). (4) A3 (dcbc873ef + CI): mirror suite extended with an engagement
+  source pin (env name + WARN level + canonical text); NEW
+  test_engagement_routing_host.cpp drives the REAL llama_log_internal ->
+  common_log_default_callback chain at served thold 3 (WARN line ARRIVES,
+  INFO probe does NOT) and FAILS on a stale build-hip - NEGATIVE CONTROL
+  PROVEN against the coordinator's actual served bin dir (exit 1, would have
+  caught E-126 pre-merge); wired as section 2b of run_premerge_ci.sh (note:
+  ROCm 6.2 hip-link driver mis-resolves a second -l flag - libs passed as
+  -Wl inputs). Canonical build CONFIGURE-EXIT:0 BUILD-EXIT:0 zero warnings;
+  CI-VERDICT: PASS 8/8 host suites (log W19_premerge_ci_2026-09-24.txt).
+  (5) CORRECTED SERVED SPEC for the dc re-run: rebuild AFTER the merge, then
+  the launcher MUST strings-grep the served libllama for "draft shape cache
+  enabled" + require a non-empty "built from:" stamp before boot; arm =
+  of-record + LLAMA_DRAFT_SHAPE_CACHE=1; engagement proof NOW at served
+  verbosity: grep -c "draft shape cache enabled (2 slots)" = 2 (target +
+  draft ctx); optional witnesses LLAMA_DECODE_TIMELINE=1 (reused=1 on catchup
+  AND step 1, issue ~1.1 ms) + LLAMA_LAUNCH_TIMELINE=1 (meta rebuild ~2x/round
+  BY DESIGN, recapture tripwire silent); battery + interleaved A/B unchanged;
+  rollback = unset env. Receipt:
+  results/W19_dc_engagement_receipt_2026-09-24.md.
+- E-131 (cont.) DC-ENGAGEMENT DESK ADDENDUM: the launcher arm-identity
+  freshness gate named in the receipt as coordinator action LANDED as E-133
+  (run_combined_window.sh: non-empty git stamp required, binary mtime must
+  not predate HEAD, missing binary refused - all exit 2 before any boot).
+  Desk completed its two consistency gaps: the gate's git call now passes
+  -c safe.directory (root-run windows get a REAL stamp instead of a hard
+  fail) and the per-cell identity block echoes the same vetted $STAMP
+  (killing the empty-"built from:" blind-arm class for good). bash -n PASS.
+  Receipt defect 2 updated. Note on the resumed-desk "env set -> line fires,
+  env unset -> silent" item: the real env gate lives in the llama_context
+  constructor (needs a model; zero-GPU law forbids a server run here) - the
+  host-side equivalents are banked (source pin of the gate + real-chain
+  routing test at served thold); the env-set/unset proof lands with the
+  corrected served spec on the next dc window.

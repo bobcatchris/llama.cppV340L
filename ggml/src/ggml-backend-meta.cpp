@@ -1874,7 +1874,7 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend, 
         // a mid-serving rebuild flips the simple-tensor double buffer, which
         // changes every device pointer and resets the die graphs' warmup -
         // name the trigger so the re-capture cost can be attributed
-        GGML_LOG_INFO("[launch-timeline] meta rebuild: nodes = %d, uid %llu -> %llu\n",
+        GGML_LOG_WARN("[launch-timeline] meta rebuild: nodes = %d, uid %llu -> %llu\n",
             cgraph->n_nodes, (unsigned long long) backend_ctx->uid, (unsigned long long) cgraph->uid);
     }
 
@@ -2371,7 +2371,7 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend, 
         g_launch_tl.meta_ar_comm += tl_comm;
         g_launch_tl.meta_ar_fallback += tl_fb;
         g_launch_tl.ar_comm_us += tl_comm_us;
-        GGML_LOG_INFO("[launch-timeline] meta nodes = %d, subs = %zu, replays = %zu, bounds = %zu, comm = %zu, fb = %zu, host = %.3f ms, ar = %.3f ms\n",
+        GGML_LOG_WARN("[launch-timeline] meta nodes = %d, subs = %zu, replays = %zu, bounds = %zu, comm = %zu, fb = %zu, host = %.3f ms, ar = %.3f ms\n",
             cgraph->n_nodes, backend_ctx->n_subgraphs, tl_replays, tl_bounds, tl_comm, tl_fb,
             (ggml_time_us() - tl_t0)/1e3, tl_comm_us/1e3);
     }

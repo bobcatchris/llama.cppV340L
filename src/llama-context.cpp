@@ -234,7 +234,10 @@ llama_context::llama_context(
             // 1 = on: the default 2 slots cover the draft catchup/step pair; a
             // single slot would re-derive the default single-slot thrash
             gf_res_shape.resize(std::min(n_slots == 1 ? 2 : n_slots, 4));
-            LLAMA_LOG_INFO("%s: draft shape cache enabled (%d slots)\n", __func__, (int) gf_res_shape.size());
+            // WARN, not INFO: the server routes library logs through
+            // common_log_default_callback, which drops ggml INFO at the served
+            // verbosity (3) - engagement evidence must survive it (E-117 law)
+            LLAMA_LOG_WARN("%s: draft shape cache enabled (%d slots)\n", __func__, (int) gf_res_shape.size());
         }
     }
 
@@ -777,7 +780,7 @@ void llama_context::synchronize() {
     ggml_backend_sched_synchronize(sched.get());
 
     if (tl_on) {
-        LLAMA_LOG_INFO("[decode-timeline] drain = %.3f ms\n", (ggml_time_us() - t_sync_start)/1e3);
+        LLAMA_LOG_WARN("[decode-timeline] drain = %.3f ms\n", (ggml_time_us() - t_sync_start)/1e3);
     }
 
     // FIXME: if multiple single tokens are evaluated without a synchronization,
@@ -837,7 +840,7 @@ void llama_context::wait_outputs() {
     }
 
     if (tl_on) {
-        LLAMA_LOG_INFO("[decode-timeline] wait_outputs = %.3f ms\n", (ggml_time_us() - t_sync_start)/1e3);
+        LLAMA_LOG_WARN("[decode-timeline] wait_outputs = %.3f ms\n", (ggml_time_us() - t_sync_start)/1e3);
     }
 }
 
@@ -1727,7 +1730,7 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
     if (tl_on) {
         t_issue_us = ggml_time_us() - t_issue_start;
 
-        LLAMA_LOG_INFO("[decode-timeline] n_tokens = %d, reused = %d, build = %.3f ms, inputs = %.3f ms, issue = %.3f ms\n",
+        LLAMA_LOG_WARN("[decode-timeline] n_tokens = %d, reused = %d, build = %.3f ms, inputs = %.3f ms, issue = %.3f ms\n",
                 ubatch.n_tokens, (int) graph_reused, t_build_us/1e3, t_set_inputs_us/1e3, t_issue_us/1e3);
     }
 
@@ -2402,7 +2405,7 @@ int llama_context::decode(const llama_batch & batch_inp) {
         }
 
         if (tl_on) {
-            LLAMA_LOG_INFO("[decode-timeline] outputs = %.3f ms (n_outputs = %d, backend sampled = %d)\n",
+            LLAMA_LOG_WARN("[decode-timeline] outputs = %.3f ms (n_outputs = %d, backend sampled = %d)\n",
                     (ggml_time_us() - t_outputs_start)/1e3, n_outputs,
                     (int) (!res->t_sampled.empty() || !res->t_sampled_probs.empty() || !res->t_sampled_logits.empty()));
         }
