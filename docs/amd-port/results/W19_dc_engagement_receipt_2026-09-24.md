@@ -152,9 +152,16 @@ The engagement print path, traced end to end in the merged tree:
    measured identical code; the verdict "no promotable served win" is VOID as a
    statement about the shape cache (it remains valid as "no effect measurable
    under that protocol"). Engagement-unproven was the correct call.
-2. The identity-stamp hole (root-run git -> empty "built from:") is open in
-   run_combined_window.sh - out of desk scope (file outside the repo), named
-   in the spec above for the coordinator.
+2. The identity-stamp hole is now CLOSED in the launcher:
+   /home/chris/run_combined_window.sh carries an arm-identity freshness gate
+   (landed as E-133 by the resumed coordinator session: non-empty git stamp
+   required, binary mtime must not predate HEAD, missing binary refused).
+   This desk completed the two consistency gaps in it: the gate's git call
+   now passes -c safe.directory so a root-run window gets a REAL stamp
+   instead of a hard fail, and the per-cell identity block echoes the same
+   vetted $STAMP instead of re-running the unsafe plain-git call (which
+   under root produced the empty "built from:" that blinded E-126).
+   bash -n SYNTAX-EXIT:0.
 3. The engagement text prints once per llama_context construction: the count
    is 2 for the draft-mtp server (target + draft); any other serving shape
    (e.g. no spec) still prints 1 for the target ctx - grep accordingly.

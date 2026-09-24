@@ -4118,3 +4118,17 @@ to Gemini's guard battery, die 3 is the dev cell.
   BY DESIGN, recapture tripwire silent); battery + interleaved A/B unchanged;
   rollback = unset env. Receipt:
   results/W19_dc_engagement_receipt_2026-09-24.md.
+- E-131 (cont.) DC-ENGAGEMENT DESK ADDENDUM: the launcher arm-identity
+  freshness gate named in the receipt as coordinator action LANDED as E-133
+  (run_combined_window.sh: non-empty git stamp required, binary mtime must
+  not predate HEAD, missing binary refused - all exit 2 before any boot).
+  Desk completed its two consistency gaps: the gate's git call now passes
+  -c safe.directory (root-run windows get a REAL stamp instead of a hard
+  fail) and the per-cell identity block echoes the same vetted $STAMP
+  (killing the empty-"built from:" blind-arm class for good). bash -n PASS.
+  Receipt defect 2 updated. Note on the resumed-desk "env set -> line fires,
+  env unset -> silent" item: the real env gate lives in the llama_context
+  constructor (needs a model; zero-GPU law forbids a server run here) - the
+  host-side equivalents are banked (source pin of the gate + real-chain
+  routing test at served thold); the env-set/unset proof lands with the
+  corrected served spec on the next dc window.
