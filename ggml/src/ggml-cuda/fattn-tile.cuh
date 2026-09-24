@@ -1613,7 +1613,7 @@ static void launch_fattn_tile_switch_ncols2(ggml_backend_cuda_context & ctx, ggm
             constexpr size_t nbytes_shared = 0;
             const int nwarps    = ggml_cuda_fattn_tile_get_nthreads (DKQ, DV, 8, cc) / warp_size;
             const int nbatch_fa = ggml_cuda_fattn_tile_get_nbatch_fa(DKQ, DV, 8, cc);
-            GGML_LOG_INFO("ggml-cuda: GGML_CUDA_FATTN_TILE_Q40_DIRECT=1, fattn tile ncols1=4 ncols2=2 q4_0 KV in-kernel (gqa_ratio %d, T %d)\n", gqa_ratio, (int) Q->ne[1]);
+            GGML_LOG_WARN("ggml-cuda: GGML_CUDA_FATTN_TILE_Q40_DIRECT=1, fattn tile ncols1=4 ncols2=2 q4_0 KV in-kernel (gqa_ratio %d, T %d)\n", gqa_ratio, (int) Q->ne[1]);
             // W17 fa40-codegen: variant 11 (scalar half2 shared-tile stores).
             // The int2/int4 copy-store granules of ggml_cuda_memcpy_1 corrupt
             // the tile in this instantiation on gfx900 (hipcc clang 18) at
