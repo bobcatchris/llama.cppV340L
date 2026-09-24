@@ -4174,3 +4174,15 @@ to Gemini's guard battery, die 3 is the dev cell.
   retry (the deep-census window's decode phase did not fit - the
   depth table's decode column is model-anchored, only the dequant
   line is directly measured at depth).
+- E-120 (cont.) 03:00 POST-REBOOT QUEUE HARDENED-WRITE: 
+  /home/chris/run_postreboot_hardened.sh staged - ONE command after the
+  next reboot: (1) verifies the hardening took (noretry=1 from the
+  modprobe.d file - aborts loudly if not) + all 4 dies present via
+  PCI-address; (2) runs the queued prefill ub1024 PAIRED window
+  (p0a/p1a/p0b/p1b, full batteries - prefill_guard is the decision
+  metric, decode_guard is the MANDATORY ub1024 regression check per
+  the W13 desk spec, all cells persist under distinct hb_* names);
+  fail-loud die gates per the E-120 lesson. Chris: reboot whenever
+  convenient, then run this one script (or let the 30-min automation
+  pick it up) - the hardened boot + the queued prefill verdict land
+  without further manual steps.
