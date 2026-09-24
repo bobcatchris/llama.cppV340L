@@ -140,6 +140,40 @@ __global__ void widelaunch_lds_kernel(float * out) {
     }
 }
 
+// forced scratch (local-memory spill) kernel: ~1440 B/thread, tiny LDS -
+// discriminates the spill/scratch class (FA<4,6> scr=1432 vs FA<4,2> 1104)
+__global__ void widelaunch_spill_kernel(float * out) {
+    float r[360];
+    const int tid = threadIdx.x;
+    for (int i = 0; i < 360; ++i) {
+        r[i] = (float) (i ^ tid);
+    }
+    float s = 0.0f;
+    for (int i = 0; i < 360; ++i) {
+        s += r[(i*7 + tid) % 360];
+    }
+    if (tid == 0) {
+        out[blockIdx.y] = s;
+    }
+}
+
+// huge-code kernel: ~4.1k unrolled iterations of dependent math - splits
+// instruction-cache / code-size class from everything else
+template <int N>
+__global__ void widelaunch_bigcode_kernel(float * out) {
+    float a = threadIdx.x * 0.5f + 1.0f;
+    float b = 0.5f;
+    #pragma unroll
+    for (int i = 0; i < N; ++i) {
+        a = fmaf(a, b, 1.0001f);
+        b = fmaf(b, a, 0.9999f);
+        a = sqrtf(a) + 1e-9f;
+    }
+    if (a == 12345.678f) {
+        out[threadIdx.x] = a + b;
+    }
+}
+
 int main(int argc, char ** argv) {
     if (argc < 2) {
         printf("usage: %s <gguf> [niter=30] [reps=5] [--served-entry] [--occupancy] [--probe] [--matrix]\n", argv[0]);
@@ -313,8 +347,10 @@ int main(int argc, char ** argv) {
         auto report = [](const char * name, std::vector<double> v) {
             std::sort(v.begin(), v.end());
             const double med = v[v.size()/2];
-            printf("MATRIX %-18s n=%2d med=%8.1f us  min=%8.1f  max=%8.1f\n",
-                   name, (int) v.size(), med, v.front(), v.back());
+            const double spread = (v.back() - v.front()) / med * 100.0;
+            printf("MATRIX %-18s n=%2d med=%8.1f us  min=%8.1f  max=%8.1f  spread=%.2f%%%s\n",
+                   name, (int) v.size(), med, v.front(), v.back(), spread,
+                   spread <= 1.05 ? "" : "  SPREAD>1.05");
         };
         auto run_scenario = [&](const char * name, int n, ArmKind k) {
             std::vector<double> v;
@@ -483,6 +519,14 @@ int main(int argc, char ** argv) {
             lds_scenario("lds32k_gw384", widelaunch_lds_kernel<32768>, g_wide, b_wide);
             lds_scenario("lds22k_gb256", widelaunch_lds_kernel<22528>, g_base, b_base);
             lds_scenario("lds32k_gb256", widelaunch_lds_kernel<32768>, g_base, b_base);
+            // spill and big-code discriminators, wide6-like shape
+            for (int w = 0; w < 50; ++w) {
+                widelaunch_spill_kernel<<<g_wide, b_wide, 0, st>>>(lds_out);
+                widelaunch_bigcode_kernel<4096><<<g_wide, b_wide, 0, st>>>(lds_out);
+            }
+            HIP_CHECK(hipDeviceSynchronize());
+            lds_scenario("spill_gw384", widelaunch_spill_kernel, g_wide, b_wide);
+            lds_scenario("bigcode_gw384", widelaunch_bigcode_kernel<4096>, g_wide, b_wide);
             // alternate big/small LDS, wide-like shape
             {
                 std::vector<double> vs, vl;
