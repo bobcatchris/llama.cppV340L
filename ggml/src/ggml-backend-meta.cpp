@@ -420,6 +420,9 @@ struct ggml_backend_meta_buffer_context {
     ggml_backend_meta_simple_tensor_container stc_compute[2];
     int stc_compute_index      = 0;
     int stc_compute_index_next = 0;
+    // diagnostics: warn once per clear epoch when a cleared simple tensor
+    // registration is lazily re-created (reused-graph shape re-entry)
+    bool heal_warned = false;
     std::vector<ggml_backend_buffer_ptr> bufs;
 
     // FIXME
@@ -471,6 +474,8 @@ static ggml_backend_buffer_t ggml_backend_meta_buffer_simple_buffer(ggml_backend
     return buf_ctx->bufs[index].get();
 }
 
+static enum ggml_status ggml_backend_meta_buffer_init_tensor_impl(ggml_backend_meta_simple_tensor_container & stc, ggml_tensor * tensor);
+
 static struct ggml_tensor * ggml_backend_meta_buffer_simple_tensor(const struct ggml_tensor * tensor, size_t index) {
     GGML_ASSERT(ggml_backend_buffer_is_meta(tensor->buffer));
     ggml_backend_meta_buffer_context * buf_ctx = (ggml_backend_meta_buffer_context *) tensor->buffer->context;
@@ -479,7 +484,19 @@ static struct ggml_tensor * ggml_backend_meta_buffer_simple_tensor(const struct 
     ggml_backend_meta_simple_tensor_container & stc = buf_ctx->get_simple_tensor_container(tensor);
     auto it = stc.simple_tensors.find(tensor);
     if (it == stc.simple_tensors.end()) {
-        return nullptr;
+        // A reused graph (e.g. a shape-cache hit) is persistent: its tensors keep their
+        // allocation, so re-allocating it on the sched never calls init_tensor again and
+        // its per-die simple tensors may have been cleared by the double-buffer cycle.
+        // Re-register them here instead of failing; the uid memo still replays the
+        // device graphs (fail-open to correctness).
+        ggml_backend_meta_buffer_init_tensor_impl(buf_ctx->get_simple_tensor_container(tensor), const_cast<ggml_tensor *>(tensor));
+        it = stc.simple_tensors.find(tensor);
+        GGML_ASSERT(it != stc.simple_tensors.end());
+        if (!buf_ctx->heal_warned) {
+            GGML_LOG_WARN("%s: re-registered cleared simple tensor %s (reused graph, shape re-entry)\n",
+                __func__, tensor->name);
+            buf_ctx->heal_warned = true;
+        }
     }
     return it->second[index];
 }
@@ -1910,6 +1927,7 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend, 
                 ggml_reset(ctx.get());
             }
             stc.simple_tensors.clear();
+            buf_ctx->heal_warned = false;
         }
         size_t n_subgraphs  = 0;
         size_t max_tmp_size = 0;
@@ -1925,9 +1943,14 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend, 
                     bcj.nodes[i] = node;
                     continue;
                 }
+                // re-registers lazily if the node's simple tensors were cleared by an
+                // earlier cycle (reused-graph shape re-entry)
                 bcj.nodes[i] = ggml_backend_meta_buffer_simple_tensor(node, j);
                 GGML_ASSERT(bcj.nodes[i]);
             }
+        }
+        for (ggml_backend_buffer_t buf : used_buffers) {
+            ((ggml_backend_meta_buffer_context *) buf->context)->heal_warned = false;
         }
 
         {
