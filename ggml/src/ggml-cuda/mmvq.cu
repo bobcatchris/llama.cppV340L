@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <type_traits>
 
 typedef float (*vec_dot_q_cuda_t)(const void * __restrict__ vbq, const block_q8_1 * __restrict__ bq8_1, const int & kbx, const int & iqs);
 
@@ -473,8 +474,8 @@ static constexpr __host__ __device__ int calc_rows_per_block(int ncols_dst, int 
     return 1;
 }
 
-template <ggml_type type, int ncols_dst, bool has_fusion, bool small_k = false, bool ALN = false, bool S2R = false>
-__launch_bounds__(calc_nwarps(type, ncols_dst, get_device_table_id())*ggml_cuda_get_physical_warp_size(), 1)
+template <ggml_type type, int ncols_dst, bool has_fusion, bool small_k = false, bool ALN = false, bool S2R = false, int min_ctas_per_cu = 1>
+__launch_bounds__(calc_nwarps(type, ncols_dst, get_device_table_id())*ggml_cuda_get_physical_warp_size(), min_ctas_per_cu)
 static __global__ void mul_mat_vec_q(
         const void * vx_ptr, const void * vy_ptr, const void * vy_aln_ptr, const int32_t * ids_ptr, const ggml_cuda_mm_fusion_args_device fusion, float * dst_ptr,
         const uint32_t ncols_x, const uint3 nchannels_y, const uint32_t stride_row_x, const uint32_t stride_col_y,
@@ -1168,6 +1169,52 @@ static bool mmvq_s2r_env_enabled(ggml_type type) {
     }
 }
 
+// C4 GLU-fusion T=4 lift (W30 desk): the fused gate/up/silu epilogue is the
+// served T=1 code; this gate extends it to the plain base variant for
+// ncols_dst 2..4. Both projections read the same y, so the fused launch
+// halves activation traffic on the gate/up class and drops one launch per
+// layer. Bit-exact vs the two separate launches (same per-(token,row) dot
+// sequence and accumulation order; the epilogue is the identical device
+// code). share/s2r stay off on the fused launch: the share body carries no
+// tmp_gate accumulation. Same-type gate/up only, enforced host-side (this
+// model mixes quant types across the gate/up pair in 28 of 65 layers).
+bool ggml_cuda_mmvq_glu_fusion_t4_enabled() {
+    static const bool on = [] {
+        const char * env = getenv("GGML_CUDA_MMVQ_GLU_FUSION_T4");
+        if (env != nullptr && env[0] == '1') {
+            GGML_LOG_WARN("ggml-cuda: GGML_CUDA_MMVQ_GLU_FUSION_T4=1, GLU fusion enabled for ncols_dst 2-4 (base variant, same-type gate/up only)\n");
+            return true;
+        }
+        return false;
+    }();
+    return on;
+}
+
+// occupancy rung (W30 desk): extra __launch_bounds__ min-blocks arms for the
+// T=2..4 launches. The shipped arm requests one block per CU and the T=4
+// register load (101-104 VGPRs on the fat types) caps residency at 2 waves
+// per SIMD, too few in-flight loads to hide HBM2 latency on the 1-2 kbx
+// iterations of runway at K=5120 (W23 M1+M2). The arms trade registers for
+// resident waves; spills may still win on a latency-starved kernel. Codegen
+// changes per arm, so every arm needs the bit-exact oracle (fa40 law).
+// Direct VGPR clamping (-mllvm -amdgpu-max-vgpr) is a separate per-TU build
+// option, see GGML_HIP_MMVQ_MAXREG in the ggml-cuda CMakeLists.
+static int mmvq_lb_env_value() {
+    static const int lb = [] {
+        const char * env = getenv("GGML_CUDA_MMVQ_LB");
+        if (env != nullptr && env[0] == '2') {
+            GGML_LOG_WARN("ggml-cuda: GGML_CUDA_MMVQ_LB=2, __launch_bounds__(...,2) arms engaged for ncols_dst 2-4\n");
+            return 2;
+        }
+        if (env != nullptr && env[0] == '4') {
+            GGML_LOG_WARN("ggml-cuda: GGML_CUDA_MMVQ_LB=4, __launch_bounds__(...,4) arms engaged for ncols_dst 2-4\n");
+            return 4;
+        }
+        return 1;
+    }();
+    return lb;
+}
+
 template<ggml_type type, int c_ncols_dst, bool small_k = false>
 static void mul_mat_vec_q_switch_fusion(
         const void * vx, const void * vy, const void * vy_aln, const int32_t * ids, const ggml_cuda_mm_fusion_args_device fusion, float * dst,
@@ -1189,36 +1236,52 @@ static void mul_mat_vec_q_switch_fusion(
     if constexpr (c_ncols_dst == 4) {
         aln_on = share && aln && mmvq_type_has_aln(type) && !s2r_on;
     }
-    if constexpr (c_ncols_dst == 1) {
-        if (has_fusion) {
+    if constexpr (c_ncols_dst >= 1 && c_ncols_dst <= 4) {
+        if (has_fusion && (c_ncols_dst == 1 || ggml_cuda_mmvq_glu_fusion_t4_enabled())) {
             const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(block_nums, block_dims, nbytes_shared, stream);
-            // aln/s2r are only live for ncols_dst 2-4; the default variant
-            // carries none of that code on the served path
+            // aln/s2r are only live for ncols_dst 2-4 and the share body has
+            // no tmp_gate accumulation, so the fused launch always runs the
+            // plain base variant with share off
             ggml_cuda_kernel_launch(mul_mat_vec_q<type, c_ncols_dst, true, small_k, false, false>, launch_params,
                  vx, vy, vy_aln, ids, fusion, dst, ncols_x, nchannels_y, stride_row_x, stride_col_y, stride_col_dst,
                  channel_ratio, stride_channel_x, stride_channel_y, stride_channel_dst,
-                 sample_ratio, stride_sample_x, stride_sample_y, stride_sample_dst, ids_stride, share);
+                 sample_ratio, stride_sample_x, stride_sample_y, stride_sample_dst, ids_stride, false);
             return;
         }
     }
 
-    GGML_ASSERT(!has_fusion && "fusion only supported for ncols_dst=1");
+    GGML_ASSERT(!has_fusion && "fusion only supported for ncols_dst=1 (or 2-4 behind GGML_CUDA_MMVQ_GLU_FUSION_T4)");
 
     const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(block_nums, block_dims, nbytes_shared, stream);
-    auto launch_variant = [&](auto aln_c, auto s2r_c) {
+    auto launch_variant = [&](auto aln_c, auto s2r_c, auto lb_c) {
         constexpr bool kAln = decltype(aln_c)::value;
         constexpr bool kS2r = decltype(s2r_c)::value;
-        ggml_cuda_kernel_launch(mul_mat_vec_q<type, c_ncols_dst, false, small_k, kAln, kS2r>, launch_params,
+        constexpr int  kLb  = decltype(lb_c)::value;
+        ggml_cuda_kernel_launch(mul_mat_vec_q<type, c_ncols_dst, false, small_k, kAln, kS2r, kLb>, launch_params,
             vx, vy, vy_aln, ids, fusion, dst, ncols_x, nchannels_y, stride_row_x, stride_col_y, stride_col_dst,
             channel_ratio, stride_channel_x, stride_channel_y, stride_channel_dst,
             sample_ratio, stride_sample_x, stride_sample_y, stride_sample_dst, ids_stride, share);
     };
     if (aln_on) {
-        if (s2r_on) { launch_variant(std::true_type{},  std::true_type{});  }
-        else         { launch_variant(std::true_type{},  std::false_type{}); }
+        if (s2r_on) { launch_variant(std::true_type{},  std::true_type{},  std::integral_constant<int, 1>{}); }
+        else         { launch_variant(std::true_type{},  std::false_type{}, std::integral_constant<int, 1>{}); }
     } else {
-        if (s2r_on) { launch_variant(std::false_type{}, std::true_type{});  }
-        else         { launch_variant(std::false_type{}, std::false_type{}); }
+        if (s2r_on) {
+            launch_variant(std::false_type{}, std::true_type{},  std::integral_constant<int, 1>{});
+        } else {
+            if constexpr (c_ncols_dst >= 2 && c_ncols_dst <= 4) {
+                const int lb = mmvq_lb_env_value();
+                if (lb == 2) {
+                    launch_variant(std::false_type{}, std::false_type{}, std::integral_constant<int, 2>{});
+                    return;
+                }
+                if (lb == 4) {
+                    launch_variant(std::false_type{}, std::false_type{}, std::integral_constant<int, 4>{});
+                    return;
+                }
+            }
+            launch_variant(std::false_type{}, std::false_type{}, std::integral_constant<int, 1>{});
+        }
     }
 }
 
@@ -1576,7 +1639,8 @@ void ggml_cuda_mul_mat_vec_q(
 
     if (fusion) {
         GGML_ASSERT( !ids || dst->ne[2] == 1);
-        GGML_ASSERT(  ids || dst->ne[1] == 1);
+        // ncols_dst = 1 always; 2..4 only behind the C4 gate (W30)
+        GGML_ASSERT(  ids || dst->ne[1] == 1 || (ggml_cuda_mmvq_glu_fusion_t4_enabled() && dst->ne[1] >= 2 && dst->ne[1] <= 4));
 
         if (fusion->x_bias) {
             GGML_ASSERT(fusion->x_bias->type == GGML_TYPE_F32);
