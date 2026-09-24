@@ -3885,3 +3885,29 @@ to Gemini's guard battery, die 3 is the dev cell.
   ADVISORY to Chris: if the XRDP session keeps degrading, a
   logout/login (or reboot) on his side will clear it - campaign
   chains now survive it either way.
+- E-120 (cont.) 20:25 CRASH ROOT CAUSE (Chris: "figure it out" - the
+  xrdp theory was WRONG). FORENSICS: `last -x` shows the machine
+  crash-looped THREE times today - boots 11:03, 17:18, 18:55 all
+  ended with NO clean shutdown record (hard deaths); current boot
+  19:34. Persistent journal death records: EVERY crashed boot shows
+  escalating `workqueue: svm_range_deferred_list_work [amdgpu]
+  hogged CPU for >10000us` (boot -3: 19 occurrences + a die-4 ring
+  page0 timeout at 15:35 with BACO reset and VRAM LOST; boot -2:
+  4->5->7 escalations 18:31-18:51 then death ~18:55; boot -1: hog
+  19:32:53 then death 19:34). All deaths are SUDDEN (last journal
+  lines are normal desktop logs - kernel died before it could
+  write = hard-hang class). No ECC on this board (EDAC: No ECC
+  support); no MCE/AER records; OD tables verified STOCK (restore
+  held; the boot warning is just OD support compiled in). VERDICT:
+  ROCm KFD SVM deferred-list instability under today's extreme
+  allocation churn (dozens of multi-GB llama-server boot/teardown
+  cycles + benches + rocprof wraps - yesterday ran 13.5 h STABLE
+  with low churn). The kernel's own suggestion is WQ_UNBOUND (needs
+  a kernel rebuild - not our lane). AVAILABLE MITIGATIONS:
+  amdgpu.noretry=1 module param (standard gfx9 SVM-storm stability
+  fix; needs one reboot) and reduced boot/teardown churn
+  operationally. CURRENT BOOT (19:34): svm hog count 0 so far;
+  the A/B is mid-flight (s1 cell live 20:19). DECISION: race the
+  A/B (2 cells left, cells bank as they complete); on completion
+  or first hog - whichever first - apply amdgpu.noretry=1 + one
+  reboot, then run remaining windows on the hardened boot.
