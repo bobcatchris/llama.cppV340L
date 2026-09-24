@@ -133,3 +133,25 @@ Revision 1: 2026-09-24 14:15 (initial; coordinator session).
 - systemd-oomd is DISABLED system-wide (it killed the U1 cgroup and the user
   terminal under memory pressure; kernel OOM-killer remains the backstop).
   Watch RAM: 62 GB total; the server peaks ~18 GB + builds.
+
+## REVISION 3 - 2026-09-24 15:25 (REBOOT-PROOFING: agent re-dispatch manifest)
+
+Agents are children of the ZCode session and die on any reboot/crash. Their
+WORK survives (WIP-commit law). On the FIRST post-reboot standing check, the
+woken session MUST re-dispatch the fleet from this manifest (each desk resumes
+from its branch tip + CHECKIN.log tail):
+
+| desk | worktree | branch | resume from | re-dispatch action |
+|---|---|---|---|---|
+| W30 mmvq-c4 | wt-mmvq-c4 | amd/mmvq-c4 | 36ac2f47c + uncommitted bench wiring | finisher: commit wiring, build bench, run SHORT oracle+timing (die 3 = HIP idx per PCI 0d:00 runtime resolve), adjudicate |
+| W31 p2p-ar | wt-p2p-ar | amd/p2p-ar | a3216df8b + 993dfb0b9 (probe staged; verdict biased-negative pre-GPU) | finisher: commit strays, run staged probe (4 dies, all-die brief window), record empirical P2P verdict |
+| W27 q40-prefill | wt-q40prefill | amd/q40-prefill | 9af2edc3a; bench binaries /tmp/fa40_bench{,_dbg} (REBUILD after reboot: hipcc -O3 --offload-arch=gfx900 -I ggml/include -I ggml/src -I ggml/src/ggml-cuda bench_attn_real.cu vs build-bench libs, rpath; see section 3 of W27 receipt) | run staged bench, adjudicate (dst-is-truth stop rule) |
+| U1 v2 deep rerun | n/a (script /home/chris/run_u1_window_v2.sh) | n/a | REQUIRED (EOS systematic 2/2); after lever queue drains | fire v2; it regenerates 150k/199k + deep decodes + acceptance points |
+| battery | n/a | n/a | /home/chris/run_post_u1_battery.sh (5 windows) | fire when benches done + machine free |
+
+RE-DISPATCH RULE: first post-reboot cycle = read PLAN_CURRENT + ledger tail,
+verify noretry/hogs/dies, run push_backups.sh, re-dispatch per this table
+(zero-GPU desks first, GPU benches second, battery last), then normal loop.
+Liveness law: every desk CHECKIN.log must advance <=45 min or it is a zombie ->
+re-dispatch from its branch tip immediately (3 silent deaths today, zero work
+lost - the law held).
