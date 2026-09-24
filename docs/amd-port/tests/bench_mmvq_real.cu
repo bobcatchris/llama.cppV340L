@@ -10,12 +10,24 @@
 //   share     decode-once share apply (the *_SHARE=1 gated path)
 //   s2r       share + row-shared y preload (the *_S2R=1 gated path; requires
 //             the s2r switch_type wiring fix this desk landed)
+//   lb2/lb4   __launch_bounds__(...,2|4) occupancy arms (W30; base variant,
+//             codegen differs, oracle mandatory)
+//   pair      C4 served baseline: up MMVQ + gate MMVQ + device GLU apply per
+//             iter (3 launches; needs a *_f row with a gate partner)
+//   fused     C4 candidate: one fused MMVQ launch (gate dots + silu epilogue)
 //
-// ORACLE: the first arm in the list must be base; every later arm's full dst
+// ORACLE: the first arm in the list must be base (or pair for a C4 fusion
+// run, where only pair/fused arms are legal); every later arm's full dst
 // (N rows x T tokens) is device-copied and memcmp'd against it BEFORE any
-// timing counts. A base dup at the end of the list doubles as the in-run
-// determinism + drift control. Timing: hip events around niter back-to-back
-// launches, reps times; spread law 1.05% per config.
+// timing counts. A base (or pair) dup at the end of the list doubles as the
+// in-run determinism + drift control. Timing: hip events around niter
+// back-to-back launches, reps times; spread law 1.05% per config.
+//
+// --dump FILE writes the first-arm reference bytes to FILE;
+// --oracle-file FILE memcmps the in-process reference against FILE: the
+// bit-exact oracle ACROSS binaries (the -mllvm -amdgpu-max-vgpr builds).
+// Run the default binary with --dump ref.bin, then the clamped binary with
+// --oracle-file ref.bin; the CROSS-ORACLE line is the verdict.
 //
 // build (flags mirrored from build-hip):
 //   /opt/rocm-6.2.0/bin/hipcc -O3 -x hip --offload-arch=gfx900 -DGGML_USE_HIP \
@@ -50,35 +62,46 @@ struct TypeInfo {
     long         len;
     int          K, N;
     int          bs;    // bytes per block
+    long         gate_off; // C4 rows: gate-partner tensor offset (0 = none)
 };
 
 // served T=4 mix representatives (offset-delta law, ASCII-P1M census), same
 // table as bench_mmvq_share_gfx900.cu
 static const TypeInfo g_types[] = {
-    {"iq3_xxs", GGML_TYPE_IQ3_XXS, 969405216L,   34119680L, 5120, 17408,  98},
-    {"q4_K",    GGML_TYPE_Q4_K,    12025224992L, 50135040L, 5120, 17408, 144},
-    {"iq4_xs",  GGML_TYPE_IQ4_XS,  1595404832L,  47349760L, 5120, 17408, 136},
-    {"q5_K",    GGML_TYPE_Q5_K,    5220080544L,  43253760L, 5120, 12288, 176},
-    {"q6_K",    GGML_TYPE_Q6_K,    4637536L,    542942400L, 5120, 129272, 210},
-    {"q3_K",    GGML_TYPE_Q3_K,    10469424416L, 38297600L, 5120, 17408, 110},
-    {"iq3_s",   GGML_TYPE_IQ3_S,   4301102016L,  38297600L, 5120, 17408, 110},
+    {"iq3_xxs", GGML_TYPE_IQ3_XXS, 969405216L,   34119680L, 5120, 17408,  98, 0},
+    {"q4_K",    GGML_TYPE_Q4_K,    12025224992L, 50135040L, 5120, 17408, 144, 0},
+    {"iq4_xs",  GGML_TYPE_IQ4_XS,  1595404832L,  47349760L, 5120, 17408, 136, 0},
+    {"q5_K",    GGML_TYPE_Q5_K,    5220080544L,  43253760L, 5120, 12288, 176, 0},
+    {"q6_K",    GGML_TYPE_Q6_K,    4637536L,    542942400L, 5120, 129272, 210, 0},
+    {"q3_K",    GGML_TYPE_Q3_K,    10469424416L, 38297600L, 5120, 17408, 110, 0},
+    {"iq3_s",   GGML_TYPE_IQ3_S,   4301102016L,  38297600L, 5120, 17408, 110, 0},
+    // C4 fusion rows: same-type gate/up pairs from one layer (W30 GGUF header
+    // parse; this model mixes gate/up quant types in 28 of 65 layers, only
+    // same-type pairs can fuse). Main tensor = UP weights, gate_off = GATE.
+    {"iq3_xxs_f", GGML_TYPE_IQ3_XXS, 1003524896L, 34119680L, 5120, 17408,  98, 969405216L},
+    {"iq4_xs_f",  GGML_TYPE_IQ4_XS,  1642754592L, 47349760L, 5120, 17408, 136, 1595404832L},
+    {"iq3_s_f",   GGML_TYPE_IQ3_S,   4305739552L, 38297600L, 5120, 17408, 110, 4267441952L},
 };
 
 struct ArmSpec {
-    std::string name;   // base | share | s2r
+    std::string name;   // base | share | s2r | lb2 | lb4 | pair | fused
 };
 
-enum ArmKind { ARM_BASE, ARM_SHARE, ARM_S2R };
+enum ArmKind { ARM_BASE, ARM_SHARE, ARM_S2R, ARM_LB2, ARM_LB4, ARM_PAIR, ARM_FUSED };
 
 static ArmKind arm_kind(const ArmSpec & a) {
-    if (a.name == "base")     return ARM_BASE;
-    if (a.name == "share")    return ARM_SHARE;
-    return ARM_S2R;
+    if (a.name == "base")  return ARM_BASE;
+    if (a.name == "share") return ARM_SHARE;
+    if (a.name == "s2r")   return ARM_S2R;
+    if (a.name == "lb2")   return ARM_LB2;
+    if (a.name == "lb4")   return ARM_LB4;
+    if (a.name == "pair")  return ARM_PAIR;
+    return ARM_FUSED;
 }
 
 // exact launch arguments of ggml_cuda_mul_mat_vec_q for the 2D no-ids case
 // (GCN table: T 2..4 -> nwarps 2, rows_per_cuda_block 2, grid (N/2, 1, 1))
-template <ggml_type type, int T, bool S2R>
+template <ggml_type type, int T, bool S2R, int LB = 1>
 static void launch_k(const void * vx, const block_q8_1 * vy, float * dst,
                      const int K, const int stride_row_x, const int stride_col_y,
                      const uint32_t stride_col_dst, const uint32_t stride_channel_y,
@@ -86,7 +109,7 @@ static void launch_k(const void * vx, const block_q8_1 * vy, float * dst,
                      const uint32_t stride_sample_dst, dim3 grid, dim3 block,
                      hipStream_t stream, bool share) {
     const ggml_cuda_mm_fusion_args_device fusion{};
-    mul_mat_vec_q<type, T, false, false, false, S2R>
+    mul_mat_vec_q<type, T, false, false, false, S2R, LB>
         <<<grid, block, 0, stream>>>(
             vx, vy, vy, nullptr, fusion, dst,
             (const uint32_t) K, make_uint3(0, 0, 0), (const uint32_t) stride_row_x,
@@ -97,10 +120,52 @@ static void launch_k(const void * vx, const block_q8_1 * vy, float * dst,
     HIP_CHECK(hipGetLastError());
 }
 
-template <ggml_type type, int T, bool S2R>
+// C4 fused arm: has_fusion template with the gate projection and the silu
+// (SWIGLU) epilogue, exactly the ggml_cuda_mul_mat_vec_q fused launch args
+template <ggml_type type, int T>
+static void launch_fused_k(const void * vx, const void * vgate, const block_q8_1 * vy, float * dst,
+                           const int K, const int stride_row_x, const int stride_col_y,
+                           const uint32_t stride_col_dst, const uint32_t stride_channel_y,
+                           const uint32_t stride_sample_y, const uint32_t stride_channel_dst,
+                           const uint32_t stride_sample_dst, dim3 grid, dim3 block,
+                           hipStream_t stream) {
+    ggml_cuda_mm_fusion_args_device fusion{};
+    fusion.gate   = vgate;
+    fusion.glu_op = GGML_GLU_OP_SWIGLU;
+    mul_mat_vec_q<type, T, true, false, false, false>
+        <<<grid, block, 0, stream>>>(
+            vx, vy, vy, nullptr, fusion, dst,
+            (const uint32_t) K, make_uint3(0, 0, 0), (const uint32_t) stride_row_x,
+            (const uint32_t) stride_col_y, stride_col_dst,
+            init_fastdiv_values(1), 1, stride_channel_y, stride_channel_dst,
+            init_fastdiv_values(1), 1, stride_sample_y, stride_sample_dst,
+            0, false);
+    HIP_CHECK(hipGetLastError());
+}
+
+// C4 served baseline epilogue: the standalone GLU kernel the graph runs
+// between the two MMVQ launches. Same device silu as the fused epilogue, so
+// pair output vs fused output is the bit-exact comparison.
+__global__ static void glu_apply_swiglu(const float * GGML_CUDA_RESTRICT up,
+                                        const float * GGML_CUDA_RESTRICT gate,
+                                        float * GGML_CUDA_RESTRICT dst, const size_t n) {
+    const size_t i = (size_t) blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        dst[i] = up[i] * ggml_cuda_op_silu_single(gate[i]);
+    }
+}
+
+static void glu_apply(const float * up, const float * gate, float * dst, size_t n, hipStream_t stream) {
+    const size_t block = 256;
+    const size_t grid = (n + block - 1) / block;
+    glu_apply_swiglu<<<grid, block, 0, stream>>>(up, gate, dst, n);
+    HIP_CHECK(hipGetLastError());
+}
+
+template <ggml_type type, int T, bool S2R, int LB = 1>
 static void occ_k(const char * name) {
     hipFuncAttributes attr{};
-    const void * kp = (const void *) &mul_mat_vec_q<type, T, false, false, false, S2R>;
+    const void * kp = (const void *) &mul_mat_vec_q<type, T, false, false, false, S2R, LB>;
     HIP_CHECK(hipFuncGetAttributes(&attr, kp));
     int blocks = 0;
     HIP_CHECK(hipOccupancyMaxActiveBlocksPerMultiprocessor(&blocks, kp, 128, 0));
@@ -109,8 +174,19 @@ static void occ_k(const char * name) {
 }
 
 template <ggml_type type, int T>
-static void dispatch_arm(const ArmSpec & a, const void * vx, const block_q8_1 * vy,
-                         float * dst, const int K, const int stride_row_x, const int stride_col_y,
+static void occ_k_fused(const char * name) {
+    hipFuncAttributes attr{};
+    const void * kp = (const void *) &mul_mat_vec_q<type, T, true, false, false, false, 1>;
+    HIP_CHECK(hipFuncGetAttributes(&attr, kp));
+    int blocks = 0;
+    HIP_CHECK(hipOccupancyMaxActiveBlocksPerMultiprocessor(&blocks, kp, 128, 0));
+    printf("OCC %s: numRegs=%d shared=%zu local=%zu maxThreadsPerBlock=%d ctas_per_cu=%d\n",
+           name, attr.numRegs, attr.sharedSizeBytes, attr.localSizeBytes, attr.maxThreadsPerBlock, blocks);
+}
+
+template <ggml_type type, int T>
+static void dispatch_arm(const ArmSpec & a, const void * vx, const void * vgate, const block_q8_1 * vy,
+                         float * dst, float * dst_b, const int K, const int stride_row_x, const int stride_col_y,
                          const uint32_t stride_col_dst, const uint32_t stride_channel_y,
                          const uint32_t stride_sample_y, const uint32_t stride_channel_dst,
                          const uint32_t stride_sample_dst, dim3 grid, dim3 block,
@@ -118,41 +194,66 @@ static void dispatch_arm(const ArmSpec & a, const void * vx, const block_q8_1 * 
     const ArmKind k = arm_kind(a);
     char nm[96];
     snprintf(nm, sizeof(nm), "%s/%s/T%d", ggml_type_name(type), a.name.c_str(), T);
-#define LK(S2R_, SHARE_) launch_k<type, T, S2R_>(vx, vy, dst, K, \
+#define LK(S2R_, SHARE_, LB_) launch_k<type, T, S2R_, LB_>(vx, vy, dst, K, \
         stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, \
         stride_channel_dst, stride_sample_dst, grid, block, stream, SHARE_)
-#define OK(S2R_) occ_k<type, T, S2R_>(nm)
+#define LKF(FUSION_VX_) launch_fused_k<type, T>(FUSION_VX_, vgate, vy, dst, K, \
+        stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, \
+        stride_channel_dst, stride_sample_dst, grid, block, stream)
+#define OK(S2R_, LB_) occ_k<type, T, S2R_, LB_>(nm)
     switch (k) {
         case ARM_BASE:
-            if (occupancy) { OK(false); return; }
-            LK(false, false);
+            if (occupancy) { OK(false, 1); return; }
+            LK(false, false, 1);
             break;
         case ARM_SHARE:
-            if (occupancy) { OK(false); return; }
-            LK(false, true);
+            if (occupancy) { OK(false, 1); return; }
+            LK(false, true, 1);
             break;
         case ARM_S2R:
-            if (occupancy) { OK(true); return; }
-            LK(true, true);
+            if (occupancy) { OK(true, 1); return; }
+            LK(true, true, 1);
+            break;
+        case ARM_LB2:
+            if (occupancy) { OK(false, 2); return; }
+            LK(false, false, 2);
+            break;
+        case ARM_LB4:
+            if (occupancy) { OK(false, 4); return; }
+            LK(false, false, 4);
+            break;
+        case ARM_PAIR:
+            if (occupancy) { OK(false, 1); return; }
+            // served 3-kernel sequence: up mm, gate mm, glu apply
+            launch_k<type, T, false, 1>(vx, vy, dst, K, stride_row_x, stride_col_y, stride_col_dst,
+                stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, false);
+            launch_k<type, T, false, 1>(vgate, vy, dst_b, K, stride_row_x, stride_col_y, stride_col_dst,
+                stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, false);
+            glu_apply(dst, dst_b, dst, (size_t) stride_col_dst*T, stream);
+            break;
+        case ARM_FUSED:
+            if (occupancy) { occ_k_fused<type, T>(nm); return; }
+            LKF(vx);
             break;
     }
 #undef LK
+#undef LKF
 #undef OK
 }
 
 template <ggml_type type>
-static void dispatch_T(int T, const ArmSpec & a, const void * vx, const block_q8_1 * vy,
-                       float * dst, const int K, const int stride_row_x, const int stride_col_y,
+static void dispatch_T(int T, const ArmSpec & a, const void * vx, const void * vgate, const block_q8_1 * vy,
+                       float * dst, float * dst_b, const int K, const int stride_row_x, const int stride_col_y,
                        const uint32_t stride_col_dst, const uint32_t stride_channel_y,
                        const uint32_t stride_sample_y, const uint32_t stride_channel_dst,
                        const uint32_t stride_sample_dst, dim3 grid, dim3 block,
                        hipStream_t stream, bool occupancy) {
     if (T == 2) {
-        dispatch_arm<type, 2>(a, vx, vy, dst, K, stride_row_x, stride_col_y,
+        dispatch_arm<type, 2>(a, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y,
             stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst,
             stride_sample_dst, grid, block, stream, occupancy);
     } else if (T == 4) {
-        dispatch_arm<type, 4>(a, vx, vy, dst, K, stride_row_x, stride_col_y,
+        dispatch_arm<type, 4>(a, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y,
             stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst,
             stride_sample_dst, grid, block, stream, occupancy);
     } else {
@@ -161,20 +262,20 @@ static void dispatch_T(int T, const ArmSpec & a, const void * vx, const block_q8
     }
 }
 
-static void dispatch_type(ggml_type type, int T, const ArmSpec & a, const void * vx,
-                          const block_q8_1 * vy, float * dst, const int K, const int stride_row_x,
+static void dispatch_type(ggml_type type, int T, const ArmSpec & a, const void * vx, const void * vgate,
+                          const block_q8_1 * vy, float * dst, float * dst_b, const int K, const int stride_row_x,
                           const int stride_col_y, const uint32_t stride_col_dst,
                           const uint32_t stride_channel_y, const uint32_t stride_sample_y,
                           const uint32_t stride_channel_dst, const uint32_t stride_sample_dst,
                           dim3 grid, dim3 block, hipStream_t stream, bool occupancy) {
     switch (type) {
-        case GGML_TYPE_IQ3_XXS: dispatch_T<GGML_TYPE_IQ3_XXS>(T, a, vx, vy, dst, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
-        case GGML_TYPE_Q4_K:    dispatch_T<GGML_TYPE_Q4_K>   (T, a, vx, vy, dst, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
-        case GGML_TYPE_IQ4_XS:  dispatch_T<GGML_TYPE_IQ4_XS> (T, a, vx, vy, dst, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
-        case GGML_TYPE_Q5_K:    dispatch_T<GGML_TYPE_Q5_K>   (T, a, vx, vy, dst, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
-        case GGML_TYPE_Q6_K:    dispatch_T<GGML_TYPE_Q6_K>   (T, a, vx, vy, dst, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
-        case GGML_TYPE_Q3_K:    dispatch_T<GGML_TYPE_Q3_K>   (T, a, vx, vy, dst, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
-        case GGML_TYPE_IQ3_S:   dispatch_T<GGML_TYPE_IQ3_S>  (T, a, vx, vy, dst, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
+        case GGML_TYPE_IQ3_XXS: dispatch_T<GGML_TYPE_IQ3_XXS>(T, a, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
+        case GGML_TYPE_Q4_K:    dispatch_T<GGML_TYPE_Q4_K>   (T, a, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
+        case GGML_TYPE_IQ4_XS:  dispatch_T<GGML_TYPE_IQ4_XS> (T, a, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
+        case GGML_TYPE_Q5_K:    dispatch_T<GGML_TYPE_Q5_K>   (T, a, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
+        case GGML_TYPE_Q6_K:    dispatch_T<GGML_TYPE_Q6_K>   (T, a, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
+        case GGML_TYPE_Q3_K:    dispatch_T<GGML_TYPE_Q3_K>   (T, a, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
+        case GGML_TYPE_IQ3_S:   dispatch_T<GGML_TYPE_IQ3_S>  (T, a, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y, stride_col_dst, stride_channel_y, stride_sample_y, stride_channel_dst, stride_sample_dst, grid, block, stream, occupancy); break;
         default: printf("type not supported\n"); exit(1);
     }
 }
@@ -210,7 +311,7 @@ static void quantize_q8_1_row(const float * x, int K, int nblocks, uint8_t * out
 
 int main(int argc, char ** argv) {
     if (argc < 5) {
-        printf("usage: %s <gguf> <type-name> <T> <arm[,arm...]> [niter=30] [reps=4] [--occupancy]\n", argv[0]);
+        printf("usage: %s <gguf> <type-name> <T> <arm[,arm...]> [niter=30] [reps=4] [--occupancy] [--dump FILE] [--oracle-file FILE]\n", argv[0]);
         return 1;
     }
     const char * gguf_path = argv[1];
@@ -219,8 +320,12 @@ int main(int argc, char ** argv) {
     int    niter     = argc > 5 ? atoi(argv[5]) : 30;
     int    reps      = argc > 6 ? atoi(argv[6]) : 4;
     bool   occupancy = false;
+    const char * dump_file  = nullptr;
+    const char * oracle_file = nullptr;
     for (int i = 5; i < argc; ++i) {
         if (strcmp(argv[i], "--occupancy") == 0) occupancy = true;
+        if (strcmp(argv[i], "--dump") == 0 && i + 1 < argc) { dump_file = argv[i+1]; ++i; }
+        if (strcmp(argv[i], "--oracle-file") == 0 && i + 1 < argc) { oracle_file = argv[i+1]; ++i; }
     }
     if (occupancy) { niter = 1; reps = 1; }
 
@@ -237,17 +342,43 @@ int main(int argc, char ** argv) {
         for (char * tok = strtok(dup, ","); tok; tok = strtok(nullptr, ",")) {
             ArmSpec a;
             a.name = std::string(tok);
+            const char * legal[] = { "base", "share", "s2r", "lb2", "lb4", "pair", "fused" };
+            bool ok = false;
+            for (const char * l : legal) if (a.name == l) ok = true;
+            if (!ok) { printf("unknown arm %s\n", a.name.c_str()); return 1; }
             arms.push_back(a);
         }
         free(dup);
     }
-    if (arms.empty() || arms[0].name != "base") {
-        printf("first arm must be base (oracle reference)\n");
+    if (arms.empty() || (arms[0].name != "base" && arms[0].name != "pair")) {
+        printf("first arm must be base (oracle reference) or pair (C4 fusion reference)\n");
         return 1;
+    }
+    const bool fusion_mode = arms[0].name == "pair";
+    for (const auto & a : arms) {
+        const bool fusion_arm = a.name == "pair" || a.name == "fused";
+        if (fusion_mode != fusion_arm) {
+            printf("a C4 fusion run takes only pair/fused arms; a base run takes only base/share/s2r/lb2/lb4\n");
+            return 1;
+        }
+        if (fusion_arm && ti->gate_off == 0) {
+            printf("type %s has no gate partner row (use a *_f type)\n", ti->name);
+            return 1;
+        }
     }
 
     HIP_CHECK(hipSetDevice(0));
     hipStream_t stream = nullptr;
+
+    // die-resolution witness: the script greps this line and aborts unless it
+    // reads the intended die (die 3 = 0000:0d:00.0 per the campaign map)
+    {
+        hipDevice_t dev;
+        char pci[16] = { 0 };
+        if (hipDeviceGet(&dev, 0) == hipSuccess && hipDeviceGetPCIBusId(pci, sizeof(pci), dev) == hipSuccess) {
+            printf("device PCI: %s\n", pci);
+        }
+    }
 
     // real weight bytes (offset-delta law)
     const int fd = open(gguf_path, O_RDONLY);
@@ -266,6 +397,13 @@ int main(int argc, char ** argv) {
     HIP_CHECK(hipMalloc(&vx, ti->len));
     HIP_CHECK(hipMemcpy(vx, (const uint8_t *) mm + ti->off, ti->len, hipMemcpyHostToDevice));
 
+    // C4: gate-partner weights (the fused kernel reads both projections)
+    void * vgate = nullptr;
+    if (fusion_mode) {
+        HIP_CHECK(hipMalloc(&vgate, ti->len));
+        HIP_CHECK(hipMemcpy(vgate, (const uint8_t *) mm + ti->gate_off, ti->len, hipMemcpyHostToDevice));
+    }
+
     std::vector<float> src1 = build_src1(K, T);
     std::vector<uint8_t> vy_host((size_t) T*stride_col_y*36, 0);
     for (int t = 0; t < T; ++t) {
@@ -278,6 +416,10 @@ int main(int argc, char ** argv) {
 
     float * dst = nullptr;
     HIP_CHECK(hipMalloc((void **) &dst, (size_t) N*T*sizeof(float)));
+    float * dst_b = nullptr;   // pair arm: gate-projection scratch
+    if (fusion_mode) {
+        HIP_CHECK(hipMalloc((void **) &dst_b, (size_t) N*T*sizeof(float)));
+    }
 
     dim3 grid((unsigned)((N + 1) / 2), 1, 1);
     dim3 block(64, 2, 1);
@@ -287,7 +429,7 @@ int main(int argc, char ** argv) {
 
     if (occupancy) {
         for (const auto & a : arms) {
-            dispatch_type(ti->type, T, a, vx, vy, dst, K, stride_row_x, stride_col_y,
+            dispatch_type(ti->type, T, a, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y,
                           N, (uint32_t) T*stride_col_y, (uint32_t) T*stride_col_y,
                           (uint32_t) N*T, (uint32_t) N*T, grid, block, stream, true);
         }
@@ -295,21 +437,54 @@ int main(int argc, char ** argv) {
         return 0;
     }
 
-    // oracle reference from the first (base) arm
+    // oracle reference from the first arm (base, or the C4 pair sequence)
     std::vector<float> base_ref((size_t) N*T);
     std::vector<float> arm_out((size_t) N*T);
     {
         const ArmSpec & a0 = arms[0];
-        dispatch_type(ti->type, T, a0, vx, vy, dst, K, stride_row_x, stride_col_y,
+        dispatch_type(ti->type, T, a0, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y,
                       N, (uint32_t) T*stride_col_y, (uint32_t) T*stride_col_y,
                       (uint32_t) N*T, (uint32_t) N*T, grid, block, stream, false);
         HIP_CHECK(hipStreamSynchronize(stream));
         HIP_CHECK(hipMemcpy(base_ref.data(), dst, base_ref.size()*sizeof(float), hipMemcpyDeviceToHost));
     }
 
+    // cross-binary oracle (fa40 law): the in-process reference vs a reference
+    // dumped by a differently-compiled binary (e.g. -amdgpu-max-vgpr builds)
+    bool cross_exact = true;
+    if (oracle_file) {
+        FILE * f = fopen(oracle_file, "rb");
+        if (!f) { printf("CROSS-ORACLE open %s failed\n", oracle_file); return 1; }
+        std::vector<float> other((size_t) N*T);
+        if (fread(other.data(), sizeof(float), other.size(), f) != other.size()) {
+            printf("CROSS-ORACLE read %s failed (size mismatch)\n", oracle_file);
+            fclose(f);
+            return 1;
+        }
+        fclose(f);
+        cross_exact = memcmp(base_ref.data(), other.data(), base_ref.size()*sizeof(float)) == 0;
+        printf("%-14s CROSS-ORACLE %s\n", arms[0].name.c_str(), cross_exact ? "BITEXACT" : "FAIL");
+        if (!cross_exact) {
+            size_t nmis = 0;
+            for (size_t e = 0; e < base_ref.size() && nmis < 4; ++e) {
+                if (memcmp(base_ref.data() + e, other.data() + e, sizeof(float)) != 0) {
+                    printf("  mismatch[%zu]: this-binary %.9g other-binary %.9g\n", e, base_ref[e], other[e]);
+                    ++nmis;
+                }
+            }
+        }
+    }
+    if (dump_file) {
+        FILE * f = fopen(dump_file, "wb");
+        if (!f) { printf("dump open %s failed\n", dump_file); return 1; }
+        fwrite(base_ref.data(), sizeof(float), base_ref.size(), f);
+        fclose(f);
+        printf("reference dumped to %s (%zu floats)\n", dump_file, base_ref.size());
+    }
+
     // process-level clock warmup: kill the power-state ramp transient
     for (int w = 0; w < 120; ++w) {
-        dispatch_type(ti->type, T, arms[0], vx, vy, dst, K, stride_row_x, stride_col_y,
+        dispatch_type(ti->type, T, arms[0], vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y,
                       N, (uint32_t) T*stride_col_y, (uint32_t) T*stride_col_y,
                       (uint32_t) N*T, (uint32_t) N*T, grid, block, stream, false);
     }
@@ -319,14 +494,14 @@ int main(int argc, char ** argv) {
     HIP_CHECK(hipEventCreate(&ev0));
     HIP_CHECK(hipEventCreate(&ev1));
 
-    bool all_exact = true;
+    bool all_exact = cross_exact;
     for (size_t ai = 0; ai < arms.size(); ++ai) {
         const ArmSpec & a = arms[ai];
         const bool is_ref = ai == 0;
 
         if (!is_ref) {
             // oracle first: one launch, full dst memcmp vs base
-            dispatch_type(ti->type, T, a, vx, vy, dst, K, stride_row_x, stride_col_y,
+            dispatch_type(ti->type, T, a, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y,
                           N, (uint32_t) T*stride_col_y, (uint32_t) T*stride_col_y,
                           (uint32_t) N*T, (uint32_t) N*T, grid, block, stream, false);
             HIP_CHECK(hipStreamSynchronize(stream));
@@ -368,14 +543,14 @@ int main(int argc, char ** argv) {
         std::vector<float> us;
         for (int r = 0; r < reps; ++r) {
             for (int w = 0; w < 3; ++w) {
-                dispatch_type(ti->type, T, a, vx, vy, dst, K, stride_row_x, stride_col_y,
+                dispatch_type(ti->type, T, a, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y,
                               N, (uint32_t) T*stride_col_y, (uint32_t) T*stride_col_y,
                               (uint32_t) N*T, (uint32_t) N*T, grid, block, stream, false);
             }
             HIP_CHECK(hipStreamSynchronize(stream));
             HIP_CHECK(hipEventRecord(ev0, stream));
             for (int i = 0; i < niter; ++i) {
-                dispatch_type(ti->type, T, a, vx, vy, dst, K, stride_row_x, stride_col_y,
+                dispatch_type(ti->type, T, a, vx, vgate, vy, dst, dst_b, K, stride_row_x, stride_col_y,
                               N, (uint32_t) T*stride_col_y, (uint32_t) T*stride_col_y,
                               (uint32_t) N*T, (uint32_t) N*T, grid, block, stream, false);
             }
