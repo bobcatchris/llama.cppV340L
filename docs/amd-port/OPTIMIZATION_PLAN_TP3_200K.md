@@ -4196,3 +4196,15 @@ to Gemini's guard battery, die 3 is the dev cell.
   Chris's reboot is still the clean path, but no longer required for
   progress to resume. svm hogs frozen at 4 (noretry runtime set
   holding ~4.5 h).
+- E-120 (cont.) 22:55 OVERNIGHT WINDOW FIRED autonomously: the prefill
+  ub1024 PAIRED verdict (campaign-hb.service, system scope) - p0a
+  (b512/ub512 control) / p1a (b1024/ub1024) / p0b / p1b, full
+  batteries, cool-night thermals, stable 8 h boot on noretry=1
+  (hogs frozen at 4). DECISION RULES: prefill_guard is the decision
+  metric (W13 desk: +5-10% expected from halved staging + boundary
+  count); decode_guard is the MANDATORY regression check (ub1024
+  decode cost kills the arm); paired deltas per the E-119 law; all
+  cells persist under distinct hb_* names. If the machine dies
+  mid-window (svm risk residual), cells bank individually and the
+  campaign-postreboot unit re-runs the window on the hardened boot.
+  Verdicts land ~01:30 for the morning read.
