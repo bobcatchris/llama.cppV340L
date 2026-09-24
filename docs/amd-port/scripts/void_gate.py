@@ -269,10 +269,13 @@ def main():
             ", ".join(r["cell"] for r in voids)), file=sys.stderr)
         code = 1
     elif voids:
+        # stderr: stdout must stay parseable when --json is set (E-136)
         print("void-gate: observe mode, %d VOID ignored: %s" % (
-            len(voids), ", ".join(r["cell"] for r in voids)))
+            len(voids), ", ".join(r["cell"] for r in voids)), file=sys.stderr)
     if code == 0 and not unadjudicable and not voids:
-        print("void-gate: all %d cell(s) PASS (E-133)" % len(results))
+        # stderr: stdout must stay parseable when --json is set (E-136)
+        print("void-gate: all %d cell(s) PASS (E-133)" % len(results),
+              file=sys.stderr)
     return code
 
 
