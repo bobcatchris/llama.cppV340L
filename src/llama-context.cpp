@@ -231,7 +231,9 @@ llama_context::llama_context(
         const int n_slots = LLAMA_DRAFT_SHAPE_CACHE ? atoi(LLAMA_DRAFT_SHAPE_CACHE) : 0;
 
         if (n_slots >= 1) {
-            gf_res_shape.resize(std::min(n_slots, 4));
+            // 1 = on: the default 2 slots cover the draft catchup/step pair; a
+            // single slot would re-derive the default single-slot thrash
+            gf_res_shape.resize(std::min(n_slots == 1 ? 2 : n_slots, 4));
             LLAMA_LOG_INFO("%s: draft shape cache enabled (%d slots)\n", __func__, (int) gf_res_shape.size());
         }
     }
