@@ -1,0 +1,14 @@
+== MANIFEST 2026-09-16T23:10:10Z grant G-AMD-E16 (user blanket grant 2026-09-16, E-12) bin b864220912aec151 10k leg: plen=10000 (BLUE base 62 + 9938 alphas), mt=64, port=8100
+KFD=0 df=15G
+listener=2234536
+t0=1789600249 2026-09-16T23:10:49Z
+== attempt2 mt=192 2026-09-16T23:26:13Z
+== attempt2 GRADE: plen=10000 mt=192 finish=stop content='BLUE' usage={prompt:10000,completion:69} mojibake=none -> PASS
+== attempt1 mt=64 VOID (E-4 class: reasoning exhausted 64 tokens, content empty, finish=length — coherent reasoning, not garble; re-fired at mt=192 per the E-4 warning)
+[2026-09-16 18:43:01.364] [info] ninfer-serve: [req 2] prefill: 9728/10000 tok (97%) 9.3 tok/s
+[2026-09-16 18:43:15.237] [info] ninfer-serve: [req 2] prefill: 9856/10000 tok (99%) 9.2 tok/s
+[2026-09-16 18:43:29.795] [info] ninfer-serve: [req 2] prefill: 9984/10000 tok (100%) 8.8 tok/s
+[tp2] single-seq lane 0: acceptance=0.00 tok/round=0.00 rounds=0 gen=69 prefill=1029.78s decode=26.87s
+KFD=1
+KFD=0
+0
