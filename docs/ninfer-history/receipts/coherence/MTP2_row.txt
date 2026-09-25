@@ -1,0 +1,3 @@
+== MANIFEST 2026-09-17T00:12:14Z G-AMD-MTP2 bin b864220912aec151 --spec mtp --draft-tokens 2 GRAPHS-ON port=8100
+boot2 MTP k=2 GRAPHS-ON: count600 decode=58.35s (10.28 tok/s, rounds=204, acc=0.97, t/r=2.94) — 1.70x vs no-graphs; spot BLUE@66 exact, water coherent
+[tp2] single-seq lane 0: acceptance=0.76 tok/round=2.56 rounds=25 gen=64 prefill=2.33s decode=8.58s
