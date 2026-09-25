@@ -1,0 +1,21 @@
+[kvarn-decode-route] UNIFIED (default) (NINFER_KVARN_DECODE=<unset>)
+  rel(k5v4 vs k4v2-same-bytes)=1.002698  err(k5v4 vs bf16)=0.105060  err(k4v2 vs bf16)=13.750408
+PASS  dispatch ROUTES by width: k5v4 and k4v2 over identical bytes must differ (identical => the launcher ignored the widths and both ran slice4)
+PASS  k5v4 output is close to BF16-over-original-K/V (quantization only)
+PASS  k5v4 is closer to the BF16 reference than a k4v2 misread
+PASS  k5v4 output is all-finite
+  rel(k4v4 vs k4v2)=1.001803  rel(k4v4 vs k5v4)=0.666765  err(k4v4 vs bf16)=0.672207
+PASS  dispatch ROUTES k4v4 distinctly from k4v2 over identical bytes (identical => (4,4) fell through to slice4)
+PASS  k4v4 and k5v4 are distinct tiers, not two names for one kernel
+PASS  k4v4 output is all-finite (no read outside its geometry)
+  NATIVE k4v4 fixture: err(k4v4 vs bf16)=0.116836
+PASS  k4v4 committed AND read at (4,4) is close to BF16-over-original-K/V (quantization only, not a mis-tier read)
+PASS  native k4v4 output is all-finite
+PASS  unregistered width pair k3/v3 THROWS at dispatch (no silent k4v2 fallback)
+PASS  k5v4 on the BATCHED route THROWS (batching stays k4v2-only)
+PASS  k5v4 PREFILL read route (T>6, materialize _w) runs without error
+  [T=8 prefill] rel(k5v4 vs k4v2)=1.001272  err(k5v4 vs bf16)=0.106131  err(k4v2 vs bf16)=13.275524
+PASS  prefill route also dispatches by width
+PASS  k5v4 prefill output close to BF16 reference
+PASS  k5v4 prefill beats a k4v2 misread
+ninfer_k5v4_dispatch_test: PASS

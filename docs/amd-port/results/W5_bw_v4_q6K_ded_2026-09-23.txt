@@ -1,0 +1,56 @@
+lock held by mmvq-bw
+== producer emit (quantize_q8_1 clone, K=5120 T=4): 640 blocks, value memcmp IDENTICAL
+   legacy emit 4.23 us | aln emit 4.23 us | delta -0.1%
+== q6_K [K=5120 N=129272 210 B/block] off=4637536 len=542942400
+  t1_aln     BITEXACT vs q6_K t1_base (memcmp, 129272 rows x 1 tokens)
+  t4_base2   in-run control IDENTICAL (memcmp)
+  t2_share   BITEXACT vs q6_K t2_base (memcmp, 129272 rows x 2 tokens)
+  t3_share   BITEXACT vs q6_K t3_base (memcmp, 129272 rows x 3 tokens)
+  t4_share   BITEXACT vs q6_K t4_base (memcmp, 129272 rows x 4 tokens)
+  t4_share2  BITEXACT vs q6_K t4_base (memcmp, 129272 rows x 4 tokens)
+  t2_aln     BITEXACT vs q6_K t2_base (memcmp, 129272 rows x 2 tokens)
+  t3_aln     BITEXACT vs q6_K t3_base (memcmp, 129272 rows x 3 tokens)
+  t4_aln     BITEXACT vs q6_K t4_base (memcmp, 129272 rows x 4 tokens)
+  t4_aln2    BITEXACT vs q6_K t4_base (memcmp, 129272 rows x 4 tokens)
+  t4_cfull2  in-run control IDENTICAL (determinism memcmp)
+  t2_s2r     BITEXACT vs q6_K t2_base (memcmp, 129272 rows x 2 tokens)
+  t3_s2r     BITEXACT vs q6_K t3_base (memcmp, 129272 rows x 3 tokens)
+  t4_s2r     BITEXACT vs q6_K t4_base (memcmp, 129272 rows x 4 tokens)
+  t4_s2r2    BITEXACT vs q6_K t4_base (memcmp, 129272 rows x 4 tokens)
+  config        T    us/call       GB/s    spread   per-rep us
+  t1_base       1     3095.5      175.6    78.51%   [3015.1 3054.7 3095.5 3240.0 5445.2]
+  t1_aln        1     3760.1      144.5    65.03%   [3719.3 3723.8 3760.1 3906.2 6164.6]
+  t2_base       2     3888.6      139.9    64.32%   [3835.6 3856.9 3888.6 4008.3 6336.7]
+  t3_base       3     5544.2       98.2   107.36%   [5501.8 5499.8 5544.2 5886.0 11452.2]
+  t4_base       4     6663.1       81.8    55.23%   [6545.6 6572.2 6663.1 7055.6 10225.7]
+  t4_base2      4     6672.5       81.7    92.80%   [6545.3 6573.0 6672.5 7030.9 12737.3]
+  t2_share      2     3834.4      141.9    60.68%   [3690.7 3711.1 3834.4 3966.6 6017.4]
+  t3_share      3     5337.5      102.0   103.93%   [5238.4 5276.5 5337.5 5574.9 10785.7]
+  t4_share      4     6370.1       85.6   104.41%   [6252.9 6282.8 6370.1 6627.4 12903.6]
+  t4_share2     4     6368.8       85.6    67.37%   [6252.3 6287.6 6368.8 6630.4 10543.2]
+  t2_aln        2     6283.9       86.6    40.25%   [5999.5 6152.1 6283.9 6448.0 8528.5]
+  t3_aln        3     9026.6       60.3    61.66%   [8572.7 8792.4 9026.6 9302.0 14138.8]
+  t4_aln        4    12544.2       43.4    33.86%   [12544.2 12513.4 12524.1 12731.6 16761.4]
+  t4_aln2       4    12543.1       43.5    35.69%   [12543.1 12516.1 12525.6 12708.7 16993.3]
+  t4_cfull      4     4589.3      118.8   139.25%   [4447.1 4473.5 4589.3 4842.7 10837.7]
+  t4_cfull2     4     4748.8      114.8   115.28%   [4451.7 4472.2 4748.8 4849.2 9926.0]
+  t4_cx         4     4379.9      124.4   117.37%   [4001.7 4012.8 4379.9 4814.9 9142.6]
+  t4_cy         4     2513.0      216.9     2.71%   [2497.2 2497.4 2513.0 2565.2 2563.0]
+  t2_wide       2        0.0        inf     -nan%   [0.0 0.0 0.0 0.0 0.0]
+  t3_wide       3        0.0        inf     -nan%   [0.0 0.0 0.0 0.0 0.0]
+  t4_wide       4        0.0        inf     -nan%   [0.0 0.0 0.0 0.0 0.0]
+  t4_wide2      4        0.0        inf     -nan%   [0.0 0.0 0.0 0.0 0.0]
+  t2_s2r        2     3803.5      143.0    89.09%   [3756.5 3803.5 3789.6 4032.9 7145.2]
+  t3_s2r        3     5240.5      103.9    94.28%   [5008.9 5124.6 5240.5 6685.4 9949.5]
+  t4_s2r        4     6686.3       81.5    68.20%   [6572.9 6572.2 6686.3 8542.3 11132.1]
+  t4_s2r2       4     6714.1       81.2   100.03%   [6567.0 6567.6 6714.1 10531.5 13282.9]
+  q6_K T=4 share verdict: -4.4% vs base
+  q6_K T=4 aln verdict: +88.3% vs base, +96.9% vs share (the served increment)
+  q6_K T=4 consume ceilings: cfull 4589.3 us (118.8 GB/s) | cx 4379.9 us (124.4 GB/s) | cy 2513.0 us (216.9 GB/s)
+  q6_K T=4 decode+dp4a tax: +38.8% (share vs cfull); x-only / y-only load time ratio: 1.74
+  q6_K T=4 s2r verdict: +0.3% vs base, +5.0% vs share (the served increment)
+  q6_K session law: worst per-config spread 139.25% VOID (gate 1%)
+
+control: t4_base2/t4_share2 are the in-run controls (bit + spread);
+base-vs-share deltas at same T are the A/B verdicts; session law 1%.
+session done rc=0, releasing lock
