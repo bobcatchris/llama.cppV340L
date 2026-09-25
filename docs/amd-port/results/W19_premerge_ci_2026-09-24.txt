@@ -1,0 +1,61 @@
+CI-PASS: tree clean
+In file included from docs/amd-port/tests/test_q81_cache_host.cpp:26:
+ggml/src/ggml-cuda/common.cuh:13:9: warning: 'GGML_COMMON_DECL_HIP' macro redefined [-Wmacro-redefined]
+   13 | #define GGML_COMMON_DECL_HIP
+      |         ^
+<command line>:1:9: note: previous definition is here
+    1 | #define GGML_COMMON_DECL_HIP 1
+      |         ^
+1 warning generated when compiling for gfx900.
+In file included from docs/amd-port/tests/test_q81_cache_host.cpp:26:
+ggml/src/ggml-cuda/common.cuh:13:9: warning: 'GGML_COMMON_DECL_HIP' macro redefined [-Wmacro-redefined]
+   13 | #define GGML_COMMON_DECL_HIP
+      |         ^
+<command line>:1:9: note: previous definition is here
+    1 | #define GGML_COMMON_DECL_HIP 1
+      |         ^
+1 warning generated when compiling for host.
+test_q81_cache_host: ALL PASS
+CI-PASS: test_q81_cache_host
+== distinct random (small vocab, many trials)
+== distinct random (large vocab)
+== k-boundary near-ties
+== exact ties (documented tie-order risk)
+  [info] n_vocab=64: exact-tie trials with tie-order diffs: 43612/50000 (documented, stochastic draw only)
+  [info] n_vocab=1000: exact-tie trials with tie-order diffs: 18000/20000 (documented, stochastic draw only)
+== full-scale top-1 (129272)
+== edges
+ALL PASS
+CI-PASS: test_mtp_sampling_host
+section 1+2: splice equivalence + row resolution
+  done
+section 3: sampler parity through the fetch
+  note: vocab=129272, 2/200 trials diverged in exactly-tied candidate order (documented heap-select caveat)
+  done
+edges
+ALL PASS
+CI-PASS: test_packed_get_host
+ALL PASS (verify-row sampling parity: greedy + seeded top-k/dist, ties, guards)
+CI-PASS: test_verify_row_sampling_host
+ALL PASS (async input staging: byte-exact landings, ring-overwrite safety, event and backend-sync gates, growth, fallbacks)
+CI-PASS: test_async_input_host
+ALL PASS (pinned staging cache: reuse, growth, byte-exact copies, fallbacks)
+CI-PASS: test_pinned_staging_host
+DEFECT replicated: single-slot steady round reused = 0,0,1,1 (2 misses/round, 20 graph + meta rebuilds in 10 rounds, per-die uids churn)
+FIX proven: shape-cache steady round reused = 1,1,1,1 (0 misses/round, 2 total builds, 18 cached re-splits, per-die uids stable)
+SCHEDULE identity: cached re-entry signature 't4_st4_sq1_o4_g1' matches the fresh build; shape-A built once, uid stable (121); single-slot rebuilt every round (12 builds)
+INVALIDATION: memory update resets both slots -> both shapes rebuild, then reuse resumes
+PREDICATE safety: unseen shape misses (degrades to today's rebuild), no stale hit
+ENGAGEMENT source pin: gate env + WARN level + canonical text verified in src/llama-context.cpp
+ALL PASS: draft shape cache host suite
+CI-PASS: test_draft_shape_cache_host
+draft shape cache enabled (2 slots)
+DCENG-PROBE INFO-AT-THOLD4 level=2
+FRESHNESS: build-hip/bin/libllama.so carries the engagement gate text
+WIRING: llama_log_get reports common_log_default_callback installed
+FILTER thold=3: engagement WARN line arrives, INFO probe dropped (the E-126 visibility defect)
+FILTER thold=4: INFO probe arrives (filter direction confirmed)
+ALL PASS: engagement routing suite
+CI-PASS: test_engagement_routing_host (fresh build + served-filter routing)
+CI-SKIP: gate-wiring (CI_SKIP_GPU=1, zero-GPU run; merge gate re-runs it)
+CI-VERDICT: PASS

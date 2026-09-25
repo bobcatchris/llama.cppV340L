@@ -1,0 +1,248 @@
+die 3 (0000:0d:00.0) -> HIP_VISIBLE_DEVICES=2
+W30 mmvq-c4 SHORT bench, 2026-09-24T15:36:15-05:00, die 3 = 0000:0d:00.0 = HIP_VISIBLE_DEVICES=2 (resolved at runtime)
+binary: /tmp/w30_bench_default (default codegen; -mllvm -amdgpu-max-vgpr NOT AVAILABLE on ROCm 6.2.0 LLVM 18,
+  so the max-vgpr 80/96 arms are BUILD-FAIL and the occupancy question rests on LB-2 + OCC report)
+timing convention: T=4, niter=30, reps=5, spread law 1.05%
+
+=== RUN iq4_xs base/lb2 + dump: iq4_xs 4 base,lb2,base 30 5 --dump /tmp/w30_ref_iq4_xs.bin ===
+device PCI: 0000:0d:00.0
+bench_mmvq_real: iq4_xs K=5120 N=17408 T=4 niter=30 reps=5 arms=base,lb2,base
+reference dumped to /tmp/w30_ref_iq4_xs.bin (69632 floats)
+base           us: 610.4 612.0 603.7 614.0 601.5 | med 610.4 spread 2.04% SPREAD-FAIL
+lb2            ORACLE BITEXACT
+lb2            us: 616.8 614.0 620.0 622.2 614.6 | med 616.8 spread 1.33% SPREAD-FAIL
+base           ORACLE BITEXACT
+base           us: 607.8 614.8 609.5 610.3 604.9 | med 609.5 spread 1.63% SPREAD-FAIL
+oracle: ALL BITEXACT
+RUN-EXIT:0
+
+=== RUN iq4_xs_f pair/fused: iq4_xs_f 4 pair,fused,pair 30 5 ===
+device PCI: 0000:0d:00.0
+bench_mmvq_real: iq4_xs_f K=5120 N=17408 T=4 niter=30 reps=5 arms=pair,fused,pair
+pair           us: 1211.2 1214.8 1198.9 1210.9 1222.1 | med 1211.2 spread 1.92% SPREAD-FAIL
+fused          ORACLE FAIL
+  mismatch[0]: row 0 tok 0: base 3.17052125e+11 arm 3.17052191e+11 rel 2.07e-07
+  mismatch[1]: row 1 tok 0: base -2.53001114e+10 arm -2.53001236e+10 rel 4.86e-07
+  mismatch[3]: row 3 tok 0: base -4.23460078e+11 arm -4.23460143e+11 rel 1.55e-07
+  mismatch[4]: row 4 tok 0: base -1.0334829e+11 arm -1.03348339e+11 rel 4.76e-07
+  total: 19449/69632 max_rel 0.114 | by_tok: 5720 5754 5452 2523 | by_rowpar: 11035 8414 | by_cta16: 1271 1213 1167 1189 1183 1203 1281 1247 1177 1167 1213 1250 1225 1197 1215 1251
+fused          us: 2612.4 2613.4 2604.2 2597.1 2612.5 | med 2612.4 spread 0.62%
+pair           ORACLE BITEXACT
+pair           us: 1218.5 1228.7 1228.9 1221.7 1224.8 | med 1224.8 spread 0.84%
+oracle: DEFECT - do not use timing
+RUN-EXIT:1
+
+=== RUN iq3_s base/lb2 + dump: iq3_s 4 base,lb2,base 30 5 --dump /tmp/w30_ref_iq3_s.bin ===
+device PCI: 0000:0d:00.0
+bench_mmvq_real: iq3_s K=5120 N=17408 T=4 niter=30 reps=5 arms=base,lb2,base
+reference dumped to /tmp/w30_ref_iq3_s.bin (69632 floats)
+base           us: 1752.0 1766.7 1755.6 1771.9 1752.2 | med 1755.6 spread 1.13% SPREAD-FAIL
+lb2            ORACLE BITEXACT
+lb2            us: 1777.4 1771.7 1776.6 1772.3 1767.4 | med 1772.3 spread 0.56%
+base           ORACLE BITEXACT
+base           us: 1759.7 1757.8 1763.0 1756.6 1762.4 | med 1759.7 spread 0.36%
+oracle: ALL BITEXACT
+RUN-EXIT:0
+
+=== RUN iq3_s_f pair/fused: iq3_s_f 4 pair,fused,pair 30 5 ===
+device PCI: 0000:0d:00.0
+bench_mmvq_real: iq3_s_f K=5120 N=17408 T=4 niter=30 reps=5 arms=pair,fused,pair
+pair           us: 3494.4 3479.9 3481.3 3495.0 3481.5 | med 3481.5 spread 0.43%
+fused          ORACLE BITEXACT
+fused          us: 4241.9 4240.8 4244.1 4241.2 4241.9 | med 4241.9 spread 0.08%
+pair           ORACLE BITEXACT
+pair           us: 3485.6 3499.2 3521.9 3475.0 3497.4 | med 3497.4 spread 1.34% SPREAD-FAIL
+oracle: ALL BITEXACT
+RUN-EXIT:0
+
+=== RUN q4_K base/lb2 + dump: q4_K 4 base,lb2,base 30 5 --dump /tmp/w30_ref_q4_K.bin ===
+device PCI: 0000:0d:00.0
+bench_mmvq_real: q4_K K=5120 N=17408 T=4 niter=30 reps=5 arms=base,lb2,base
+reference dumped to /tmp/w30_ref_q4_K.bin (69632 floats)
+base           us: 1086.7 1073.6 1079.1 1080.1 1079.0 | med 1079.1 spread 1.21% SPREAD-FAIL
+lb2            ORACLE BITEXACT
+lb2            us: 1077.9 1086.6 1084.9 1081.2 1090.9 | med 1084.9 spread 1.20% SPREAD-FAIL
+base           ORACLE BITEXACT
+base           us: 1076.1 1078.4 1078.3 1074.9 1081.8 | med 1078.3 spread 0.64%
+oracle: ALL BITEXACT
+RUN-EXIT:0
+
+=== RUN occ iq4_xs: iq4_xs 4 base,lb2,lb4 --occupancy ===
+device PCI: 0000:0d:00.0
+bench_mmvq_real: iq4_xs K=5120 N=17408 T=4 niter=1 reps=1 arms=base,lb2,lb4
+OCC iq4_xs/base/T4: numRegs=84 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq4_xs/lb2/T4: numRegs=84 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq4_xs/lb4/T4: numRegs=64 shared=2048 local=80 maxThreadsPerBlock=128 ctas_per_cu=8
+occupancy dump done
+RUN-EXIT:0
+
+=== RUN occ iq3_s: iq3_s 4 base,lb2,lb4 --occupancy ===
+device PCI: 0000:0d:00.0
+bench_mmvq_real: iq3_s K=5120 N=17408 T=4 niter=1 reps=1 arms=base,lb2,lb4
+OCC iq3_s/base/T4: numRegs=77 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq3_s/lb2/T4: numRegs=77 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq3_s/lb4/T4: numRegs=64 shared=2048 local=64 maxThreadsPerBlock=128 ctas_per_cu=8
+occupancy dump done
+RUN-EXIT:0
+
+=== RUN occ q4_K: q4_K 4 base,lb2,lb4 --occupancy ===
+device PCI: 0000:0d:00.0
+bench_mmvq_real: q4_K K=5120 N=17408 T=4 niter=1 reps=1 arms=base,lb2,lb4
+OCC q4_K/base/T4: numRegs=112 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q4_K/lb2/T4: numRegs=111 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q4_K/lb4/T4: numRegs=64 shared=2048 local=256 maxThreadsPerBlock=128 ctas_per_cu=8
+occupancy dump done
+RUN-EXIT:0
+
+=== RUN occ iq4_xs_f: iq4_xs_f 4 pair,fused --occupancy ===
+device PCI: 0000:0d:00.0
+bench_mmvq_real: iq4_xs_f K=5120 N=17408 T=4 niter=1 reps=1 arms=pair,fused
+OCC iq4_xs/pair/T4: numRegs=84 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq4_xs/fused/T4: numRegs=63 shared=4096 local=80 maxThreadsPerBlock=128 ctas_per_cu=8
+occupancy dump done
+RUN-EXIT:0
+
+=== RUN occ iq3_s_f: iq3_s_f 4 pair,fused --occupancy ===
+device PCI: 0000:0d:00.0
+bench_mmvq_real: iq3_s_f K=5120 N=17408 T=4 niter=1 reps=1 arms=pair,fused
+OCC iq3_s/pair/T4: numRegs=77 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq3_s/fused/T4: numRegs=104 shared=4096 local=80 maxThreadsPerBlock=128 ctas_per_cu=4
+occupancy dump done
+RUN-EXIT:0
+
+W30 SESSION DONE 2026-09-24T15:36:24-05:00
+
+ADJUDICATION (bench-finisher, 2026-09-24 15:40 CDT, oracle-first law)
+
+Oracle verdicts:
+- lb2 arm: BITEXACT on iq4_xs, iq3_s, q4_K (3/3 types).
+- fused arm (C4 GLU-fusion T=4): iq3_s BITEXACT; iq4_xs ORACLE FAIL -
+  19449/69632 els differ (27.9%), max_rel 0.114, spread across all tokens,
+  both row parities, all CTA buckets (not the localized W17 tile signature;
+  the fused has_fusion code path diverges from the pair sequence only on
+  the iq4_xs instantiation). DEFECT - do not use timing (still recorded).
+- max-vgpr 80/96 arms: NOT RUN - BUILD-FAIL. ROCm 6.2.0 LLVM 18 has no
+  -mllvm -amdgpu-max-vgpr option (verified against the option registry);
+  GGML_HIP_MMVQ_MAXREG as committed cannot build on this stack.
+
+Timing medians (T=4, niter=30, reps=5, us):
+- iq4_xs:  base 610.4 | lb2 616.8 (+1.05%) | pair 1211.2 | fused 2612.4
+- iq3_s:   base 1755.6 | lb2 1772.3 (+0.95%) | pair 3481.5 | fused 4241.9 (+21.8% vs pair)
+- q4_K:    base 1079.1 | lb2 1084.9 (+0.54%) (no same-type gate partner -> no fusion arm)
+
+Occupancy (default codegen): base numRegs 84/77/112, ctas_per_cu 6/6/6/4
+(iq4_xs/iq3_s/q4_K). lb2 changes NOTHING (84/77/111 regs, same ctas) -
+__launch_bounds__(128,2) is already satisfied, the arm is a no-op.
+lb4 (not timed, not in spec) forces regs to 64 and ctas to 8 but q4_K
+spills to 256 B local. Fused kernel: iq4_xs 63 regs/8 ctas,
+iq3_s 104 regs/4 ctas.
+
+Verdict: BOTH W30 arms FAIL adjudication for the served C4 class.
+- lb2: bit-exact but a codegen no-op, deltas within noise. NO WIN.
+- fused: iq4_xs numerically wrong (oracle law kills it); iq3_s bit-exact
+  but +21.8% slower (fewer CTAs x 2x work each does not beat the served
+  3-launch sequence at these sizes). NO WIN.
+Recommendation: keep GGML_CUDA_MMVQ_GLU_FUSION_T4 / GGML_CUDA_MMVQ_LB
+default-off (they are default-off; served builds stay byte-identical).
+No promotion.
+
+Caveats: session 15:36:15-15:36:24 (9 s, dies idle, 42-47 C at start);
+several arms SPREAD-FAIL the 1.05% law (1.1-2.0%) - short-session clock
+ramp; base dup arms reproduce within 0.5-1.5% so medians are usable.
+Reference dumps: /tmp/w30_ref_{iq4_xs,iq3_s,q4_K}.bin for any future
+cross-binary oracle.
+
+CHARACTERIZATION (C4-FAIL desk, 2nd dispatch, 2026-09-24 22:13 UTC; zero-GPU,
+compile-only ISA evidence; ROCm 6.2.41133 / clang 18.0.0git, gfx900)
+
+Q: why is the C4 fused arm (GGML_CUDA_MMVQ_GLU_FUSION_T4, mul_mat_vec_q
+<type, ncols_dst=4, has_fusion=true>) oracle BIT-EXACT on iq3_s but FAIL on
+iq4_xs (19449/69632 els, max_rel 0.114, broad over all tokens / both row
+parities / all CTA buckets)?
+
+A: FMA-contraction divergence between template instantiations. NOT a logic
+bug. The fused branch is semantically identical to the served pair sequence
+(same vec_dot_q_cuda, same geometry, same dst layout; up dot at
+ggml/src/ggml-cuda/mmvq.cu:782-783, gate dot at mmvq.cu:786-788, silu
+epilogue at mmvq.cu:841-870 vs bench glu_apply_swiglu at
+docs/amd-port/tests/bench_mmvq_real.cu:149-156). Both vec_dots end in the
+same float skeleton,
+
+  acc += (float(bq.d) * float(bq8_1.ds)) * float(sumi)
+  [vecdotq.cuh:1660-1661 (iq4_xs), vecdotq.cuh:1483-1484 (iq3_s)]
+
+which contains one contractible a+b*c site per accumulation step. Under the
+HIP default -ffp-contract=fast the compiler is free to fuse it per
+instantiation, and it fused inconsistently:
+
+ISA evidence (hipcc -O3 -x hip --offload-arch=gfx900 --save-temps on
+bench_mmvq_real.cu at the W30 build flags; kernel bodies extracted from
+bench_mmvq_real-hip-amdgcn-amd-amdhsa-gfx900.s):
+
+  kernel              v_fma_f32  v_add_f32  v_mul_f32   accumulation in the
+                                                                   hot loop
+  iq4_xs pair  (T4)      1          63         30      7/8 chains mul+add,
+                                                         1/8 chain fma
+  iq4_xs fused (T4)    115         156         92      all chains fma
+  iq3_s pair  (T4)      16          56         16      fma
+  iq3_s fused (T4)     115         156         92      fma
+
+iq4_xs pair loop-carried merges (block %.loopexit165): seven v_add_f32
+acc-merges plus exactly one v_fma_f32 (v9); the per-dot tail is
+v_cvt_f32_f16, v_cvt_f32_i32, v_mul_f32 (d*ds), v_mul_f32 (t*sumi) ->
+3 roundings per step. iq4_xs fused tail: v_cvt_f32_f16, v_cvt_f32_i32,
+v_mul_f32 (d*ds), v_fma_f32 (t*sumi+acc) -> 2 roundings per step. That
+rounding difference on every one of ~160 accumulation steps reproduces the
+observed signature exactly: ulp-scale rel errors (sampled 1.5e-7..4.9e-7),
+broad uniform mismatch (28%), max_rel 0.114 at near-cancellation outputs.
+iq3_s pair and fused both chose fma -> same rounding -> BITEXACT. The
+contraction choice flipped for iq4_xs because the fused instantiation
+carries 16 accumulator chains (T=4 x rpb=2, up+gate) vs 8 and compiles
+completely differently (OCC: fused iq4_xs 63 regs / 80B local / 8 ctas vs
+pair 84 regs / 48B / 6 ctas); clang's contraction heuristic is
+instantiation-local, so bit-exactness of a fused variant vs the pair
+sequence is not guaranteed by the source and cannot be asserted per type
+without the oracle - exactly why the oracle-first law exists.
+
+CLASSIFICATION: numerics-class (candidate (a), fp-order/contraction), not
+(b) pre/post-scale (epilogue applies silu AFTER the full gate dot and BEFORE
+the up multiply on both paths), not (c) wrong index/missing scale (both dots
+use the same kbx_offset/kqs/stride indexing as the pair launches; the oracle
+reference is produced in-process from the same vx/vgate buffers, so offset
+errors cannot produce this signature).
+
+Owner-sign-off lever (accept ulp-level divergence): NOT APPLICABLE. The
+lever is only worth pulling if the arm is faster. It is not: fused iq4_xs
+2612.4 us vs pair 1211.2 (2.16x slower; recorded timing, oracle-defective
+run) and fused iq3_s 4241.9 vs pair 3481.5 (+21.8%, exact). Signing off
+numerics to keep a 2x regression is a non-starter.
+
+SALVAGE REALITY CHECK (W30's own table):
+- iq4_xs_f: wrong AND 2.16x slower.
+- iq3_s_f: exact AND +21.8% slower (fused 104 regs -> 4 ctas/cu vs pair 6;
+  2x per-CTA work does not beat the 3-launch sequence at K=5120 N=17408 T=4).
+- q4_K: no same-type gate partner in the served GGUF -> no fusion arm.
+- iq3_xxs_f: in the harness table but not run in W30; both tested types
+  lose for the same structural reason (doubled per-CTA dot work, spills),
+  so no evidence it flips the verdict.
+NO type in the W30 table is both exact AND faster. VERDICT: C4 GLU-fusion
+T=4 arm is DEAD. Keep GGML_CUDA_MMVQ_GLU_FUSION_T4 default-off (it already
+is; served builds stay byte-identical). No promotion, no further GPU spend
+on this arm.
+
+FIX PATH (A6): SKIPPED. Making the fused iq4_xs instantiation bit-match the
+pair sequence would require reproducing the pair kernel's exact mixed
+contraction pattern (7/8 chains uncontracted + 1/8 contracted) - a compiler
+heuristic outcome, not expressible in source. Forcing -ffp-contract=off (or
+FP_CONTRACT pragma) on mmvq.cu would change the SERVED base/pair kernels'
+bit-stream too (iq3_s base is fully contracted today; iq4_xs base carries
+the one contracted chain), violating the served byte-identity law - and
+would still leave the arm 2.16x/+21.8% slower. Nothing to salvage.
+
+ISA evidence repro (no GPU needed):
+  /opt/rocm-6.2.0/bin/hipcc -O3 -x hip --offload-arch=gfx900 -DGGML_USE_HIP \
+    -DGGML_BACKEND_BUILD -DGGML_SHARED -I ggml/include -I ggml/src \
+    -I ggml/src/ggml-cuda --save-temps -c docs/amd-port/tests/bench_mmvq_real.cu
+  grep the gfx900 .s for mul_mat_vec_qIL9ggml_type23ELi4 (iq4_xs) / type21
+  (iq3_s) with template args Li4ELb1.. (fused) vs Li4ELb0.. (pair) and count
+  v_fma_f32 / v_add_f32 / v_mul_f32 per kernel body.

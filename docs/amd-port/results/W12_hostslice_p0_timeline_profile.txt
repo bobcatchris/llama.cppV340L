@@ -1,0 +1,49 @@
+== docs/amd-port/results/W12_hostslice_diag_tl_165820.log: 40890 timeline events ==
+  verify: n=2
+  meta host (whole graph_compute)              n=2     med   130.739 ms  min    27.779  p90   233.698  max   233.698
+  meta allreduce host (comm enqueues)          n=2     med     7.984 ms  min     6.051  p90     9.916  max     9.916
+  meta replays/ubatch                          n=2     med   516.000     min   516.000  p90   516.000  max   516.000
+  meta bounds/ubatch                           n=2     med   128.000     min   128.000  p90   128.000  max   128.000
+  meta comm/ubatch (RCCL served)               n=2     med   128.000     min   128.000  p90   128.000  max   128.000
+  meta fb/ubatch (butterfly fallback)          n=2     med     0.000     min     0.000  p90     0.000  max     0.000
+  graph nodes                                  n=2     med  4278.000     min  4278.000  p90  4278.000  max  4278.000
+  catchup: n=72
+  meta host (whole graph_compute)              n=72    med     2.909 ms  min     0.314  p90    10.704  max    27.553
+  meta allreduce host (comm enqueues)          n=72    med     0.279 ms  min     0.127  p90     5.417  max     5.980
+  meta replays/ubatch                          n=72    med    12.000     min    12.000  p90   516.000  max   516.000
+  meta bounds/ubatch                           n=72    med     2.000     min     2.000  p90   128.000  max   128.000
+  meta comm/ubatch (RCCL served)               n=72    med     2.000     min     2.000  p90   128.000  max   128.000
+  meta fb/ubatch (butterfly fallback)          n=72    med     0.000     min     0.000  p90     0.000  max     0.000
+  graph nodes                                  n=72    med    49.000     min    49.000  p90  4278.000  max  4278.000
+  draft: n=5
+  meta host (whole graph_compute)              n=5     med    29.090 ms  min     0.815  p90   279.075  max   279.075
+  meta allreduce host (comm enqueues)          n=5     med     1.505 ms  min     0.127  p90     6.891  max     6.891
+  meta replays/ubatch                          n=5     med   516.000     min    12.000  p90   516.000  max   516.000
+  meta bounds/ubatch                           n=5     med   128.000     min     2.000  p90   128.000  max   128.000
+  meta comm/ubatch (RCCL served)               n=5     med   128.000     min     2.000  p90   128.000  max   128.000
+  meta fb/ubatch (butterfly fallback)          n=5     med     0.000     min     0.000  p90     0.000  max     0.000
+  graph nodes                                  n=5     med  4278.000     min    49.000  p90  4278.000  max  4278.000
+  cuda mode=replay: n=24140
+  cuda host per call                           n=24140 med     0.007 ms  min     0.002  p90     0.015  max     0.076
+  cuda check (compat+props scan)               n=24140 med     0.001 ms  min     0.000  p90     0.001  max     0.019
+  cuda launch (graph launch, incl. backpressure) n=24140 med     0.006 ms  min     0.002  p90     0.012  max     0.045
+  cuda nodes                                   n=24140 med     8.000     min     5.000  p90    64.000  max    65.000
+  cuda mode=capture: n=1976
+  cuda host per call                           n=1976  med     0.352 ms  min     0.016  p90     0.451  max     4.805
+  cuda check (compat+props scan)               n=1976  med     0.001 ms  min     0.000  p90     0.002  max     0.003
+  cuda launch (graph launch, incl. backpressure) n=1976  med     0.005 ms  min     0.001  p90     0.012  max     0.045
+  cuda nodes                                   n=1976  med     8.000     min     5.000  p90    64.000  max    65.000
+  cuda mode=direct: n=5300
+  cuda host per call                           n=5300  med     0.043 ms  min     0.004  p90     0.080  max   698.080
+  cuda check (compat+props scan)               n=5300  med     0.001 ms  min     0.000  p90     0.001  max     0.026
+  cuda launch (graph launch, incl. backpressure) n=5300  med     0.000 ms  min     0.000  p90     0.000  max     0.000
+  cuda nodes                                   n=5300  med    44.000     min     5.000  p90    64.000  max    65.000
+  per round (n=1, verify->verify windows):
+  sched input copies (cpy delta)               n=1     med    66.000     min    66.000  p90    66.000  max    66.000
+  sched input drains (csync delta)             n=1     med    66.000     min    66.000  p90    66.000  max    66.000
+  backend syncs (all, delta)                   n=1     med   500.000     min   500.000  p90   500.000  max   500.000
+  backend sync blocked ms (delta)              n=1     med   374.220 ms  min   374.220  p90   374.220  max   374.220
+  drain lines/round                            n=1     med    17.000     min    17.000  p90    17.000  max    17.000
+  drain ms/round (sum)                         n=1     med   177.688 ms  min   177.688  p90   177.688  max   177.688
+  verify decode issue: n=2 med 200.273 ms
+  meta host share of verify issue (%)          n=2     med    58.136 %   min    16.766  p90    99.506  max    99.506

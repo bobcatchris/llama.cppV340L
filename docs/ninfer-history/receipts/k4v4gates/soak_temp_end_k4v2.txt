@@ -1,0 +1,1 @@
+GPU[0]		: Temperature (Sensor edge) (C): 84.0

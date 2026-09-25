@@ -1,0 +1,25 @@
+W7 ROW — G4 chunk-ladder probe: --prefill-chunk 256 vs 128, 2026-09-18, window 7 (lane amd/wo-w7-body)
+bin: a943225ad6da661e (same as serving); env: P2 known-good MINUS the 96 MiB workspace override
+  (arena left free to size for chunk 256; allocator gated, no refusal constants — VRAM law);
+  probe plen-2075 mt 64 temp 0; clocks sideband W7_ladder_clocks.log (partial coverage, leg tail);
+  serve log W7_ladder_chunk256_serve.log; n=9 chunk-forwards for 2075 tokens (vs n=17 at 128).
+
+MEASURED (4-rank means, per 256-token chunk):
+  wall 2730-2840 (mean ~2770)  => 256/2.77s = 92.4 tok/s prefill class (+15% vs the 80.1 class at chunk 128)
+  gemm 1748-1822  -> 6.9-7.1 ms/128tok-equivalent vs 5.86 at M=128: **GEMM TF/s did NOT rise** (~2.0-2.1 TF/s/die;
+    the V0 family is per-thread-resourced, M only tiles the grid). The G4 hope of a free GEMM win at larger M is
+    MEASURED DEAD — consistent with the tile-shape/CSHAPE/W3 closures (per-thread constraints, not grid arithmetic).
+  dn 541-554      -> 2.15 ms/token vs 3.76 at M=128: dn is LAUNCH/FIXED-cost bound (64 layers x per-chunk overhead);
+    the W1 SIMT cure amortizes BETTER on the ladder (per-token dn halves again).
+  gqa 62-64 (vs 2x34): ~sub-linear. gate 16-19.6 (vs 2x11): sub-linear. unbr 81-113. mact ~4.
+  ar 79-123 (vs 2x65=130): mildly sub-linear.
+  gap 391-501 (!!) vs 360 for two 128-chunks: gap is TOKEN-PROPORTIONAL OR WORSE, now ~16% of the chunk —
+    the W2 gap-capture target is fatter than the plan's 122.7-era number and grows with chunk size.
+
+LADDER VERDICT: +15% today (92.4 class); the ladder COMPOUNDS with W1 (dn cure) and W2 (gap capture) but does
+  NOT unlock GEMM. Post W1+W2 the M=128 and M=256 paths project to the same ~110-135 class; chunk 256 remains
+  worth a re-leg after gap capture (its gap share is the bigger prize there).
+HARD CEILING STATE (measured this window): GEMM alone at 2.0-2.1 TF/s/die = 8.0-8.6 TF/s aggregate over a
+  54 TF/s 1k requirement => with the GEMM front closed (5 ledger kills) prefill caps at ~163 tok/s even if every
+  non-GEMM ms went to zero. Reaching 300+ requires the named G1 reopeners (gfx906 dot10 class, compiler
+  wait-emission at <=112 VGPR, or a different arithmetic class). This is the honest number to plan against.
