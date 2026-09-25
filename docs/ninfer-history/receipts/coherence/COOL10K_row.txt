@@ -1,0 +1,15 @@
+== MANIFEST 2026-09-17T01:54:57Z night COOL10K (cool-machine 10k MTP row with clocks sideband) bin 07ad7eccc0b97cc0
+grant: user order "start on it now, full velocity" (blanket GPU grant 2026-09-16 stands)
+config: TP4 --devices 0,1,2,3 --spec mtp --draft-tokens 2 GRAPHS-ON port=8100 NINFER_TP2_TIMING=1 NINFER_WORKSPACE_MIB=96 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16
+purpose: honest deep-ctx numbers under THARM1 law — MTP3's 3.52 tok/s decode and E-16's 2.6 are thermal-confounded. plen=10000 (BLUE base 62 + 9938 alphas), mt=192, clocks sideband (sysfs pp_dpm_sclk + edge) sampled 2s through the whole leg
+pre-state: edge 36-42C after ~15 min idle (THARM1 released ~20:50); KFD=0
+== LEG: plen=10000 (BLUE 62 + 9938 alphas) mt=192 temp=0, MTP k=2 graphs-ON, cool start (edge 36-42C after ~15 min idle)
+== GRADE: finish=stop content='BLUE' mojibake=none -> PASS
+[tp2] single-seq lane 0: acceptance=0.69 tok/round=2.42 rounds=26 gen=63 prefill=885.49s decode=17.27s (COOL10K_serve.log)
+done line: ttft=885492ms prefill=11.3tok/s decode=3.5tok/s wall=902.78s speculative=mtp 2.38tok/round (69.2%)
+== PREFILL (phase-separated): PLATEAU 24.5->23.7 tok/s FLAT through tok 1664 (~68 s — longest plateau tonight, cool start; PF-A 53 s, MTP3 ~60 s) -> KNEE 18.0/15.6/14.4 across tok 1792-2304 (~13 s) -> SLOW 12.5 by tok 2560 -> deep ~9.x; total 885.49 s = 11.30 tok/s mean (1.06x MTP3 939.25 s = 10.65)
+   knee-onset ordering (1664 > MTP3 1152) fits the THARM1 load-duration integrator: cooler start buys ~10 s more plateau
+== DECODE (phase-separated): 17.27 s / 63 tok = 3.65 tok/s engine-side (billed 3.5) @10k ctx
+   CONFOUND STILL PRESENT: decode follows the 885 s prefill soak — sideband (COOL10K_clocks.log, sysfs) shows decode-window sclk unstable 300-1269 MHz at edge 84-85C. The honest cool 10k decode CANNOT be had without the privileged forced-clock cell (decode cannot precede its own prefill); tonight's number is the soaked-machine number and brackets the crisis together with THARM1's 12.0-vs-5.5 @1.3k datum
+== CLOCK PROOF: COOL10K_clocks.log (sysfs pp_dpm_sclk + edge, 2 s, whole leg banked): plateau window 991-1350 MHz, knee/deep 560-775 collapses, decode window 300-1269 unstable
+== RELEASE 2026-09-17T02:12:37Z: sampler 2455243 stopped (own); serve killed exact-PID anchored 2455246 (sole match); no serve remains; KFD=0 verified
