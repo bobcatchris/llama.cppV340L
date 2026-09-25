@@ -1,0 +1,3 @@
+== MANIFEST 2026-09-17T00:14:57Z G-AMD-BASE2 bin b864220912aec151 NON-MTP GRAPHS-ON port=8100
+boot3 NON-MTP GRAPHS-ON: count600 decode=180.32s (3.33 tok/s) — same-shape baseline; MTP k=2+graphs = 3.09x
+[tp2] single-seq lane 0: acceptance=0.00 tok/round=0.00 rounds=0 gen=600 prefill=3.09s decode=180.32s
