@@ -1,0 +1,10 @@
+ggml_cuda_init: found 3 ROCm devices (Total VRAM: 24528 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+  Device 1: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+  Device 2: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+| model                          |       size |     params | backend    | ngl | type_k | type_v |     sm |  fa |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | --: | -----: | -----: | -----: | --: | --------------: | -------------------: |
+| qwen35 27B all F32 (guessed)   |  11.41 GiB |    26.10 B | ROCm       |  99 |   q4_0 |   q4_0 | tensor |   1 |         pp10000 |         94.69 ± 0.00 |
+| qwen35 27B all F32 (guessed)   |  11.41 GiB |    26.10 B | ROCm       |  99 |   q4_0 |   q4_0 | tensor |   1 |           tg128 |         12.24 ± 0.00 |
+
+build: 24e9e5dc4 (114)

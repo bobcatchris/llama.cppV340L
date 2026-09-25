@@ -1,0 +1,422 @@
+device 0: AMD Radeon Graphics CUs 56 clk 1500 MHz | reps 3 x 100 iters (interleaved)
+
+resource census (hipFuncGetAttributes):
+  a1 MT128 NT32 TY4 TX4 KC32 fl0: THT 256 VGPR  74 lds 20992 B (wave cap: VGPR 10/SIMD, LDS 3 WG/CU, reg-limited threads 256)
+  a2 MT128 NT32 TY4 TX4 KC32 fl64: THT 256 VGPR  74 lds 20992 B (wave cap: VGPR 10/SIMD, LDS 3 WG/CU, reg-limited threads 256)
+  a3 MT128 NT64 TY8 TX4 KC32 fl0: THT 256 VGPR 118 lds 25088 B (wave cap: VGPR 8/SIMD, LDS 2 WG/CU, reg-limited threads 256)
+  a4 MT128 NT64 TY8 TX4 KC16 fl0: THT 256 VGPR  88 lds 12544 B (wave cap: VGPR 10/SIMD, LDS 5 WG/CU, reg-limited threads 256)
+  a5 MT128 NT128 TY8 TX8 KC16 fl0: THT 256 VGPR 132 lds 16640 B (wave cap: VGPR 7/SIMD, LDS 3 WG/CU, reg-limited threads 256)
+  a6 MT128 NT128 TY8 TX8 KC32 fl0: THT 256 VGPR 155 lds 33280 B (wave cap: VGPR 6/SIMD, LDS 1 WG/CU, reg-limited threads 256)
+  a7 MT64 NT128 TY8 TX8 KC32 fl0: THT 128 VGPR 161 lds 25088 B (wave cap: VGPR 6/SIMD, LDS 2 WG/CU, reg-limited threads 128)
+  a8 MT128 NT64 TY4 TX8 KC32 fl0: THT 256 VGPR  93 lds 25088 B (wave cap: VGPR 10/SIMD, LDS 2 WG/CU, reg-limited threads 256)
+  a9 MT128 NT64 TY8 TX8 KC16 fl0: THT 128 VGPR 134 lds 12544 B (wave cap: VGPR 7/SIMD, LDS 5 WG/CU, reg-limited threads 128)
+
+phase 1: oracle (die0 share) + fp64/rocBLAS error anchors
+  ffn_gate      a1 MT128 NT32 TY4 TX4 KC32 fl0 ks2: mismatch  0.000% max rel 0.00e+00 | L2 f64 9.401e-03 (rb16 4.875e-02) -> PASS
+  ffn_gate      a2 MT128 NT32 TY4 TX4 KC32 fl64 ks2: mismatch  0.000% max rel 0.00e+00 | L2 f64 9.401e-03 (rb16 4.875e-02) -> PASS
+  ffn_gate      a3 MT128 NT64 TY8 TX4 KC32 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.512e-03 (rb16 4.875e-02) -> PASS
+  ffn_gate      a4 MT128 NT64 TY8 TX4 KC16 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.512e-03 (rb16 4.875e-02) -> PASS
+  ffn_gate      a5 MT128 NT128 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.581e-03 (rb16 4.875e-02) -> PASS
+  ffn_gate      a6 MT128 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.581e-03 (rb16 4.875e-02) -> PASS
+  ffn_gate      a7 MT64 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.581e-03 (rb16 4.875e-02) -> PASS
+  ffn_gate      a8 MT128 NT64 TY4 TX8 KC32 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.512e-03 (rb16 4.875e-02) -> PASS
+  ffn_gate      a9 MT128 NT64 TY8 TX8 KC16 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.512e-03 (rb16 4.875e-02) -> PASS
+  ffn_up        a1 MT128 NT32 TY4 TX4 KC32 fl0 ks2: mismatch  0.000% max rel 0.00e+00 | L2 f64 9.401e-03 (rb16 4.875e-02) -> PASS
+  ffn_up        a2 MT128 NT32 TY4 TX4 KC32 fl64 ks2: mismatch  0.000% max rel 0.00e+00 | L2 f64 9.401e-03 (rb16 4.875e-02) -> PASS
+  ffn_up        a3 MT128 NT64 TY8 TX4 KC32 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.512e-03 (rb16 4.875e-02) -> PASS
+  ffn_up        a4 MT128 NT64 TY8 TX4 KC16 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.512e-03 (rb16 4.875e-02) -> PASS
+  ffn_up        a5 MT128 NT128 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.581e-03 (rb16 4.875e-02) -> PASS
+  ffn_up        a6 MT128 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.581e-03 (rb16 4.875e-02) -> PASS
+  ffn_up        a7 MT64 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.581e-03 (rb16 4.875e-02) -> PASS
+  ffn_up        a8 MT128 NT64 TY4 TX8 KC32 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.512e-03 (rb16 4.875e-02) -> PASS
+  ffn_up        a9 MT128 NT64 TY8 TX8 KC16 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.512e-03 (rb16 4.875e-02) -> PASS
+  ffn_down      a1 MT128 NT32 TY4 TX4 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.403e-03 (rb16 1.965e-02) -> PASS
+  ffn_down      a2 MT128 NT32 TY4 TX4 KC32 fl64 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.403e-03 (rb16 1.965e-02) -> PASS
+  ffn_down      a3 MT128 NT64 TY8 TX4 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.403e-03 (rb16 1.965e-02) -> PASS
+  ffn_down      a4 MT128 NT64 TY8 TX4 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.403e-03 (rb16 1.965e-02) -> PASS
+  ffn_down      a5 MT128 NT128 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.403e-03 (rb16 1.965e-02) -> PASS
+  ffn_down      a6 MT128 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.403e-03 (rb16 1.965e-02) -> PASS
+  ffn_down      a7 MT64 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.403e-03 (rb16 1.965e-02) -> PASS
+  ffn_down      a8 MT128 NT64 TY4 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.403e-03 (rb16 1.965e-02) -> PASS
+  ffn_down      a9 MT128 NT64 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.403e-03 (rb16 1.965e-02) -> PASS
+  gdn_qkv       a1 MT128 NT32 TY4 TX4 KC32 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 4.935e-03 (rb16 5.393e-02) -> PASS
+  gdn_qkv       a2 MT128 NT32 TY4 TX4 KC32 fl64 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 4.935e-03 (rb16 5.393e-02) -> PASS
+  gdn_qkv       a3 MT128 NT64 TY8 TX4 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.325e-03 (rb16 5.393e-02) -> PASS
+  gdn_qkv       a4 MT128 NT64 TY8 TX4 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.325e-03 (rb16 5.393e-02) -> PASS
+  gdn_qkv       a5 MT128 NT128 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.325e-03 (rb16 5.393e-02) -> PASS
+  gdn_qkv       a6 MT128 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.325e-03 (rb16 5.393e-02) -> PASS
+  gdn_qkv       a7 MT64 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.325e-03 (rb16 5.393e-02) -> PASS
+  gdn_qkv       a8 MT128 NT64 TY4 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.325e-03 (rb16 5.393e-02) -> PASS
+  gdn_qkv       a9 MT128 NT64 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.325e-03 (rb16 5.393e-02) -> PASS
+  ssm_out       a1 MT128 NT32 TY4 TX4 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  ssm_out       a2 MT128 NT32 TY4 TX4 KC32 fl64 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  ssm_out       a3 MT128 NT64 TY8 TX4 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  ssm_out       a4 MT128 NT64 TY8 TX4 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  ssm_out       a5 MT128 NT128 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  ssm_out       a6 MT128 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  ssm_out       a7 MT64 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  ssm_out       a8 MT128 NT64 TY4 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  ssm_out       a9 MT128 NT64 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  gdn_gate      a1 MT128 NT32 TY4 TX4 KC32 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 7.726e-03 (rb16 1.170e-02) -> PASS
+  gdn_gate      a2 MT128 NT32 TY4 TX4 KC32 fl64 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 7.726e-03 (rb16 1.170e-02) -> PASS
+  gdn_gate      a3 MT128 NT64 TY8 TX4 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 3.580e-03 (rb16 1.170e-02) -> PASS
+  gdn_gate      a4 MT128 NT64 TY8 TX4 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 3.580e-03 (rb16 1.170e-02) -> PASS
+  gdn_gate      a5 MT128 NT128 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 3.580e-03 (rb16 1.170e-02) -> PASS
+  gdn_gate      a6 MT128 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 3.580e-03 (rb16 1.170e-02) -> PASS
+  gdn_gate      a7 MT64 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 3.580e-03 (rb16 1.170e-02) -> PASS
+  gdn_gate      a8 MT128 NT64 TY4 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 3.580e-03 (rb16 1.170e-02) -> PASS
+  gdn_gate      a9 MT128 NT64 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 3.580e-03 (rb16 1.170e-02) -> PASS
+  attn_q+gate   a1 MT128 NT32 TY4 TX4 KC32 fl0 ks2: mismatch  0.000% max rel 0.00e+00 | L2 f64 9.389e-03 (rb16 5.197e-02) -> PASS
+  attn_q+gate   a2 MT128 NT32 TY4 TX4 KC32 fl64 ks2: mismatch  0.000% max rel 0.00e+00 | L2 f64 9.389e-03 (rb16 5.197e-02) -> PASS
+  attn_q+gate   a3 MT128 NT64 TY8 TX4 KC32 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 4.884e-03 (rb16 5.197e-02) -> PASS
+  attn_q+gate   a4 MT128 NT64 TY8 TX4 KC16 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 4.884e-03 (rb16 5.197e-02) -> PASS
+  attn_q+gate   a5 MT128 NT128 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.374e-03 (rb16 5.197e-02) -> PASS
+  attn_q+gate   a6 MT128 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.374e-03 (rb16 5.197e-02) -> PASS
+  attn_q+gate   a7 MT64 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.374e-03 (rb16 5.197e-02) -> PASS
+  attn_q+gate   a8 MT128 NT64 TY4 TX8 KC32 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 4.884e-03 (rb16 5.197e-02) -> PASS
+  attn_q+gate   a9 MT128 NT64 TY8 TX8 KC16 fl0 ks4: mismatch  0.000% max rel 0.00e+00 | L2 f64 4.884e-03 (rb16 5.197e-02) -> PASS
+  attn_out      a1 MT128 NT32 TY4 TX4 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  attn_out      a2 MT128 NT32 TY4 TX4 KC32 fl64 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  attn_out      a3 MT128 NT64 TY8 TX4 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  attn_out      a4 MT128 NT64 TY8 TX4 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  attn_out      a5 MT128 NT128 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  attn_out      a6 MT128 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  attn_out      a7 MT64 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  attn_out      a8 MT128 NT64 TY4 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  attn_out      a9 MT128 NT64 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.594e-03 (rb16 1.358e-02) -> PASS
+  attn_k        a1 MT128 NT32 TY4 TX4 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_k        a2 MT128 NT32 TY4 TX4 KC32 fl64 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_k        a3 MT128 NT64 TY8 TX4 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_k        a4 MT128 NT64 TY8 TX4 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_k        a5 MT128 NT128 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_k        a6 MT128 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_k        a7 MT64 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_k        a8 MT128 NT64 TY4 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_k        a9 MT128 NT64 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_v        a1 MT128 NT32 TY4 TX4 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_v        a2 MT128 NT32 TY4 TX4 KC32 fl64 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_v        a3 MT128 NT64 TY8 TX4 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_v        a4 MT128 NT64 TY8 TX4 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_v        a5 MT128 NT128 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_v        a6 MT128 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_v        a7 MT64 NT128 TY8 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_v        a8 MT128 NT64 TY4 TX8 KC32 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+  attn_v        a9 MT128 NT64 TY8 TX8 KC16 fl0 ks8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.850e-03 (rb16 1.077e-02) -> PASS
+
+phase 2: 3 interleaved reps x 100 iters
+
+shape          die   arm     ks   THT         ms     TF/s    gate%
+ffn_gate         0  rb16      1     0    1.33114     5.67    122.8
+ffn_gate         0    a1      2   256    1.50637     5.01    108.5
+ffn_gate         0    a2      2   256    1.50528     5.02    108.6
+ffn_gate         0    a3      4   256    1.45489     5.19    112.3
+ffn_gate         0    a4      4   256    1.47822     5.11    110.5
+ffn_gate         0    a5      8   256    1.82783     4.13     89.4
+ffn_gate         0    a6      8   256    1.75018     4.31     93.4
+ffn_gate         0    a7      8   128    2.00093     3.77     81.7
+ffn_gate         0    a8      4   256    1.34881     5.60    121.2
+ffn_gate         0    a9      4   128    1.81697     4.16     89.9
+ffn_gate         1  rb16      1     0    1.32336     5.70    123.5
+ffn_gate         1    a1      2   256    1.51096     5.00    108.2
+ffn_gate         1    a2      2   256    1.50840     5.01    108.3
+ffn_gate         1    a3      4   256    1.45662     5.18    112.2
+ffn_gate         1    a4      4   256    1.48186     5.09    110.3
+ffn_gate         1    a5      8   256    1.83013     4.13     89.3
+ffn_gate         1    a6      8   256    1.75073     4.31     93.3
+ffn_gate         1    a7      8   128    2.00836     3.76     81.4
+ffn_gate         1    a8      4   256    1.35228     5.58    120.8
+ffn_gate         1    a9      4   128    1.82245     4.14     89.7
+ffn_gate         2  rb16      1     0    1.32014     5.85    126.5
+ffn_gate         2    a1      2   256    1.55462     4.96    107.5
+ffn_gate         2    a2      2   256    1.54816     4.98    107.9
+ffn_gate         2    a3      4   256    1.46873     5.25    113.7
+ffn_gate         2    a4      4   256    1.50241     5.14    111.2
+ffn_gate         2    a5      8   256    1.88281     4.10     88.7
+ffn_gate         2    a6      8   256    1.77726     4.34     94.0
+ffn_gate         2    a7      8   128    2.00607     3.85     83.3
+ffn_gate         2    a8      4   256    1.38839     5.56    120.3
+ffn_gate         2    a9      4   128    1.84838     4.18     90.4
+ffn_up           0  rb16      1     0    1.34576     5.61    121.4
+ffn_up           0    a1      2   256    1.50414     5.02    108.6
+ffn_up           0    a2      2   256    1.50176     5.03    108.8
+ffn_up           0    a3      4   256    1.45575     5.19    112.3
+ffn_up           0    a4      4   256    1.48404     5.09    110.1
+ffn_up           0    a5      8   256    1.84110     4.10     88.8
+ffn_up           0    a6      8   256    1.76909     4.27     92.4
+ffn_up           0    a7      8   128    2.00746     3.76     81.4
+ffn_up           0    a8      4   256    1.34675     5.61    121.3
+ffn_up           0    a9      4   128    1.82438     4.14     89.6
+ffn_up           1  rb16      1     0    1.33087     5.67    122.8
+ffn_up           1    a1      2   256    1.50187     5.03    108.8
+ffn_up           1    a2      2   256    1.50329     5.02    108.7
+ffn_up           1    a3      4   256    1.46031     5.17    111.9
+ffn_up           1    a4      4   256    1.48879     5.07    109.8
+ffn_up           1    a5      8   256    1.84801     4.09     88.4
+ffn_up           1    a6      8   256    1.76281     4.28     92.7
+ffn_up           1    a7      8   128    2.00267     3.77     81.6
+ffn_up           1    a8      4   256    1.35248     5.58    120.8
+ffn_up           1    a9      4   128    1.81773     4.15     89.9
+ffn_up           2  rb16      1     0    1.33369     5.79    125.3
+ffn_up           2    a1      2   256    1.55444     4.96    107.5
+ffn_up           2    a2      2   256    1.55072     4.98    107.7
+ffn_up           2    a3      4   256    1.48809     5.19    112.3
+ffn_up           2    a4      4   256    1.51276     5.10    110.4
+ffn_up           2    a5      8   256    1.88886     4.09     88.4
+ffn_up           2    a6      8   256    1.78822     4.32     93.4
+ffn_up           2    a7      8   128    2.01438     3.83     82.9
+ffn_up           2    a8      4   256    1.39661     5.53    119.6
+ffn_up           2    a9      4   128    1.85353     4.16     90.1
+ffn_down         0  rb16      1     0    1.86974     3.97     85.8
+ffn_down         0    a1      8   256    1.49394     4.96    107.4
+ffn_down         0    a2      8   256    1.48248     5.00    108.3
+ffn_down         0    a3      8   256    1.33756     5.54    120.0
+ffn_down         0    a4      8   256    1.39201     5.33    115.3
+ffn_down         0    a5      8   256    1.53289     4.84    104.7
+ffn_down         0    a6      8   256    1.45513     5.10    110.3
+ffn_down         0    a7      8   128    1.44167     5.14    111.3
+ffn_down         0    a8      8   256    1.20672     6.15    133.0
+ffn_down         0    a9      8   128    1.42843     5.19    112.4
+ffn_down         1  rb16      1     0    1.87454     3.96     85.6
+ffn_down         1    a1      8   256    1.49214     4.97    107.6
+ffn_down         1    a2      8   256    1.49802     4.95    107.1
+ffn_down         1    a3      8   256    1.34179     5.53    119.6
+ffn_down         1    a4      8   256    1.39057     5.33    115.4
+ffn_down         1    a5      8   256    1.53286     4.84    104.7
+ffn_down         1    a6      8   256    1.45175     5.11    110.6
+ffn_down         1    a7      8   128    1.45036     5.11    110.7
+ffn_down         1    a8      8   256    1.21728     6.09    131.9
+ffn_down         1    a9      8   128    1.43044     5.18    112.2
+ffn_down         2  rb16      1     0    1.91542     4.17     90.2
+ffn_down         2    a1      8   256    1.59012     5.02    108.7
+ffn_down         2    a2      8   256    1.59281     5.01    108.5
+ffn_down         2    a3      8   256    1.41425     5.65    122.2
+ffn_down         2    a4      8   256    1.50320     5.31    115.0
+ffn_down         2    a5      8   256    1.60298     4.98    107.8
+ffn_down         2    a6      8   256    1.48169     5.39    116.7
+ffn_down         2    a7      8   128    1.49609     5.34    115.5
+ffn_down         2    a8      8   256    1.33973     5.96    129.0
+ffn_down         2    a9      8   128    1.62118     4.93    106.6
+gdn_qkv          0  rb16      1     0    0.99815     4.37     94.6
+gdn_qkv          0    a1      4   256    0.92556     4.71    102.0
+gdn_qkv          0    a2      4   256    0.92224     4.73    102.4
+gdn_qkv          0    a3      8   256    0.86786     5.03    108.8
+gdn_qkv          0    a4      8   256    0.93612     4.66    100.9
+gdn_qkv          0    a5      8   256    1.00138     4.36     94.3
+gdn_qkv          0    a6      8   256    0.98433     4.43     95.9
+gdn_qkv          0    a7      8   128    1.00222     4.35     94.2
+gdn_qkv          0    a8      8   256    0.84227     5.18    112.1
+gdn_qkv          0    a9      8   128    1.01854     4.28     92.7
+gdn_qkv          1  rb16      1     0    0.99815     4.54     98.2
+gdn_qkv          1    a1      4   256    0.99720     4.54     98.3
+gdn_qkv          1    a2      4   256    0.99976     4.53     98.1
+gdn_qkv          1    a3      8   256    0.92152     4.92    106.4
+gdn_qkv          1    a4      8   256    0.99786     4.54     98.3
+gdn_qkv          1    a5      8   256    1.00643     4.50     97.4
+gdn_qkv          1    a6      8   256    0.99907     4.53     98.1
+gdn_qkv          1    a7      8   128    1.01322     4.47     96.8
+gdn_qkv          1    a8      8   256    0.88968     5.09    110.2
+gdn_qkv          1    a9      8   128    1.11867     4.05     87.6
+gdn_qkv          2  rb16      1     0    1.00254     4.52     97.8
+gdn_qkv          2    a1      4   256    0.99885     4.54     98.2
+gdn_qkv          2    a2      4   256    0.99741     4.54     98.3
+gdn_qkv          2    a3      8   256    0.93254     4.86    105.1
+gdn_qkv          2    a4      8   256    0.99892     4.53     98.2
+gdn_qkv          2    a5      8   256    1.00397     4.51     97.7
+gdn_qkv          2    a6      8   256    0.99887     4.53     98.2
+gdn_qkv          2    a7      8   128    1.01047     4.48     97.0
+gdn_qkv          2    a8      8   256    0.87895     5.15    111.6
+gdn_qkv          2    a9      8   128    1.10640     4.09     88.6
+ssm_out          0  rb16      1     0    0.87825     2.98     64.5
+ssm_out          0    a1      8   256    0.64906     4.03     87.3
+ssm_out          0    a2      8   256    0.65201     4.01     86.9
+ssm_out          0    a3      8   256    0.54159     4.83    104.6
+ssm_out          0    a4      8   256    0.66939     3.91     84.6
+ssm_out          0    a5      8   256    0.66007     3.97     85.8
+ssm_out          0    a6      8   256    0.60401     4.33     93.8
+ssm_out          0    a7      8   128    0.62354     4.20     90.9
+ssm_out          0    a8      8   256    0.52537     4.98    107.8
+ssm_out          0    a9      8   128    0.74468     3.51     76.1
+ssm_out          1  rb16      1     0    0.83309     3.14     68.0
+ssm_out          1    a1      8   256    0.64949     4.03     87.2
+ssm_out          1    a2      8   256    0.65214     4.01     86.9
+ssm_out          1    a3      8   256    0.53692     4.87    105.5
+ssm_out          1    a4      8   256    0.66945     3.91     84.6
+ssm_out          1    a5      8   256    0.66134     3.96     85.7
+ssm_out          1    a6      8   256    0.60759     4.31     93.2
+ssm_out          1    a7      8   128    0.62301     4.20     90.9
+ssm_out          1    a8      8   256    0.52983     4.94    106.9
+ssm_out          1    a9      8   128    0.74366     3.52     76.2
+ssm_out          2  rb16      1     0    0.90792     3.10     67.2
+ssm_out          2    a1      8   256    0.68926     4.09     88.5
+ssm_out          2    a2      8   256    0.68408     4.12     89.2
+ssm_out          2    a3      8   256    0.61200     4.61     99.7
+ssm_out          2    a4      8   256    0.79230     3.56     77.0
+ssm_out          2    a5      8   256    0.71336     3.95     85.5
+ssm_out          2    a6      8   256    0.62500     4.51     97.6
+ssm_out          2    a7      8   128    0.64469     4.37     94.6
+ssm_out          2    a8      8   256    0.57220     4.93    106.6
+ssm_out          2    a9      8   128    0.88065     3.20     69.3
+gdn_gate         0  rb16      1     0    0.62519     4.29     92.9
+gdn_gate         0    a1      4   256    0.55273     4.86    105.1
+gdn_gate         0    a2      4   256    0.55904     4.80    103.9
+gdn_gate         0    a3      8   256    0.51205     5.24    113.5
+gdn_gate         0    a4      8   256    0.58120     4.62    100.0
+gdn_gate         0    a5      8   256    0.73203     3.67     79.4
+gdn_gate         0    a6      8   256    0.71587     3.75     81.2
+gdn_gate         0    a7      8   128    0.70240     3.82     82.7
+gdn_gate         0    a8      8   256    0.50247     5.34    115.6
+gdn_gate         0    a9      8   128    0.67118     4.00     86.6
+gdn_gate         1  rb16      1     0    0.62110     4.32     93.5
+gdn_gate         1    a1      4   256    0.55894     4.80    104.0
+gdn_gate         1    a2      4   256    0.56034     4.79    103.7
+gdn_gate         1    a3      8   256    0.51470     5.22    112.9
+gdn_gate         1    a4      8   256    0.57744     4.65    100.6
+gdn_gate         1    a5      8   256    0.72568     3.70     80.1
+gdn_gate         1    a6      8   256    0.72325     3.71     80.3
+gdn_gate         1    a7      8   128    0.70356     3.82     82.6
+gdn_gate         1    a8      8   256    0.50344     5.33    115.4
+gdn_gate         1    a9      8   128    0.66985     4.01     86.7
+gdn_gate         2  rb16      1     0    0.67604     3.97     85.9
+gdn_gate         2    a1      4   256    0.55511     4.84    104.7
+gdn_gate         2    a2      4   256    0.55049     4.88    105.5
+gdn_gate         2    a3      8   256    0.51099     5.25    113.7
+gdn_gate         2    a4      8   256    0.58202     4.61     99.8
+gdn_gate         2    a5      8   256    0.73429     3.66     79.1
+gdn_gate         2    a6      8   256    0.71601     3.75     81.1
+gdn_gate         2    a7      8   128    0.70319     3.82     82.6
+gdn_gate         2    a8      8   256    0.49928     5.38    116.4
+gdn_gate         2    a9      8   128    0.66935     4.01     86.8
+attn_q+gate      0  rb16      1     0    1.47902     3.63     78.6
+attn_q+gate      0    a1      2   256    1.00763     5.33    115.3
+attn_q+gate      0    a2      2   256    1.00035     5.37    116.2
+attn_q+gate      0    a3      4   256    1.00142     5.36    116.0
+attn_q+gate      0    a4      4   256    1.15063     4.67    101.0
+attn_q+gate      0    a5      8   256    1.31964     4.07     88.1
+attn_q+gate      0    a6      8   256    1.28075     4.19     90.7
+attn_q+gate      0    a7      8   128    1.36479     3.93     85.1
+attn_q+gate      0    a8      4   256    1.00114     5.36    116.1
+attn_q+gate      0    a9      4   128    1.43694     3.74     80.9
+attn_q+gate      1  rb16      1     0    1.48069     3.63     78.5
+attn_q+gate      1    a1      2   256    1.00475     5.34    115.7
+attn_q+gate      1    a2      2   256    0.99955     5.37    116.3
+attn_q+gate      1    a3      4   256    1.00191     5.36    116.0
+attn_q+gate      1    a4      4   256    1.14869     4.67    101.2
+attn_q+gate      1    a5      8   256    1.32094     4.06     88.0
+attn_q+gate      1    a6      8   256    1.29264     4.15     89.9
+attn_q+gate      1    a7      8   128    1.37112     3.92     84.8
+attn_q+gate      1    a8      4   256    1.00434     5.35    115.7
+attn_q+gate      1    a9      4   128    1.43484     3.74     81.0
+attn_q+gate      2  rb16      1     0    1.48592     3.61     78.2
+attn_q+gate      2    a1      2   256    1.00606     5.34    115.5
+attn_q+gate      2    a2      2   256    0.99994     5.37    116.2
+attn_q+gate      2    a3      4   256    1.00161     5.36    116.0
+attn_q+gate      2    a4      4   256    1.15182     4.66    100.9
+attn_q+gate      2    a5      8   256    1.31329     4.09     88.5
+attn_q+gate      2    a6      8   256    1.28960     4.16     90.1
+attn_q+gate      2    a7      8   128    1.36809     3.92     84.9
+attn_q+gate      2    a8      4   256    1.00030     5.37    116.2
+attn_q+gate      2    a9      4   128    1.43552     3.74     81.0
+attn_out         0  rb16      1     0    0.83277     3.14     68.0
+attn_out         0    a1      8   256    0.65964     3.97     85.9
+attn_out         0    a2      8   256    0.65369     4.00     86.7
+attn_out         0    a3      8   256    0.54960     4.76    103.1
+attn_out         0    a4      8   256    0.67106     3.90     84.4
+attn_out         0    a5      8   256    0.66725     3.92     84.9
+attn_out         0    a6      8   256    0.60853     4.30     93.1
+attn_out         0    a7      8   128    0.62442     4.19     90.7
+attn_out         0    a8      8   256    0.52969     4.94    106.9
+attn_out         0    a9      8   128    0.75171     3.48     75.4
+attn_out         1  rb16      1     0    0.72232     3.62     78.4
+attn_out         1    a1      8   256    0.65375     4.00     86.7
+attn_out         1    a2      8   256    0.64884     4.03     87.3
+attn_out         1    a3      8   256    0.54767     4.78    103.4
+attn_out         1    a4      8   256    0.66762     3.92     84.9
+attn_out         1    a5      8   256    0.66252     3.95     85.5
+attn_out         1    a6      8   256    0.60807     4.30     93.2
+attn_out         1    a7      8   128    0.63077     4.15     89.8
+attn_out         1    a8      8   256    0.53287     4.91    106.3
+attn_out         1    a9      8   128    0.75014     3.49     75.5
+attn_out         2  rb16      1     0    0.89356     3.15     68.3
+attn_out         2    a1      8   256    0.69333     4.07     88.0
+attn_out         2    a2      8   256    0.69089     4.08     88.3
+attn_out         2    a3      8   256    0.61227     4.60     99.6
+attn_out         2    a4      8   256    0.79625     3.54     76.6
+attn_out         2    a5      8   256    0.71442     3.95     85.4
+attn_out         2    a6      8   256    0.62950     4.48     96.9
+attn_out         2    a7      8   128    0.65584     4.30     93.0
+attn_out         2    a8      8   256    0.57392     4.91    106.3
+attn_out         2    a9      8   128    0.88760     3.18     68.7
+attn_k           0  rb16      1     0    0.22094     1.52     32.9
+attn_k           0    a1      8   256    0.11235     2.99     64.6
+attn_k           0    a2      8   256    0.11097     3.02     65.4
+attn_k           0    a3      8   256    0.12581     2.67     57.7
+attn_k           0    a4      8   256    0.12588     2.67     57.7
+attn_k           0    a5      8   256    0.19163     1.75     37.9
+attn_k           0    a6      8   256    0.18029     1.86     40.3
+attn_k           0    a7      8   128    0.17595     1.91     41.3
+attn_k           0    a8      8   256    0.11746     2.86     61.8
+attn_k           0    a9      8   128    0.17151     1.96     42.3
+attn_k           1  rb16      1     0    0.24113     2.09     45.2
+attn_k           1    a1      8   256    0.12314     4.09     88.5
+attn_k           1    a2      8   256    0.12223     4.12     89.1
+attn_k           1    a3      8   256    0.14267     3.53     76.4
+attn_k           1    a4      8   256    0.13992     3.60     77.9
+attn_k           1    a5      8   256    0.20449     2.46     53.3
+attn_k           1    a6      8   256    0.19074     2.64     57.1
+attn_k           1    a7      8   128    0.18712     2.69     58.2
+attn_k           1    a8      8   256    0.13188     3.82     82.6
+attn_k           1    a9      8   128    0.18697     2.69     58.3
+attn_k           2  rb16      1     0    0.23896     2.11     45.6
+attn_k           2    a1      8   256    0.12429     4.05     87.7
+attn_k           2    a2      8   256    0.12298     4.09     88.6
+attn_k           2    a3      8   256    0.14163     3.55     76.9
+attn_k           2    a4      8   256    0.13881     3.63     78.5
+attn_k           2    a5      8   256    0.20466     2.46     53.2
+attn_k           2    a6      8   256    0.19030     2.64     57.2
+attn_k           2    a7      8   128    0.18684     2.69     58.3
+attn_k           2    a8      8   256    0.13175     3.82     82.7
+attn_k           2    a9      8   128    0.18657     2.70     58.4
+attn_v           0  rb16      1     0    0.22053     1.52     32.9
+attn_v           0    a1      8   256    0.11250     2.98     64.6
+attn_v           0    a2      8   256    0.11265     2.98     64.5
+attn_v           0    a3      8   256    0.12554     2.67     57.9
+attn_v           0    a4      8   256    0.12521     2.68     58.0
+attn_v           0    a5      8   256    0.19245     1.74     37.7
+attn_v           0    a6      8   256    0.17966     1.87     40.4
+attn_v           0    a7      8   128    0.17557     1.91     41.4
+attn_v           0    a8      8   256    0.11726     2.86     61.9
+attn_v           0    a9      8   128    0.17150     1.96     42.3
+attn_v           1  rb16      1     0    0.24119     2.09     45.2
+attn_v           1    a1      8   256    0.12276     4.10     88.7
+attn_v           1    a2      8   256    0.12284     4.10     88.7
+attn_v           1    a3      8   256    0.14202     3.54     76.7
+attn_v           1    a4      8   256    0.14007     3.59     77.8
+attn_v           1    a5      8   256    0.20467     2.46     53.2
+attn_v           1    a6      8   256    0.19039     2.64     57.2
+attn_v           1    a7      8   128    0.18697     2.69     58.3
+attn_v           1    a8      8   256    0.13196     3.81     82.6
+attn_v           1    a9      8   128    0.18649     2.70     58.4
+attn_v           2  rb16      1     0    0.24119     2.09     45.2
+attn_v           2    a1      8   256    0.12260     4.11     88.9
+attn_v           2    a2      8   256    0.12270     4.10     88.8
+attn_v           2    a3      8   256    0.14144     3.56     77.0
+attn_v           2    a4      8   256    0.13815     3.64     78.9
+attn_v           2    a5      8   256    0.20533     2.45     53.1
+attn_v           2    a6      8   256    0.19029     2.64     57.2
+attn_v           2    a7      8   128    0.18788     2.68     58.0
+attn_v           2    a8      8   256    0.13193     3.82     82.6
+attn_v           2    a9      8   128    0.18665     2.70     58.4
+
+f32-out checksum(64) 5.442e+01 ok
+
+call-weighted aggregates (same weights as E-015 run):
+  a1: die0 agg 4.86 TF/s/die (vs rb16-txt 4.52) | all-die agg 4.85 TF/s/die (W5 gate 4.62: MET)
+  a2: die0 agg 4.87 TF/s/die (vs rb16-txt 4.52) | all-die agg 4.85 TF/s/die (W5 gate 4.62: MET)
+  a3: die0 agg 5.20 TF/s/die (vs rb16-txt 4.52) | all-die agg 5.20 TF/s/die (W5 gate 4.62: MET)
+  a4: die0 agg 4.90 TF/s/die (vs rb16-txt 4.52) | all-die agg 4.88 TF/s/die (W5 gate 4.62: MET)
+  a5: die0 agg 4.21 TF/s/die (vs rb16-txt 4.52) | all-die agg 4.23 TF/s/die (W5 gate 4.62: missed)
+  a6: die0 agg 4.39 TF/s/die (vs rb16-txt 4.52) | all-die agg 4.44 TF/s/die (W5 gate 4.62: missed)
+  a7: die0 agg 4.10 TF/s/die (vs rb16-txt 4.52) | all-die agg 4.14 TF/s/die (W5 gate 4.62: missed)
+  a8: die0 agg 5.56 TF/s/die (vs rb16-txt 4.52) | all-die agg 5.53 TF/s/die (W5 gate 4.62: MET)
+  a9: die0 agg 4.24 TF/s/die (vs rb16-txt 4.52) | all-die agg 4.21 TF/s/die (W5 gate 4.62: missed)
+  rb16: die0 agg 4.49 TF/s/die (vs rb16-txt 4.52) | all-die agg 4.55 TF/s/die (W5 gate 4.62: missed)

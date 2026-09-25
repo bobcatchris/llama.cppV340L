@@ -1,0 +1,5 @@
+NCCL error 1 (unhandled cuda error (run with NCCL_DEBUG=INFO for details)) at docs/amd-port/tests/rccl_multidie_probe.cu:258: ncclCommInitRank(&comm, MAX_RANKS, sh->uid, rank)
+NCCL error 1 (unhandled cuda error (run with NCCL_DEBUG=INFO for details)) at docs/amd-port/tests/rccl_multidie_probe.cu:258: ncclCommInitRank(&comm, MAX_RANKS, sh->uid, rank)
+NCCL error 1 (unhandled cuda error (run with NCCL_DEBUG=INFO for details)) at docs/amd-port/tests/rccl_multidie_probe.cu:258: ncclCommInitRank(&comm, MAX_RANKS, sh->uid, rank)
+NCCL error 1 (unhandled cuda error (run with NCCL_DEBUG=INFO for details)) at docs/amd-port/tests/rccl_multidie_probe.cu:258: ncclCommInitRank(&comm, MAX_RANKS, sh->uid, rank)
+a worker FAILED

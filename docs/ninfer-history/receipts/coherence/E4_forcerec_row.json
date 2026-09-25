@@ -1,0 +1,74 @@
+[
+ {
+  "k": 1,
+  "prompt": 63,
+  "gen": 40,
+  "fin": "stop",
+  "ok": true,
+  "content": "BLUE",
+  "reason": "We need reply to user. User says: \"Reply with exactly the si"
+ },
+ {
+  "k": 2,
+  "prompt": 64,
+  "gen": 35,
+  "fin": "stop",
+  "ok": true,
+  "content": "BLUE",
+  "reason": "We need answer user's request: \"Reply with exactly the singl"
+ },
+ {
+  "k": 3,
+  "prompt": 65,
+  "gen": 41,
+  "fin": "stop",
+  "ok": true,
+  "content": "BLUE",
+  "reason": "We need to reply with exactly single word BLUE. User says: R"
+ },
+ {
+  "k": 4,
+  "prompt": 66,
+  "gen": 42,
+  "fin": "stop",
+  "ok": true,
+  "content": "BLUE",
+  "reason": "We need to reply with exactly single word BLUE. User says: R"
+ },
+ {
+  "k": 5,
+  "prompt": 67,
+  "gen": 9,
+  "fin": "stop",
+  "ok": false,
+  "content": "",
+  "reason": "\u95b2\u628a\u5173ild\u98df-demougar\u00e9di\u9a8f"
+ },
+ {
+  "k": 6,
+  "prompt": 68,
+  "gen": 25,
+  "fin": "stop",
+  "ok": false,
+  "content": "",
+  "reason": "\u95b2\u5bab\u9f99\u534e\u9f13\u7b49\u7684ignanoensteinuli\u51e1aid \u0430\u0432\u0442\u043e\u043d\u043e\u043c\u7b4bceg\u0119s\u5929\u738bloh\u62d3stalkh\u00f4\u6d17 \u2013\u2013af"
+ },
+ {
+  "k": 7,
+  "prompt": 69,
+  "gen": 8,
+  "fin": "stop",
+  "ok": false,
+  "content": "",
+  "reason": "antryoit2 Kitt Corner\u85b0\uc871 "
+ },
+ {
+  "k": 8,
+  "prompt": 70,
+  "gen": 7,
+  "fin": "stop",
+  "ok": false,
+  "content": "",
+  "reason": "antry.foundation\u1ee8\u122d Rowe\u63d0\u8d77"
+ }
+]

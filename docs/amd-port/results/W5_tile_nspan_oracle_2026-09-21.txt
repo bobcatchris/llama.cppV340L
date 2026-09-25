@@ -1,0 +1,13 @@
+device 0: AMD Radeon Graphics CUs 56 | integrated-kernel oracle (tile-gemm.cu)
+  ffn_gate      K= 5120 N_d=5760 ks=4: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.608e-03 | chunked bit-diff 0/737280 nspan bit-diff 0/737280 -> PASS
+  ffn_up        K= 5120 N_d=5760 ks=4: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.608e-03 | chunked bit-diff 0/737280 nspan bit-diff 0/737280 -> PASS
+  ffn_down      K=17408 N_d=1664 ks=8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.396e-03 | chunked bit-diff 0/212992 nspan bit-diff 0/212992 -> PASS
+  gdn_qkv       K= 5120 N_d=3328 ks=8: mismatch  0.000% max rel 0.00e+00 | L2 f64 3.305e-03 | chunked bit-diff 0/425984 nspan bit-diff 0/425984 -> PASS
+  ssm_out       K= 6144 N_d=1664 ks=8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.369e-03 | chunked bit-diff 0/212992 nspan bit-diff 0/212992 -> PASS
+  gdn_gate      K= 5120 N_d=2048 ks=8: mismatch  0.000% max rel 0.00e+00 | L2 f64 3.499e-03 | chunked bit-diff 0/262144 nspan bit-diff 0/262144 -> PASS
+  attn_q+gate   K= 5120 N_d=4096 ks=4: mismatch  0.000% max rel 0.00e+00 | L2 f64 6.136e-03 | chunked bit-diff 0/524288 nspan bit-diff 0/524288 -> PASS
+  attn_out      K= 6144 N_d=1664 ks=8: mismatch  0.000% max rel 0.00e+00 | L2 f64 5.369e-03 | chunked bit-diff 0/212992 nspan bit-diff 0/212992 -> PASS
+  attn_k        K= 5120 N_d= 256 ks=8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.875e-03 | chunked bit-diff 0/32768 nspan bit-diff 0/32768 -> PASS
+  attn_v        K= 5120 N_d= 256 ks=8: mismatch  0.000% max rel 0.00e+00 | L2 f64 2.875e-03 | chunked bit-diff 0/32768 nspan bit-diff 0/32768 -> PASS
+
+ORACLE PASS (0 failures)

@@ -1,0 +1,35 @@
+SWEEP_row — TILED tile-shape sweep V0-V4 at M=128, 2026-09-17, GPU-OWNER window (amd/tp4-cure)
+Bench: /tmp/gpuowner_build/nvfp4_prefill_bench_sweep (results/amd/coherence/nvfp4_prefill_bench.cu
+  + src/core/device.cu, -O3 LAW line ONESHOT_AR_notes §5 form, RC=0, 143 warnings = desk-identical count)
+Log: SWEEP_run_20260917.log (raw). Device: GPU[0] die, gfx900, 56 SMs. Event timing, 3 warmup + 20 iters.
+Clocks: 5 s mclk hammer inside bench BEFORE timing; sampler verified GPU[0] mclk level 3 (945 MHz, TOP)
+  for the entire window — zero 167 MHz samples; sclk DVFS 1269-1500 MHz under compute (samples:
+  /tmp/gpuowner_build/clock_samples_sweep.txt). Thermal pre 64/66/67 C (edge/junct/mem GPU0) -> post 68/71/67 C.
+Ceilings this run (DRAM anchor): copy 354.4 GB/s | read 368.7 GB/s (achievable anchor; 483.8 nominal not reached).
+GF/s %col anchor: kNominalF32Peak = 10.75 TF/s (doc 01 §3 @1.5 GHz, 56 CU) — M=128 lives past the M-wall,
+  COMPUTE-bound: GF/s is the decisive column (bench header law); DRAM GB/s does not bind.
+
+relL2 vs REFERENCE (1e-2 bar): 0.00e+00 on ALL 20 rows (4 geometries x V0-V4) — bit-identical outputs
+  across ids as predicted (k-ascending fp32 order shared). NO RED ROW. No consistency STOP.
+
+Per-geometry GF/s (ms) [%nom vs 10.75 TF/s nominal]:
+AttnInput   n=14336 k=5120: REF 241.6 GF/s | V0 3083.0 (6.095ms) 28.7% | V1 2276.4 21.2% | V2 2301.8 21.4% | V3 1920.7 17.9% | V4 2063.6 19.2%
+GdnInput    n=16384 k=5120: REF 243.6 GF/s | V0 2755.7 (7.793ms) 25.6% | V1 2119.4 19.7% | V2 1809.7 16.8% | V3 1786.3 16.6% | V4 1908.1 17.7%
+MlpGateUp   n=34816 k=5120: REF 258.9 GF/s | V0 3103.3 (14.705ms) 28.9% | V1 2220.1 20.7% | V2 2242.2 20.9% | V3 1876.0 17.5% | V4 2007.9 18.7%
+Residual6144 n=5120 k=6144: REF 181.3 GF/s | V0 2365.8 (3.404ms) 22.0% | V1 2146.4 20.0% | V2 1699.7 15.8% | V3 1390.7 12.9% | V4 1490.8 13.9%
+
+Effective weight-stream rate, V0 (cache-served, NOT DRAM: working sets reused across timed iters):
+  41.3 MB / 6.095 ms = 6774 GB/s | 47.2 MB / 7.793 ms = 6055 GB/s | 100.3 MB / 14.705 ms = 6819 GB/s
+  | 17.7 MB / 3.404 ms = 5198 GB/s — all >> 368.7 GB/s read ceiling, confirming compute/issue-bound regime.
+
+VERDICT: WINNER = V0 (shipped 64r x TN, 4r x TN/16t, BK64) on ALL FOUR geometries, by 15-41% over every variant.
+Pre-registered prediction V4>V3>V0>V1>V2: FALSIFIED. Actual order: V0 > V2 >= V1 > V4 > V3.
+FALSIFIER (a) FIRED: V3 <= V0 by 38-41% and V4 <= V0 by 33-37% (>5% bar) -> "35 KB LDS occupancy beats the
+  barrier/overlap win; winner stays V0". Note V1 (the SMALLER x-tile footprint knob) ALSO lost by 16-26% ->
+  the follow-up knob named in falsifier (a) is already measured dead: shape-sweeping this kernel is closed.
+FALSIFIER (b) NOT fired (nothing within noise of V0 except itself).
+MISSION step 3 branch: winner NOT >V0 by >5% => V0 stays; NO tile promotion, NO rebuild owed from this arm.
+
+Binary sha256 (bench): see sha line appended below at bank time.
+0ed849be3c526487ba9f32f7effe4cde702f1d63dbbf40092c29740fcd43b060  /tmp/gpuowner_build/nvfp4_prefill_bench_sweep
+2a52722227a67128445f2f477ca60312ff1d911dd121096d1c46ced94c8ec1ca  /tmp/gpuowner_build/nvfp4_smallt_roofline_bench

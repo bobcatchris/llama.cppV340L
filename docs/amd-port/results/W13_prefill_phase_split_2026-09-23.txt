@@ -1,0 +1,110 @@
+trace span 59.882 s, dispatches (clean) 589000
+PREFILL [19.002 .. 55.843] s = 36.840 s
+DECODE  [55.843 .. 59.882] s = 4.039 s
+
+== PREFILL: 231285 launches, 142349.8 ms kernel time ==
+  fam Cijk  :    59541.9 ms ( 41.8%)
+  fam flash :    41931.1 ms ( 29.5%)
+  fam nccl  :    23567.9 ms ( 16.6%)
+  fam other :    17309.0 ms ( 12.2%)
+
+== DECODE: 335858 launches, 13827.4 ms kernel time ==
+  fam mmvq  :     7430.1 ms ( 53.7%)
+  fam nccl  :     3141.3 ms ( 22.7%)
+  fam other :     1651.0 ms ( 11.9%)
+  fam flash :     1605.0 ms ( 11.6%)
+
+== PREFILL top 30 kernels by time ==
+    41780.0 ms    1020 launches   40960.8 us/launch  void flash_attn_tile<256, 256, 16, 2, false>(char const*, char const*, char const*, char c
+    38448.1 ms    8288 launches    4639.0 us/launch  Cijk_Alik_Bljk_HB_MT32x32x32_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_A
+    23567.9 ms    7799 launches    3021.9 us/launch  ncclDevKernel_Generic(ncclDevComm*, channelMasks, ncclWork*)
+    10351.6 ms    6760 launches    1531.3 us/launch  Cijk_Alik_Bljk_HB_MT128x64x16_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_
+     7651.0 ms    5704 launches    1341.3 us/launch  Cijk_Alik_Bljk_HB_MT64x64x16_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_A
+     3726.4 ms    2880 launches    1293.9 us/launch  void gated_delta_net_cuda<128, false, true>(float const*, float const*, float const*, floa
+     2168.8 ms    7800 launches     278.0 us/launch  Cijk_Alik_Bljk_HB_MT16x16x24_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_A
+     1699.1 ms   30239 launches      56.2 us/launch  void convert_unary<float, __half>(void const*, __half*, long, long, long, HIP_vector_type<
+     1682.2 ms   30240 launches      55.6 us/launch  void convert_unary<__half, float>(void const*, float*, long, long, long, HIP_vector_type<u
+     1641.6 ms    7380 launches     222.4 us/launch  void dequantize_block_iq3_s<__half>(void const*, __half*)
+     1308.1 ms    5040 launches     259.5 us/launch  void dequantize_block_iq3_xxs<__half>(void const*, __half*)
+     1165.0 ms    5580 launches     208.8 us/launch  void dequantize_block_iq4_xs<__half>(void const*, __half*)
+      861.2 ms    7279 launches     118.3 us/launch  void convert_unary<float, __hip_bfloat16>(void const*, __hip_bfloat16*, long, long, long, 
+      734.2 ms   10676 launches      68.8 us/launch  void k_bin_bcast<&(op_add(float, float)), float, float, float, float const*>(float const*,
+      603.8 ms    8035 launches      75.1 us/launch  void rms_norm_f32<1024, true, false>(float const*, float*, int, long, long, long, float, f
+      594.3 ms    5280 launches     112.6 us/launch  void dequantize_block_q4_K<__half>(void const*, __half*)
+      547.1 ms    6780 launches      80.7 us/launch  void unary_gated_op_kernel<&(op_silu(float)), float>(float const*, float const*, float*, l
+      514.3 ms    2880 launches     178.6 us/launch  void concat_non_cont<unsigned int, 0>(char const*, char const*, char*, long, long, long, l
+      431.9 ms    7276 launches      59.4 us/launch  void convert_unary<__hip_bfloat16, float>(void const*, float*, long, long, long, HIP_vecto
+      412.1 ms     452 launches     911.6 us/launch  Cijk_Alik_Bljk_HB_MT32x32x24_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_A
+      341.1 ms     592 launches     576.1 us/launch  Cijk_Alik_Bljk_HB_MT64x32x32_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_A
+      321.5 ms    5760 launches      55.8 us/launch  void l2_norm_f32<32>(float const*, float*, int, long, long, long, float)
+      234.6 ms    2880 launches      81.4 us/launch  void ssm_conv_long_token_f32<true, 128ul, 4ul, 32l>(float const*, float const*, float cons
+      221.7 ms    4920 launches      45.1 us/launch  void rms_norm_f32<256, true, false>(float const*, float*, int, long, long, long, float, fl
+      216.7 ms     899 launches     241.0 us/launch  void dequantize_block_q3_K<__half>(void const*, __half*)
+      151.3 ms   12540 launches      12.1 us/launch  void cpy_scalar<&(void cpy_1_scalar<float, float>(char const*, char*))>(char const*, char*
+      151.1 ms    1020 launches     148.1 us/launch  void flash_attn_combine_results<256>(float const*, HIP_vector_type<float, 2u> const*, floa
+      137.4 ms    2880 launches      47.7 us/launch  __amd_rocclr_copyBufferRectAligned
+       80.7 ms    2040 launches      39.6 us/launch  void rope_multi<true, false, float>(float const*, float*, int, int, int, int, int, int, in
+       72.2 ms    2760 launches      26.2 us/launch  void dequantize_block_q5_K<__half>(void const*, __half*)
+
+== PREFILL Cijk variants ==
+    38448.1 ms ( 64.6% of Cijk) Cijk_Alik_Bljk_HB_MT32x32x32_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_ASM_ASAE01_ASCE01_ASEM2_AAC0_BL1_BS1_CLR0_DTLA0_DTLB0_DTVA0_DTVB0_DVO0_ETSP_EPS1_ELFLR0_EMLL0_FSSC10_FL0_GLVWA4_GLVWB4_GRCGA1_GRCGB1_GRPM1_GRVW4_GSU1_GSUASB_GLS0_ISA900_IU1_K1_KLA_LBSPPA0_LBSPPB0_LPA0_LPB0_LDL1_LRVW4_LWPMn1_LDW0_FMA_MIAV0_MDA2_MO40_MMFGLC_MKFGSU256_NTA0_NTB0_NTC0_NTD0_NEPBS0_NLCA1_NLCB1_ONLL1_OPLV0_PK0_PAP0_PGR1_PLR1_PKA0_SIA1_SLW1_SS0_SU32_SUM0_SUS256_SCIUI1_SPO0_SRVW0_SSO0_SVW4_SNLL0_TSGRA0_TSGRB0_TT4_4_TLDS0_UMLDSA0_UMLDSB0_USFGRO0_VAW2_VS1_VW4_VWB4_VFLRP0_WSGRA0_WSGRB0_WS64_WG8_8_1_WGM8
+    10351.6 ms ( 17.4% of Cijk) Cijk_Alik_Bljk_HB_MT128x64x16_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_ASM_ASAE01_ASCE01_ASEM2_AAC0_BL1_BS1_CLR0_DTLA0_DTLB0_DTVA0_DTVB0_DVO0_ETSP_EPS1_ELFLR0_EMLL0_FSSC10_FL0_GLVWA4_GLVWB4_GRCGA1_GRCGB1_GRPM1_GRVW4_GSU1_GSUASB_GLS0_ISA900_IU1_K1_KLA_LBSPPA0_LBSPPB0_LPA0_LPB0_LDL1_LRVW4_LWPMn1_LDW0_FMA_MIAV0_MDA2_MO40_MMFGLC_MKFGSU256_NTA0_NTB0_NTC0_NTD0_NEPBS0_NLCA1_NLCB1_ONLL1_OPLV0_PK0_PAP0_PGR1_PLR1_PKA0_SIA1_SLW1_SS0_SU32_SUM0_SUS256_SCIUI1_SPO0_SRVW0_SSO0_SVW4_SNLL0_TSGRA0_TSGRB0_TT8_4_TLDS0_UMLDSA0_UMLDSB0_USFGRO0_VAW2_VS1_VW4_VWB4_VFLRP0_WSGRA0_WSGRB0_WS64_WG16_16_1_WGM8
+     7651.0 ms ( 12.8% of Cijk) Cijk_Alik_Bljk_HB_MT64x64x16_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_ASM_ASAE01_ASCE01_ASEM2_AAC0_BL1_BS1_CLR0_DTLA0_DTLB0_DTVA0_DTVB0_DVO0_ETSP_EPS1_ELFLR0_EMLL0_FSSC10_FL0_GLVWA4_GLVWB4_GRCGA1_GRCGB1_GRPM1_GRVW4_GSU1_GSUASB_GLS0_ISA900_IU1_K1_KLA_LBSPPA0_LBSPPB0_LPA0_LPB0_LDL1_LRVW4_LWPMn1_LDW0_FMA_MIAV0_MDA2_MO40_MMFGLC_MKFGSU256_NTA0_NTB0_NTC0_NTD0_NEPBS0_NLCA1_NLCB1_ONLL1_OPLV0_PK0_PAP0_PGR1_PLR1_PKA0_SIA1_SLW1_SS0_SU32_SUM0_SUS256_SCIUI1_SPO0_SRVW0_SSO0_SVW4_SNLL0_TSGRA0_TSGRB0_TT4_4_TLDS0_UMLDSA0_UMLDSB0_USFGRO0_VAW2_VS1_VW4_VWB4_VFLRP0_WSGRA0_WSGRB0_WS64_WG16_16_1_WGM8
+     2168.8 ms (  3.6% of Cijk) Cijk_Alik_Bljk_HB_MT16x16x24_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_ASM_ASAE01_ASCE01_ASEM2_AAC0_BL1_BS1_CLR0_DTLA0_DTLB0_DTVA0_DTVB0_DVO0_ETSP_EPS1_ELFLR0_EMLL0_FSSC10_FL0_GLVWA2_GLVWB2_GRCGA1_GRCGB1_GRPM1_GRVW2_GSU1_GSUASB_GLS0_ISA900_IU1_K1_KLA_LBSPPA0_LBSPPB0_LPA0_LPB0_LDL1_LRVW2_LWPMn1_LDW0_FMA_MIAV0_MDA2_MO40_MMFGLC_MKFGSU256_NTA0_NTB0_NTC0_NTD0_NEPBS0_NLCA3_NLCB3_ONLL1_OPLV0_PK0_PAP0_PGR1_PLR1_PKA0_SIA1_SLW1_SS0_SU32_SUM0_SUS256_SCIUI1_SPO0_SRVW0_SSO0_SVW4_SNLL0_TSGRA0_TSGRB0_TT2_2_TLDS0_UMLDSA0_UMLDSB0_USFGRO1_VAW2_VS1_VW2_VWB2_VFLRP0_WSGRA0_WSGRB0_WS64_WG8_8_1_WGM1
+      412.1 ms (  0.7% of Cijk) Cijk_Alik_Bljk_HB_MT32x32x24_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_ASM_ASAE01_ASCE01_ASEM2_AAC0_BL1_BS1_CLR0_DTLA0_DTLB0_DTVA0_DTVB0_DVO0_ETSP_EPS1_ELFLR0_EMLL0_FSSC10_FL0_GLVWA4_GLVWB4_GRCGA1_GRCGB1_GRPM1_GRVW4_GSU1_GSUASB_GLS0_ISA900_IU1_K1_KLA_LBSPPA0_LBSPPB0_LPA0_LPB0_LDL1_LRVW4_LWPMn1_LDW0_FMA_MIAV0_MDA2_MO40_MMFGLC_MKFGSU256_NTA0_NTB0_NTC0_NTD0_NEPBS0_NLCA3_NLCB3_ONLL1_OPLV0_PK0_PAP0_PGR1_PLR1_PKA0_SIA1_SLW1_SS0_SU32_SUM0_SUS256_SCIUI1_SPO0_SRVW0_SSO0_SVW4_SNLL0_TSGRA0_TSGRB0_TT4_4_TLDS0_UMLDSA0_UMLDSB0_USFGRO0_VAW2_VS1_VW4_VWB4_VFLRP0_WSGRA0_WSGRB0_WS64_WG8_8_1_WGM8
+      341.1 ms (  0.6% of Cijk) Cijk_Alik_Bljk_HB_MT64x32x32_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_ASM_ASAE01_ASCE01_ASEM2_AAC0_BL1_BS1_CLR0_DTLA0_DTLB0_DTVA0_DTVB0_DVO0_ETSP_EPS1_ELFLR0_EMLL0_FSSC10_FL0_GLVWA4_GLVWB4_GRCGA1_GRCGB1_GRPM1_GRVW4_GSU1_GSUASB_GLS0_ISA900_IU1_K1_KLA_LBSPPA0_LBSPPB0_LPA0_LPB0_LDL1_LRVW4_LWPMn1_LDW0_FMA_MIAV0_MDA2_MO40_MMFGLC_MKFGSU256_NTA0_NTB0_NTC0_NTD0_NEPBS0_NLCA1_NLCB1_ONLL1_OPLV0_PK0_PAP0_PGR1_PLR1_PKA0_SIA1_SLW1_SS0_SU32_SUM0_SUS256_SCIUI1_SPO0_SRVW0_SSO0_SVW4_SNLL0_TSGRA0_TSGRB0_TT4_4_TLDS0_UMLDSA0_UMLDSB0_USFGRO0_VAW2_VS1_VW4_VWB4_VFLRP0_WSGRA0_WSGRB0_WS64_WG16_8_1_WGM8
+       69.8 ms (  0.1% of Cijk) Cijk_Alik_Bljk_HB_MT32x32x24_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_ASM_ASAE01_ASCE01_ASEM2_AAC0_BL1_BS1_CLR0_DTLA0_DTLB0_DTVA0_DTVB0_DVO0_ETSP_EPS1_ELFLR0_EMLL0_FSSC10_FL0_GLVWA4_GLVWB4_GRCGA1_GRCGB1_GRPM1_GRVW4_GSU1_GSUASB_GLS0_ISA900_IU1_K1_KLA_LBSPPA0_LBSPPB0_LPA0_LPB0_LDL1_LRVW4_LWPMn1_LDW0_FMA_MIAV0_MDA2_MO40_MMFGLC_MKFGSU256_NTA0_NTB0_NTC0_NTD0_NEPBS0_NLCA3_NLCB3_ONLL1_OPLV0_PK0_PAP0_PGR1_PLR1_PKA0_SIA1_SLW1_SS0_SU32_SUM0_SUS256_SCIUI1_SPO0_SRVW0_SSO0_SVW4_SNLL0_TSGRA0_TSGRB0_TT4_4_TLDS0_UMLDSA0_UMLDSB0_USFGRO0_VAW2_VS1_VW4_VWB4_VFLRP0_WSGRA0_WSGRB0_WS64_WG8_8_1_WGM1
+       54.9 ms (  0.1% of Cijk) Cijk_Alik_Bljk_HB_MT16x16x24_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_ASM_ASAE01_ASCE01_ASEM2_AAC0_BL1_BS1_CLR0_DTLA0_DTLB0_DTVA0_DTVB0_DVO0_ETSP_EPS1_ELFLR0_EMLL0_FSSC10_FL0_GLVWA2_GLVWB2_GRCGA1_GRCGB1_GRPM1_GRVW2_GSU1_GSUASB_GLS0_ISA900_IU1_K1_KLA_LBSPPA0_LBSPPB0_LPA0_LPB0_LDL1_LRVW2_LWPMn1_LDW0_FMA_MIAV0_MDA2_MO40_MMFGLC_MKFGSU256_NTA0_NTB0_NTC0_NTD0_NEPBS0_NLCA3_NLCB3_ONLL1_OPLV0_PK0_PAP0_PGR1_PLR1_PKA0_SIA1_SLW1_SS0_SU32_SUM0_SUS256_SCIUI1_SPO0_SRVW0_SSO0_SVW4_SNLL0_TSGRA0_TSGRB0_TT2_2_TLDS0_UMLDSA0_UMLDSB0_USFGRO1_VAW2_VS1_VW2_VWB2_VFLRP0_WSGRA0_WSGRB0_WS64_WG8_8_1_WGM8
+       44.7 ms (  0.1% of Cijk) Cijk_Alik_Bljk_HB_MT64x32x16_SN_1LDSB0_APM1_ABV0_ACED0_AF0EM2_AF1EM1_AMAS3_ASE_ASGT_ASLT_ASM_ASAE01_ASCE01_ASEM2_AAC0_BL1_BS1_CLR0_DTLA0_DTLB0_DTVA0_DTVB0_DVO0_ETSP_EPS1_ELFLR0_EMLL0_FSSC10_FL0_GLVWA4_GLVWB4_GRCGA1_GRCGB1_GRPM1_GRVW4_GSU1_GSUASB_GLS0_ISA900_IU1_K1_KLA_LBSPPA0_LBSPPB0_LPA0_LPB0_LDL1_LRVW4_LWPMn1_LDW0_FMA_MIAV0_MDA2_MO40_MMFGLC_MKFGSU256_NTA0_NTB0_NTC0_NTD0_NEPBS0_NLCA1_NLCB1_ONLL1_OPLV0_PK0_PAP0_PGR1_PLR1_PKA0_SIA1_SLW1_SS0_SU32_SUM0_SUS256_SCIUI1_SPO0_SRVW0_SSO0_SVW4_SNLL0_TSGRA0_TSGRB0_TT4_4_TLDS0_UMLDSA0_UMLDSB0_USFGRO0_VAW2_VS1_VW4_VWB4_VFLRP0_WSGRA0_WSGRB0_WS64_WG16_8_1_WGM8
+  TOTAL Cijk 59541.9 ms
+
+== PREFILL convert/dequant/staging kernels ==
+     1699.1 ms   30239 launches  void convert_unary<float, __half>(void const*, __half*, long, long, long, HIP_vector_type<
+     1682.2 ms   30240 launches  void convert_unary<__half, float>(void const*, float*, long, long, long, HIP_vector_type<u
+      861.2 ms    7279 launches  void convert_unary<float, __hip_bfloat16>(void const*, __hip_bfloat16*, long, long, long, 
+      431.9 ms    7276 launches  void convert_unary<__hip_bfloat16, float>(void const*, float*, long, long, long, HIP_vecto
+     1641.6 ms    7380 launches  void dequantize_block_iq3_s<__half>(void const*, __half*)
+     1308.1 ms    5040 launches  void dequantize_block_iq3_xxs<__half>(void const*, __half*)
+     1165.0 ms    5580 launches  void dequantize_block_iq4_xs<__half>(void const*, __half*)
+      594.3 ms    5280 launches  void dequantize_block_q4_K<__half>(void const*, __half*)
+      216.7 ms     899 launches  void dequantize_block_q3_K<__half>(void const*, __half*)
+       72.2 ms    2760 launches  void dequantize_block_q5_K<__half>(void const*, __half*)
+       49.2 ms     180 launches  void dequantize_block_iq2_xxs<__half>(void const*, __half*)
+       31.1 ms    1920 launches  void dequantize_block_q4_0<__half>(void const*, __half*, int)
+       19.7 ms    2280 launches  void dequantize_block_q8_0_f16<false>(void const*, __half*, long)
+       15.3 ms      60 launches  void dequantize_block_iq2_xs<__half>(void const*, __half*)
+       11.6 ms     720 launches  void dequantize_block_q6_K<__half>(void const*, __half*)
+        0.3 ms      60 launches  void dequantize_block_q2_K<__half>(void const*, __half*)
+     1641.6 ms    7380 launches  void dequantize_block_iq3_s<__half>(void const*, __half*)
+     1308.1 ms    5040 launches  void dequantize_block_iq3_xxs<__half>(void const*, __half*)
+     1165.0 ms    5580 launches  void dequantize_block_iq4_xs<__half>(void const*, __half*)
+      594.3 ms    5280 launches  void dequantize_block_q4_K<__half>(void const*, __half*)
+      216.7 ms     899 launches  void dequantize_block_q3_K<__half>(void const*, __half*)
+       72.2 ms    2760 launches  void dequantize_block_q5_K<__half>(void const*, __half*)
+       49.2 ms     180 launches  void dequantize_block_iq2_xxs<__half>(void const*, __half*)
+       31.1 ms    1920 launches  void dequantize_block_q4_0<__half>(void const*, __half*, int)
+       26.5 ms    1920 launches  _ZL16k_set_rows_quantIl10block_q4_0Li32ETnPFvPKfPT0_EXadL_ZL23quantize_f32_q4_0_blockS2_PS
+       19.7 ms    2280 launches  void dequantize_block_q8_0_f16<false>(void const*, __half*, long)
+       15.3 ms      60 launches  void dequantize_block_iq2_xs<__half>(void const*, __half*)
+       11.6 ms     720 launches  void dequantize_block_q6_K<__half>(void const*, __half*)
+        0.3 ms      60 launches  void dequantize_block_q2_K<__half>(void const*, __half*)
+      151.3 ms   12540 launches  void cpy_scalar<&(void cpy_1_scalar<float, float>(char const*, char*))>(char const*, char*
+      137.4 ms    2880 launches  __amd_rocclr_copyBufferRectAligned
+      151.3 ms   12540 launches  void cpy_scalar<&(void cpy_1_scalar<float, float>(char const*, char*))>(char const*, char*
+      514.3 ms    2880 launches  void concat_non_cont<unsigned int, 0>(char const*, char const*, char*, long, long, long, l
+       12.8 ms      60 launches  void concat_cont<unsigned int, 0>(unsigned int const*, unsigned int const*, unsigned int*,
+
+== PREFILL per-die family seconds ==
+  die(agent) 1: busy 35610.58 s | Cijk=14732.83s(41.4%) flash=10468.61s(29.4%) nccl=6031.54s(16.9%) other=4377.59s(12.3%)
+  die(agent) 2: busy 35601.19 s | Cijk=14124.26s(39.7%) flash=10421.22s(29.3%) nccl=6937.29s(19.5%) other=4118.41s(11.6%)
+  die(agent) 3: busy 35566.13 s | Cijk=14953.38s(42.0%) flash=10450.43s(29.4%) nccl=5914.15s(16.6%) other=4248.17s(11.9%)
+  die(agent) 4: busy 35571.95 s | Cijk=15731.40s(44.2%) flash=10590.80s(29.8%) nccl=4684.87s(13.2%) other=4564.87s(12.8%)
+
+== Cijk variant grids (launch counts, prefill) ==
+  MT32x32x32|WG8: 8288 launches | grid 8704x16x1: 6760, grid 6144x16x1: 884, grid 8704x9x1: 520, grid 6144x9x1: 68, grid 10240x16x1: 52, grid 10240x9x1: 4
+  MT16x16x24|WG8: 7992 launches | grid 64x32x1: 4992, grid 1024x32x1: 1768, grid 64x3x1: 384, grid 64x17x1: 384, grid 6144x3x1: 192, grid 1024x3x1: 136
+  MT128x64x16|WG16: 6760 launches | grid 10240x8x1: 6760
+  MT64x64x16|WG16: 5704 launches | grid 10240x8x1: 2496, grid 6144x8x1: 2496, grid 20480x5x1: 520, grid 10240x5x1: 192
+  MT32x32x24|WG8: 644 launches | grid 10240x2x1: 260, grid 5120x2x1: 192, grid 3072x9x1: 192
+  MT64x32x32|WG16: 592 launches | grid 8704x2x1: 520, grid 6144x2x1: 68, grid 10240x2x1: 4
+  MT64x32x16|WG16: 260 launches | grid 10240x2x1: 260
