@@ -1,0 +1,19 @@
+== MANIFEST 2026-09-17T01:15:11Z night TIMINGPF (prefill decay falsifier: cold-boot plateau vs warm re-fire) bin 07ad7eccc0b97cc0
+grant: user order "start on it now, full velocity" (blanket GPU grant 2026-09-16 stands)
+config: TP4 --devices 0,1,2,3 --spec mtp --draft-tokens 2 GRAPHS-ON port=8100 NINFER_TP2_TIMING=1 NINFER_WORKSPACE_MIB=96 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16
+design: cold boot -> run A (~1280-tok filler prompt, expect ~24 plateau if fresh-state fast regime exists) -> run B immediately (if ~9.5, STATE not depth) ; rocm-smi temp/clock sideband cold / post-A / post-B
+KFD precondition: 0. serial TP4 boot, sole GPU user.
+== COLD SIDEBAND (pre-boot): edge 32-35C, junction 33-36C, memory 38-40C — idle cold
+== RUN A (cold boot, immediate): plen=1279, client wall 56.67s, finish=stop content='Alpha' (coherent)
+   per-chunk: 24.5 24.4 24.5 24.3 24.2 24.1 24.0 23.9 23.9 — FLAT through 1279 (TIMINGPF_serve.log; tp2 prefill=52.73s decode=3.93s=12.0 tok/s)
+== SIDEBAND POST-A: edge 67-77C; sclk 300MHz (idle sample between requests)
+== RUN B (immediate re-fire, same prompt): plen=1279, client wall 78.59s, finish=stop content='Alpha'
+   per-chunk: 24.1 24.0 24.0 23.9 [640] then KNEE: 16.2 15.5 14.9 14.1 13.6 (TIMINGPF_serve.log; tp2 prefill=70.03s decode=8.54s=5.5 tok/s)
+== SIDEBAND POST-B: edge 84-85C all four GPUs
+== VERDICT (PREFILL DECAY HUNT, first decisive read):
+   1. Depth does NOT set the fast regime: run A flat 24 to tok 1279; run B slowed at the SAME depths.
+   2. The regime is LOAD-DURATION/STATE: ~24 tok/s held ~45-60 s of sustained TP4 load from cold (run A: 53 s flat; MTP3: knee at ~60 s in), then progressive ramp-down (run B knee at ~45 s starting warm at ~77C; 16.2 -> 13.6 over ~35 s). Consistent with thermal/clock throttling; sclk sideband caught only idle samples (300 MHz) — during-load clocks are the missing frame.
+   3. DECODE IS ALSO THERMAL-SENSITIVE: same request, same depth 1279: decode 12.0 tok/s cold(A) vs 5.5 tok/s hot(B). The deep-ctx decode crisis (2.6-3.5 @10k) is confounded by thermal state — a cool-machine 10k decode row is needed before pricing any decode fix.
+   4. Next-window falsifiers: (a) rocm-smi --showclocks DURING load (loop in background while prefill runs); (b) cool-down re-fire (idle 60 s -> if 24 returns, thermal confirmed; if not, KV-pool state); (c) forced clocks (ppfeature) A/B.
+== GRADE: TIMINGPF PASS — both runs coherent ('Alpha', stop), falsifier decisive
+== RELEASE 2026-09-17T01:19:33Z: exact-PID kill (anchored, sole match), no serve remains, KFD=0 verified after
