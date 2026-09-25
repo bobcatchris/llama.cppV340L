@@ -1,0 +1,31 @@
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+MATRIX a_solo_base        n=30 med=   796.3 us  min=   773.2  max=   965.9  spread=24.20%  SPREAD>1.05
+MATRIX a_solo_mid3        n=30 med=   988.3 us  min=   957.4  max=  1034.2  spread=7.78%  SPREAD>1.05
+MATRIX a_solo_wide6       n=30 med=   876.2 us  min=   822.1  max=   902.8  spread=9.22%  SPREAD>1.05
+MATRIX b_alt_base         n=30 med=  1020.5 us  min=   961.8  max=  1131.7  spread=16.65%  SPREAD>1.05
+MATRIX b_alt_wide6        n=30 med=   875.7 us  min=   811.4  max=   982.1  spread=19.49%  SPREAD>1.05
+MATRIX c_after_wide_base  n=30 med=  1017.1 us  min=   950.7  max=  1125.7  spread=17.20%  SPREAD>1.05
+MATRIX d_noop_base        n=30 med=  1014.5 us  min=   799.7  max=  1134.4  spread=32.99%  SPREAD>1.05
+MATRIX d_noop_wide6       n=30 med=   875.7 us  min=   809.6  max=   977.5  spread=19.17%  SPREAD>1.05
+MATRIX sparse_base        n=30 med=  1143.7 us  min=  1091.1  max=  1875.4  spread=68.58%  SPREAD>1.05
+MATRIX sparse_wide6       n=30 med=  1603.9 us  min=  1518.0  max=  1776.2  spread=16.10%  SPREAD>1.05
+MATRIX double_wide6/2     n=30 med=   871.6 us  min=   806.4  max=   933.6  spread=14.60%  SPREAD>1.05
+MATRIX double_base/2      n=30 med=   792.1 us  min=   782.9  max=   898.6  spread=14.61%  SPREAD>1.05
+MATRIX pipe_base          n= 6 med=   796.6 us  min=   788.6  max=   797.2  spread=1.09%  SPREAD>1.05
+MATRIX pipe_wide6         n= 6 med=   879.7 us  min=   873.2  max=   893.9  spread=2.35%  SPREAD>1.05
+MATRIX hostrate        base    4.0 us/launch  wide6    3.6 us/launch (host enqueue only)
+MATRIX lds22k_gw384       n=30 med=    10.1 us  min=     9.8  max=    10.5  spread=7.36%  SPREAD>1.05
+MATRIX lds32k_gw384       n=30 med=     9.8 us  min=     9.6  max=    10.7  spread=10.61%  SPREAD>1.05
+MATRIX lds22k_gb256       n=30 med=     9.6 us  min=     9.3  max=    10.1  spread=7.69%  SPREAD>1.05
+MATRIX lds32k_gb256       n=30 med=    10.2 us  min=    10.1  max=    10.5  spread=4.35%  SPREAD>1.05
+MATRIX lds32k_vg128       n=30 med=     9.8 us  min=     9.6  max=    10.1  spread=4.55%  SPREAD>1.05
+MATRIX lds22k_vg128       n=30 med=     9.3 us  min=     9.0  max=    11.3  spread=23.82%  SPREAD>1.05
+MATRIX lds16k_vg128       n=30 med=     8.9 us  min=     8.7  max=     9.3  spread=6.66%  SPREAD>1.05
+MATRIX attr lds32k_vg128: numRegs=9 shared=32768 local=0
+MATRIX attr spilllight: numRegs=36 shared=0 local=272
+MATRIX attr spillheavy: numRegs=39 shared=0 local=1456
+MATRIX spilllight_gw384   n=30 med=    24.4 us  min=    23.9  max=    25.3  spread=6.06%  SPREAD>1.05
+MATRIX bigcodelight_gw384 n=30 med=    16.1 us  min=    16.0  max=    16.3  spread=1.84%  SPREAD>1.05
+MATRIX lds_alt_22k        n=30 med=     9.2 us  min=     9.0  max=     9.5  spread=4.83%  SPREAD>1.05
+MATRIX lds_alt_32k        n=30 med=     9.8 us  min=     9.6  max=    10.1  spread=4.56%  SPREAD>1.05

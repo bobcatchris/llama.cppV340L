@@ -1,0 +1,8 @@
+[kvarn-decode-route] UNIFIED (default) (NINFER_KVARN_DECODE=<unset>)
+  placement check: all committed pages present at their table physical pages
+  lane0 tail tile byte-identical
+  lane1 tail tile byte-identical
+kvarn_batched_ops PASS (bind stride=32768, append per-lane state bit-identical)
+  lane0 attend bit-identical vs per-lane
+  lane1 attend bit-identical vs per-lane
+kvarn_batched_ops attend PASS

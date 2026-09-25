@@ -1,0 +1,11 @@
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+ORACLE direct vs base: DUST (6144/6144 els differ, max rel 3.722e+02)
+
+per-launch us (niter=30, reps=12), served geometry T=4 gqa=6 ne11=7168 q4_0 KV:
+  base     med=   792.7 us  min=   789.4  max=   798.3  spread=1.13%  vs base   -0.51%  SPREAD-FAIL (>1.05%)
+  direct   med=   479.0 us  min=   477.0  max=   481.0  spread=0.85%  vs base  -39.89%
+  basedup  med=   791.1 us  min=   789.8  max=   797.8  spread=1.00%  vs base   -0.71%
+REPS base    : 791.4 793.4 792.7 798.3 795.4 796.8 793.5 791.9 790.4 790.1 789.4
+REPS direct  : 478.9 479.2 478.9 479.5 481.0 479.1 477.0 479.0 479.2 478.0 478.4
+REPS basedup : 790.6 793.9 796.8 797.8 796.6 796.6 789.8 790.2 791.1 791.0 791.1
