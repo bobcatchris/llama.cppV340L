@@ -1,0 +1,31 @@
+W7 PK16 BENCH ROW — the REV2 reopen desk: measured KILL at 1.34x V0 (pre-registered <1.5x), 2026-09-18, window 7
+bin: bin/w7_pk16_bench (hipcc -O3 -DNDEBUG -std=gnu++20 gfx900; production law line; built from lane 765f8edf9)
+log: W7_pk16_bench_run1.log (raw). Methodology = the SWEEP bench verbatim (results/amd/coherence/
+  nvfp4_prefill_bench.cu + src/core/device.cu, event timing 3 warmup + 20 iters, 5 s mclk hammer, ceilings cell) —
+  VALIDATED: V0 reproduced SWEEP_row within ~2% (3157/2830/3166/2396 vs 3083/2756/3103/2366 GF/s).
+
+CENSUS-FIRST KILL-SWITCH (passed for the benched arm): A16/TN64 = 102 VGPR, 0 B scratch,
+  v_pk_fma_f16 x128/body (w3_census.py on the bench compile; A32 points spill 136-140 B as before, not benched).
+
+MEASURED (M=128, four full geometries, GF/s | relL2 vs REF | ratio vs V0):
+  AttnInput   14336x5120: V0 3157.5 | pk16 4088.7 | relL2 1.46e+02 FAIL | 1.29x
+  GdnInput    16384x5120: V0 2830.1 | pk16 3799.4 | relL2 1.46e+02 FAIL | 1.34x
+  MlpGateUp   34816x5120: V0 3166.4 | pk16 4043.1 | relL2 1.46e+02 FAIL | 1.28x
+  Residual6144 5120x6144: V0 2396.1 | pk16 3421.7 | relL2 1.79e+02 FAIL | 1.43x
+  MEAN pk16/V0 = 1.34x  =>  PRE-REGISTERED VERDICT: KILL (<1.5x AMBER floor).
+
+WHY (mechanism, not narrative): the pk16 MAC body at the only register-fundable point (A16) sustains
+  ~4.0 TF/s/die = 38% of fp32 nominal / ~19% of pk16 peak — the 44 waits/body the W3 census measured DO
+  NOT hide, exactly the stall-risk REV2 §2 named as the ceiling-not-floor caveat. The 2x-MAC density
+  gain nets only +29-43% over V0 after the group-flush tax and the wait stalls. Numerics FAIL note: the
+  sketch was a census artifact whose dequant algebra was never device-validated; the bench caught it
+  (relL2 ~146 vs REF — likely scale-plane or pair-order mismatch, UNDEBUGGED BY DESIGN: a numerics fix
+  only ADDS work, so it cannot change the KILL verdict — recorded as the reason the arm never qualified
+  for integration, not as an open work item).
+
+LEDGER CONSEQUENCE (R1/R4): the W3 reopen row (goal change) CLOSES — KILL. The pk16 GEMM class is now
+  killed THREE times at three bars: HFMA2-PK (resourcing, 1.07x), W3 census (54% 1k bar, in-doc), W7 bench
+  (1.34x measured under the 700-class 2x bar). The GEMM front on THIS hardware/compiler is CLOSED with a
+  measured floor: no software GEMM lever exists; REV2's projection reverts to the additive path
+  (finalize + AR floor + capture => ~140-160 tok/s class) and 300+ requires the hardware/compiler
+  reopeners (gfx906 dot10, ROCm wait-emission change). This is the plan's honest end state, now measured.

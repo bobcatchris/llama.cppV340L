@@ -1,0 +1,15 @@
+W7 PADDED-SWIZZLE ROW — addressing micro-lever: measured WASH/LOSS, closed, 2026-09-18
+hypothesis: V0's XOR-swizzle address math (part of the measured 52% conversion/addr stream) could be
+  deleted by padded LDS rows (stride +1 word, bank (w+t)%32) at zero conflict cost.
+method: same-band A/B, both binaries back-to-back, default-mode TILED arm at M=128 (relL2 0.00 all rows):
+  geometry        V0(XOR) GF/s   padded GF/s   delta
+  AttnInput        3041.4         2340.5        -23%
+  GdnInput         2238.5         2137.7         -4.5%
+  MlpGateUp        2330.5         2647.7        +14%
+  Residual6144     2100.8         1927.0         -8%
+  mean             2428           2263           -7%
+VERDICT: no net win — the scheduler was already hiding the swizzle math, and padded banking trades it for
+  conflicts that cost the same or more per geometry. CLOSED. (Static-census hint that per-FMA overhead halved
+  was an unroll-difference artifact — achieved rate is the truth, R5.)
+ALSO: this row is evidence against "the wall polluted us" — the lever has nothing to do with the parked
+  VRAM idea; it was hunted fresh, priced by census, benched same-band, and died on its own merits.
