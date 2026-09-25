@@ -1,0 +1,16 @@
+== MANIFEST 2026-09-17T02:23:29Z night B3HARDEN (draft-vocab path hardening validation) bin fcef463d655e8150 (sha256 fcef463d655e8150..., banked /home/chris/artifacts_bin/ninfer-serve_fcef463d655e8150.bin, BANK-BEFORE-RELINK obeyed)
+grant: user order "start on it now, full velocity" (blanket GPU grant 2026-09-16 stands)
+change: tp_engine.cpp draft_vocab resolution NINFER_DRAFT_VOCAB env -> executable-relative (<exe>/../../, /../, /) -> legacy CWD; loud [tp2] WARNING when unreadable with drafter enabled (was: silent ~3x lm_head fallback); guard G5 narrative updated (selftest 21 mutations PASS, suite GREEN); battery step 0b text updated
+config: TP4 --devices 0,1,2,3 --spec mtp --draft-tokens 2 GRAPHS-ON port=8100, booted FROM WORKTREE ROOT (exe-relative should resolve, NO warning expected)
+KFD precondition: 0
+== POSITIVE BOOT (repo root): NO draft-vocab warning; remap LOADED ("loaded 40960 draft vocabulary IDs", "draft output head ready")
+== count600: wall 63.29s (warm post-E1), 294.92 ms/round (Verify 265.81 = 90.1%, AR chain 13.95 = 4.7%), acc=0.97 t/r=2.94 rounds=204 — structure IDENTICAL to cold 07ad7ecc runs (92.2/3.6); absolute rate thermal-shifted per THARM1 law
+== COOLED RE-PROBE (190 s idle, 81C -> 52-59C): 244.27 ms/round, decode 50.13 s = 11.97 tok/s — recovered within the thermal band (THARM1: 213 cold / 222.62 post-3-min-idle); acc/t/r/rounds unchanged
+== BLUE: finish=stop 'BLUE' PASS
+== BOOT BATTERY (against live server): GUARD GREEN + step 0b present + LADDER PASS + sideband banked (2nd run after sideband fix: 56 samples; first run exposed set -e sampler death on card1 grep miss — fixed with || true pipelines, validated)
+== DEVICE CELLS: SKIP (not compiled in this build tree — build only targeted ninfer-serve; battery law allows SKIP)
+== NEGATIVE BOOT (cwd=/tmp): [tp2] WARNING fires verbatim with fix instruction; fallback functional (BLUE PASS); BLUE leg decode 6.12 s / 44 tok = 7.2 tok/s vs ~11 tok/s positive — fallback cost visible, direction correct
+== ENV-OVERRIDE BOOT (cwd=/tmp + NINFER_DRAFT_VOCAB=<worktree path>): NO warning; "loaded 40960 draft vocabulary IDs from <env path>" — env arm proven; BLUE PASS
+== TOKEN-STREAM REGRESSION: count600 [ids] on fcef463d655e8150 (graphs-ON k=2) BYTE-IDENTICAL to pre-hardening 07ad7ecc TIMING1 count600 (265 B, E1B3HARDEN_ids banked) — hardening changed no token stream; also corroborates E1 RED (divergence is config-geometry-tied, not random)
+== GRADE: B3 GREEN — all three resolution paths proven, warning loud, fallback loud-and-slow, token stream unchanged
+== RELEASE: positive server killed exact-PID 2521806 pre-negative-boot; negative server 2553120 killed; env server 2555000 killed; all anchored sole-match; KFD=0 after each (final verified 0)

@@ -1,0 +1,14 @@
+  draft steps (per round)        n=42    mean    2.522 med    2.462 p10    2.367 p90    2.616 ms
+  draft sample+batch/step        n=42    mean    1.130 med    1.120 p10    1.068 p90    1.181 ms
+  draft total/round              n=42    mean   10.958 med   10.809 p10   10.381 p90   11.323 ms
+  verify ubatch issue (4tok)     n=86    mean   93.669 med   88.674 p10   11.249 p90  167.160 ms
+  catchup/draft ubatch issue (1tok) n=128   mean    3.097 med    2.271 p10    2.121 p90    2.604 ms
+  proc line decode_issue         n=60    mean   60.894 med   14.168 p10   13.484 p90  208.335 ms
+  drain line                     n=9029  mean    0.027 med    0.001 p10    0.000 p90    0.002 ms
+  wait_outputs line              n=42    mean    0.003 med    0.003 p10    0.002 p90    0.004 ms
+  rounds (draft spec lines)     = 42
+  drains/round                  = 214.98
+  drains/draft-step             = 71.66
+  wait_outputs/round            = 1.00
+  wait_outputs/draft-step       = 0.333
+  draft rounds (spec lines)     = 42, steps total = 126

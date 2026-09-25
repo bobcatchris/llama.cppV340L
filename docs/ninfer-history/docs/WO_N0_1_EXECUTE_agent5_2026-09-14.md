@@ -1,0 +1,16 @@
+# WO-§N0.1-EXECUTE — corrected at issue by measurement (agent5, runbook desk, 2026-09-14 21:1xZ; chair seq-151 leg-2, re-scoped by the leg-3 finding)
+
+**Premise as issued:** "apply qwen38-nvfp4-support.patch to package.cpp resolve_weights + admission-cell arm grading against it."
+**Premise as MEASURED (plan REV 3.9 §8f):** the patch is a DOWNGRADE on this tree and must NOT be applied.
+- Our tree already resolves the pair (`package.cpp:108`: `model_id == "qwen3.8-27b" && weights_id == "nvfp4"`) to the DEDICATED `WeightsProfile::Qwen38Nvfp4` with its own binding route `bind_qwen38_nvfp4_text_layers` (bindings.cpp:394+), landed by **5d2c1f55 `feat(qwen3.8): integrate nvfp4 artifact runtime`** — verified ancestor of plan tip 7805bb26 AND of live amd/main tip c218547f.
+- The upstream patch (base blob 8369f4f, predates 5d2c1f55) maps the same pair to the 3.6 `Nvfp4` profile → `bind_nvfp4_text_layers`. Force-landing it re-routes a 3.8 artifact through 3.6 layer-bindings; applied as-written it is an unreachable dead branch.
+- agent3's synth grader (af31aecd) ALREADY asserts the dedicated resolution as its law — `resolve_weights(qwen3.8-27b, nvfp4) == Qwen38Nvfp4`, with the 3.6 name-diff control. The §N0.1 park was answered in-tree before the patch arrived.
+
+**EXECUTE (three legs, all zero-card until A1):**
+1. **REJECT the patch** — record: `qwen38-nvfp4-support.patch`, content8 at my seat **4849c610** (git blob path `Ostfralla/Qwen3.8-27B-NVFP4-NInfer/qwen38-nvfp4-support.patch`@main, 1007 B vs api/tree size field ✓). Nothing to merge; the §N0.1 answer is `5d2c1f55`. Upstream courtesy: their fork simply lacks our 5d2c1f55 line.
+2. **A2-at-real-bytes (the swap, already in §8):** when A1's sha-gate passes, agent3's synth grader re-points at the shipped file (input path only) — the profile-resolution arm grades the REAL manifest identity. **agent2 runs the cell** per chair order (their standing audit vantage: registration/blast/letter form, three-probe stamps). Expectation pre-declared: rc=0 with `Qwen38Nvfp4`; rc=1 on ANY other profile named in the refusal — a route to the 3.6 profile at real bytes is the pair-match/profile-mismatch class made flesh.
+3. **A3/A4 vs the conversion ledger (plan §8f):** the 4293-B `qwen3_8_27b_nvfp4.ninfer.conversion.json` (content8 **e6b82f1d**, fetched via api, size-cross-checked) pre-declares the census: {NVFP4 247, Q4G64 55, Q5G64 54, Q6G64 1, **W8G32 9**, BF16 591, FP32 343, I32 1} = 1301 tensors + 6 resources; layouts {blockscale-k16-m128x4-v1 ×247 — the block law named at source side}. ONE open reconciliation, named not guessed: the ledger's 9 W8G32 objects vs the dedicated route's vocab-endpoint format pair (bindings.cpp:43-45 returns W8G32/FP8_E4M3FN_ROW_BF16S by profile) — A3's exact-compare closes it; if the counts disagree, that is a §5-item-2 bad-way answer and we stop+report per row.
+
+**Gate:** A1 fires when `sha256(/media/chris/EMTEC256/qwen3_8_27b_nvfp4.ninfer) == eaf8ad124256d0a0c1ebbbca442ca58eee4f97ab34a60a0b4d57e2b41e2c56d2` AND size == 18,324,067,840 (download in flight, measured 4.64 GB @ 21:07Z, ~23 MiB/s). Partial file = rc=2, no verdict.
+
+— agent5. Class rows banked in §8f: identity match is a PAIR check, route equality is a PROFILE check; and HF `resolve/` 302-stubs write rc=0 garbage — sizes cross-checked against api/tree before any download is believed.

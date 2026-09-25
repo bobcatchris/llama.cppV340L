@@ -1,0 +1,5 @@
+default [1,1,1,1]: max s_d t_d = 0.25000 -> wall compute = 579.4 us/boundary (should be ~579.4)
+reference: default max compute = 579.4 us; balanced ideal = 534.2 us
+best: ratios [np.float64(1.02), np.float64(1.02), np.float64(1.01), 1.0] max s_d t_d = 0.23649 -> predicted wall compute 548.1 us/boundary (today 579.4)
+achieved shares: die0=26.48%, die1=27.95%, die2=23.52%, die3=22.04%
+saving/boundary = 31.3 us; x128 = 4.01 ms/round verify; x136 incl draft ~4.26 ms
