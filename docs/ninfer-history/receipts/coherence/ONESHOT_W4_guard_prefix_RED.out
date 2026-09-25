@@ -1,0 +1,59 @@
+== ninfer W4 one-shot-AR liveness guard suite (host CI class, W4-LOCKSTEP-LIVENESS) ==
+[L1] FAIL src/core/multi_gpu/ar_liveness.h — MISSING
+[L2] FAIL src/core/multi_gpu/ar_watchdog.h — MISSING
+[L3] src/core/multi_gpu/one_shot_allreduce.cu — 6 finding(s)
+[L4] OK  src/core/multi_gpu/one_shot_allreduce.cu — 2-rank kernel + launch site carry zero cure/injector tokens
+[L5] src/core/multi_gpu/one_shot_allreduce.cu — 9 finding(s)
+[L6] src/core/multi_gpu/tp_group.cpp — 5 finding(s)
+[L7] src/core/multi_gpu/one_shot_allreduce.cu — 6 finding(s)
+[BH] behavioral harness — compile failed
+[L1] FAIL src/core/multi_gpu/ar_liveness.h:1 — guarded file MISSING — the cure itself was deleted
+     FIX: restore src/core/multi_gpu/ar_liveness.h (constants kArCallDeadlineNs=2000000000 / kDesyncWindow=64 / kArStatusStalePass=4 / kArDiagAheadMark, ar_watchdog_scan, ar_watchdog_dump, ar_diag_max_ahead_delta) — design §2
+[L2] FAIL src/core/multi_gpu/ar_watchdog.h:1 — guarded file MISSING — the cure itself was deleted
+     FIX: restore src/core/multi_gpu/ar_watchdog.h (ArWatchdog + default death [AR-WEDGE-WATCHDOG] _exit(72)) — the kernel-never-launched net
+[L3] FAIL src/core/multi_gpu/one_shot_allreduce.cu:344 — the ahead-pass detection (gen_at_flag > step_gen) is gone — monotone >= passes would be silent again (the CLASS, arm i)
+     FIX: re-wire ar_wait_peer (HIP arm) in one_shot_allreduce.cu: kArStatusStalePass on gen_at_flag > step_gen + diag_cell writes on every outcome (§2 B1/§2d/§2e)
+[L3] FAIL src/core/multi_gpu/one_shot_allreduce.cu:344 — ahead pass no longer sets status bit kArStatusStalePass — the census signal is severed
+     FIX: re-wire ar_wait_peer (HIP arm) in one_shot_allreduce.cu: kArStatusStalePass on gen_at_flag > step_gen + diag_cell writes on every outcome (§2 B1/§2d/§2e)
+[L3] FAIL src/core/multi_gpu/one_shot_allreduce.cu:344 — ahead pass no longer marks the diag cell (kArDiagAheadMark) — the §2d matrix would misname the wedge
+     FIX: re-wire ar_wait_peer (HIP arm) in one_shot_allreduce.cu: kArStatusStalePass on gen_at_flag > step_gen + diag_cell writes on every outcome (§2 B1/§2d/§2e)
+[L3] FAIL src/core/multi_gpu/one_shot_allreduce.cu:344 — expected >=3 diag_cell writes (2 timeout paths + ahead pass), found 0 — a wedge shape would dump a blind cell
+     FIX: re-wire ar_wait_peer (HIP arm) in one_shot_allreduce.cu: kArStatusStalePass on gen_at_flag > step_gen + diag_cell writes on every outcome (§2 B1/§2d/§2e)
+[L3] FAIL src/core/multi_gpu/one_shot_allreduce.cu:385 — STALL-DRILL injector early-return missing from the world kernel
+     FIX: re-wire ar_wait_peer (HIP arm) in one_shot_allreduce.cu: kArStatusStalePass on gen_at_flag > step_gen + diag_cell writes on every outcome (§2 B1/§2d/§2e)
+[L3] FAIL src/core/multi_gpu/one_shot_allreduce.cu:385 — world kernel no longer passes the per-peer diag cell
+     FIX: re-wire ar_wait_peer (HIP arm) in one_shot_allreduce.cu: kArStatusStalePass on gen_at_flag > step_gen + diag_cell writes on every outcome (§2 B1/§2d/§2e)
+[L5] FAIL src/core/multi_gpu/one_shot_allreduce.cu:1 — the B2 progress stamp (inflight_since_ns = ar_now_ns()) before the first launch is gone — the watchdog goes blind
+     FIX: restore the B2 arm in allreduce_bf16 (world>2): deadline stamp+check, [AR-STALEPASS] census, [AR-DEADLINE]/71 + [AR-DESYNC]/73 loud deaths, unconditional N-rank [AR-RETRY]
+[L5] FAIL src/core/multi_gpu/one_shot_allreduce.cu:1 — the progress clock is never idled after success
+     FIX: restore the B2 arm in allreduce_bf16 (world>2): deadline stamp+check, [AR-STALEPASS] census, [AR-DEADLINE]/71 + [AR-DESYNC]/73 loud deaths, unconditional N-rank [AR-RETRY]
+[L5] FAIL src/core/multi_gpu/one_shot_allreduce.cu:1 — the B2 deadline constant left allreduce_bf16
+     FIX: restore the B2 arm in allreduce_bf16 (world>2): deadline stamp+check, [AR-STALEPASS] census, [AR-DEADLINE]/71 + [AR-DESYNC]/73 loud deaths, unconditional N-rank [AR-RETRY]
+[L5] FAIL src/core/multi_gpu/one_shot_allreduce.cu:1 — [AR-DEADLINE] _exit(71) bound missing
+     FIX: restore the B2 arm in allreduce_bf16 (world>2): deadline stamp+check, [AR-STALEPASS] census, [AR-DEADLINE]/71 + [AR-DESYNC]/73 loud deaths, unconditional N-rank [AR-RETRY]
+[L5] FAIL src/core/multi_gpu/one_shot_allreduce.cu:1 — [AR-DESYNC] _exit(73) bound missing
+     FIX: restore the B2 arm in allreduce_bf16 (world>2): deadline stamp+check, [AR-STALEPASS] census, [AR-DEADLINE]/71 + [AR-DESYNC]/73 loud deaths, unconditional N-rank [AR-RETRY]
+[L5] FAIL src/core/multi_gpu/one_shot_allreduce.cu:1 — the [AR-STALEPASS] census line is gone
+     FIX: restore the B2 arm in allreduce_bf16 (world>2): deadline stamp+check, [AR-STALEPASS] census, [AR-DEADLINE]/71 + [AR-DESYNC]/73 loud deaths, unconditional N-rank [AR-RETRY]
+[L5] FAIL src/core/multi_gpu/one_shot_allreduce.cu:1 — census no longer consumes the diag row via ar_diag_max_ahead_delta (single home)
+     FIX: restore the B2 arm in allreduce_bf16 (world>2): deadline stamp+check, [AR-STALEPASS] census, [AR-DEADLINE]/71 + [AR-DESYNC]/73 loud deaths, unconditional N-rank [AR-RETRY]
+[L5] FAIL src/core/multi_gpu/one_shot_allreduce.cu:1 — the desync-window decision left the census
+     FIX: restore the B2 arm in allreduce_bf16 (world>2): deadline stamp+check, [AR-STALEPASS] census, [AR-DEADLINE]/71 + [AR-DESYNC]/73 loud deaths, unconditional N-rank [AR-RETRY]
+[L5] FAIL src/core/multi_gpu/one_shot_allreduce.cu:1 — [AR-RETRY] is not unconditional for the N-rank arm (if (mc31h || impl_->world > 2)) — a wedge under construction would be invisible without NINFER_MC31
+     FIX: restore the B2 arm in allreduce_bf16 (world>2): deadline stamp+check, [AR-STALEPASS] census, [AR-DEADLINE]/71 + [AR-DESYNC]/73 loud deaths, unconditional N-rank [AR-RETRY]
+[L6] FAIL src/core/multi_gpu/tp_group.cpp:1 — tp_oneshot_ar_gate() hoisted definition missing
+     FIX: restore the B3/gate wiring in tp_group.cpp: default-OFF tp_oneshot_ar_gate(), ar_watchdog.arm inside the world>2 env branch ONLY, dtor disarm, world>2-gated crossing heartbeats
+[L6] FAIL src/core/multi_gpu/tp_group.cpp:1 — the env-gated world>2 construction branch is gone or renamed
+     FIX: restore the B3/gate wiring in tp_group.cpp: default-OFF tp_oneshot_ar_gate(), ar_watchdog.arm inside the world>2 env branch ONLY, dtor disarm, world>2-gated crossing heartbeats
+[L6] FAIL src/core/multi_gpu/tp_group.cpp:270 — the dtor does not disarm the watchdog before the views die
+     FIX: restore the B3/gate wiring in tp_group.cpp: default-OFF tp_oneshot_ar_gate(), ar_watchdog.arm inside the world>2 env branch ONLY, dtor disarm, world>2-gated crossing heartbeats
+[L6] FAIL src/core/multi_gpu/tp_group.cpp:346 — crossing heartbeat entry/exit hooks missing
+     FIX: restore the B3/gate wiring in tp_group.cpp: default-OFF tp_oneshot_ar_gate(), ar_watchdog.arm inside the world>2 env branch ONLY, dtor disarm, world>2-gated crossing heartbeats
+[L6] FAIL src/core/multi_gpu/tp_group.cpp:346 — heartbeats are not gated on (gate && world>2) — world==2 and default boots must never execute them
+     FIX: restore the B3/gate wiring in tp_group.cpp: default-OFF tp_oneshot_ar_gate(), ar_watchdog.arm inside the world>2 env branch ONLY, dtor disarm, world>2-gated crossing heartbeats
+[L7] FAIL src/core/multi_gpu/one_shot_allreduce.cu:1 — injector env NINFER_AR_TEST_STALL_RANK missing — the device drill cells (design §4a) lost their arm
+     FIX: the W4AR injectors must stay env-gated test-only arms in one_shot_allreduce.cu with dormant defaults (design §4a) — no other TU may read NINFER_AR_TEST_*
+[L7] FAIL src/core/multi_gpu/one_shot_allreduce.cu:1 — injector env NINFER_AR_TEST_AHEAD missing — the device drill cells (design §4a) lost their arm
+     FIX: the W4AR injectors must stay env-gated test-only arms in one_shot_allreduce.cu with dormant defaults (design §4a) — no other TU may read NINFER_AR_TEST_*
+[L7] FAIL src/core/multi_gpu/one_shot_allreduce.cu:1 — injector env NINFER_AR_TEST_STUCK_NCCL missing — the device drill cells (design §4a) lost their arm
+     FIX: the W4AR injectors must stay env-gated test-only arms in one_shot_allreduce.cu with dormant defaults (design §4a) — no other TU may read NINFER_AR_TEST_*

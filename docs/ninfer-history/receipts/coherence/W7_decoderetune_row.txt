@@ -1,0 +1,109 @@
+W7_decoderetune_row — decode retune desk (F4a draft-arm + F1a draft-vocab coverage), lane amd/wo-w7-body, 2026-09-18
+Grant: coordinator decode-retune mission (bench devices 2/3; :8100 serve untouched — anchored, PID 214823, bin 7c11c3ac07863366).
+Bench: results/amd/coherence/w7_draft_arm_bench.cu (pre-registered gates A1-A5 in its header, written BEFORE any timing run).
+Bin sha256 (w7_draft_arm_bench): fd764d9fa134a5528455b6bba4e8c8b17da098464d64de87e1a2c786da792047
+Runs: W7_draftarm_run1.log + W7_draftarm_run2.log, HIP_VISIBLE_DEVICES=2 (die 2), die idle (0% all, serve CU 0%), mclk 945 MHz TOP.
+Desk commit: 69db827f3 (F1a) + the F4a row commit (this file).
+
+================================================================== F1a: DRAFT-VOCAB COVERAGE ON REAL PROSE ==
+
+Method: the in-tree counter (src/runtime/tp2/vocab_output_counter.h, wired tp2_backend.cpp:1658/3410/1686)
+counts ACCEPTED tokens = the emitted stream; the serve prints the emitted ids per request
+([ids], first 64, tp_engine.cpp:677-683). Offline membership of emitted-id streams in
+tests/multi_gpu/data/qwen38_draft_vocab_ids.json therefore has IDENTICAL semantics to the counter.
+A dedicated counting boot was VRAM-BLOCKED: the :8100 posture boot holds ALL FOUR dies at 84%
+(7.27/8.59 GB per die, rocm-smi 2026-09-18); sample source = the live lane-owned :8100 instance
+(prior desk pre-declared request-use; my probes are max_tokens=16, greedy, sequential; lifecycle untouched)
++ banked serve logs of both this worktree and the shared checkout (250 files, exact-tuple dedup).
+
+  LIVE real-prose battery (this desk, 21 varied prose prompts x 16 tok, engine-printed ids):
+    334/336 in-slice = 99.40% (SE +-0.42%); missing ids: 68111 x2.
+  Corroborating (same session, concurrent foreign 768-tok decode-bench streams, prompt class unknown):
+    632/640 = 98.75%.
+  REALK sky-blue prose anchor (banked REALK2 leg, first-64 of 201-tok prose): 63/64 = 98.4% (miss 89661).
+  Counting class (banked count600/count-probe streams): 98.0% (matches the 0.97-0.99 acceptance anchor).
+  Healthy probe corpus (89 distinct probe streams, 1525 tok): 83.7%; top-6 missing ids
+    (54018, 30188, 62158, 32198, 20206, 89661) = 41% of misses — prompt-distribution-dependent.
+  Corruption-era logs (G18r36_nvfp4ids / G18r65_nan / E12b — banked NaN/corruption verdicts): 73.1%.
+    SIDE FINDING: slice coverage doubles as a cheap corruption tripwire (healthy legs sit >=98).
+
+VERDICT (banked decision rule, W7_DECODE_DESK.md F1 step 1): coverage on REAL prose = 98.4-99.4%,
+ABOVE the 90-95% bar -> slice widening NOT triggered. The +130 MiB/rank widening stays UNPRICED-FIRED.
+Coverage is NOT the prose-acceptance suppressor (0.65 acceptance with 99% coverage = the misses are
+quant-flip/draft-head-quality class, matching the desk doc's decomposition; F1b BF16-slice stays
+conditional on a serve-leg counter decomposition, NOT on coverage).
+Serve-leg recipe (zero code, for the owner's next prose boot — the high-volume confirmation):
+  NINFER_VOCAB_COUNT_DIR=<abs dir> NINFER_DRAFT_VOCAB=<abs> <canonical boot line>; drive real prose;
+  read `grep "\[vocab\]"` — periodic lines every 10k accepted tokens + flush(shutdown) reports
+  cumulative coverage at ANY run length.
+
+================================================================== F4a: DRAFT-ARM ISOLATED PROFILE + RETUNE VERDICT ==
+
+Serving anatomy verified in code: ALL SIX draft-round W8G32 GEMVs ride launch_w8_simt_r8_c4 at T=1
+(five via tp_kernel.cu:139-145 "W8G32 t<=4 -> simt_r8_c4"; fc + proposal head via the w8_dispatch
+generic tail / LMHEAD gate). Per-rank serving shapes: fc [5120,10240], attn-qkv [3584,5120],
+o_proj [5120,1536], gate_up [8704,5120], down [5120,4352], head [10240,5120] = 210.5 MB/forward,
+2 draft forwards/round (align + 1 AR-chain step at k=2).
+
+ISOLATED ROOFLINE (die 2, 300 iters/arm, 2 runs agree <=1.5%; useful-bytes GB/s; ceiling read 386-390):
+
+  shape                 serving arm ms    GB/s   %read-ceiling   floor@137GB/s   best-alt
+  fc-stem  [5120,10240]     0.2457/0.2478  227/225   58%            0.41 ms        small_t 23.8x SLOWER
+  attn-qkv [3584,5120]      0.0897/0.0905  218/216   56%            0.14 ms        c8 1.08x slower
+  o-proj  [5120,1536]       0.1007/0.1011   83/83    21%            0.06 ms        c8 1.05x slower
+  gate_up [8704,5120]       0.2032/0.2022  233/234   60%            0.35 ms        c8 1.07x slower
+  down    [5120,4352]       0.1354/0.1359  175/174   45%            0.17 ms        c8 1.07x slower
+  head    [10240,5120]      0.2318/0.2329  240/239   62%            0.41 ms        c8 1.07x slower
+  CTX attn-full [14336,5120]  0.3171/0.3202 246/244 63%            0.57 ms        small_t 72x SLOWER
+  CTX gate_up-full [34816,5120] 0.7837/0.7930 242/239 62%           1.38 ms        small_t 10x SLOWER
+
+  DRAFT-FORWARD SUM: 1.007/1.010 ms per forward (serving arm = best arm on EVERY shape)
+    -> 2.013/2.021 ms per round (2 forwards) at effective ~209 GB/s.
+  SERVING-SIDE banked residual for the same two forwards (LMHEAD_flip_row): align 2.156 +
+    chain_fwd 1.393 = 3.549 ms -> non-GEMV serving share ~1.54 ms/round (align/embedding
+    machinery ~1.15 + per-forward attention/norms/silu/AR ~0.4).
+  rel-L2(alt,serving) ALL PASS at 1e-2; rel-L2(c8,c4)=0.000e+00 (bit-identical, same schedule).
+
+JUDGMENT vs PRE-REGISTERED GATES:
+  A1 reproduce: PASS (all rows <=1.5% across runs; bar 5%).
+  A2 slow-shape (<60% of the 137 GB/s proven-achievable floor): NO shape qualifies — the minimum
+     is o_proj at 60.5-60.7% of the floor (and it costs 0.10 ms; its absolute headroom is ~0.04
+     ms/forward = 0.13% of the round). Every big shape streams 218-246 GB/s = at/above the
+     banked 137-220 band, 56-63% of the in-process pure-read ceiling.
+  A3 retune gate (>=1.5x candidate): NO CANDIDATE — the serving arm is the best measured arm on
+     every shape; alternatives (small_t, simt_r8_c8, and the emulated-mma class priced 0.39-0.40x
+     in W8_LMHEAD_row) all LOSE. NO-GO on a serve-leg flip: nothing to flip — serving already
+     routes every draft GEMV to the winning arm.
+  A5 honest re-pricing (FIRES): the master plan's "tp_gemv draft-arm retune (~10 ms/round)" is
+     NOT kernel-isolatable in the post-PLOG-044 stack. The mission's 50x-gap hypothesis ("head
+     ~10 ms vs 0.19 ms floor") is FALSIFIED by measurement: the head runs 0.232 ms vs the
+     0.20-0.21 ms 265-280 GB/s floor = 1.1-1.2x. The ~10 ms figure was the PRE-FLIP class
+     (small_t at 6.0-23.7 ms/shape): PLOG-044's LMHEAD flip already harvested it (fc 6.00 -> 0.25
+     bench-side; align/chain_fwd 16.2 -> 3.5 serving-side). Remaining draft-side GEMV headroom is
+     <=0.93 ms/round even at the unreachable pure-read ceiling (~1.6% of the 60 ms round); the
+     realistic kernel-side residue is ~0.2-0.4 ms/round.
+  A4 census: EXEMPT — zero kernel edits shipped (A2/A3 produced no candidate).
+
+WAVE64 CHECKLIST (desk enrichment, verified in code, no change needed):
+  (a) 2-rows-per-wave64: 256-thread CTA = 8 logical 32-lane row-warps = 4 hardware waves x 2
+      rows/wave — exactly iacopPBK's winning shape, by construction (kRowsPerBlockDefault=8,
+      w8_rowsplit_gemm_simt.cu:20-22).
+  (b) reductions: warp_reduce_sum = width-32 segmented __shfl_down_sync (warp.cuh:21-28) — the
+      SAFE wave64 pattern; the W8 SIMT family carries NO full-wave shuffles (the F4b hazard is
+      q4_rowsplit_gemv.cuh only, correctly FILED, off the hot path).
+  (c) control-flow uniformity: loop bounds (full_slabs, ncols) are CTA-uniform kernel args;
+      identical trip counts across the co-scheduled row-workers — no wave64 serialization.
+
+MASTER-PLAN RE-PRICE (row "last 14 ms: tp_gemv draft-arm retune (~10) + W4 one-shot AR (9.6)"):
+  the draft-arm term is DONE-as-measured: 2.01 ms/round isolated GEMV (the kernel class the plan
+  wanted is ALREADY the serving arm). The honest remaining draft-side owners, in fire order:
+  1. the AR chain (F2 / W4 one-shot, 7.85-9.6 ms/round class — unchanged, still the big lever);
+  2. align/embedding machinery ~1.15 ms/round (scatters/gathers around the alignment forward);
+  3. per-forward non-GEMV body ~0.8 ms/round (attention/norms/silu at T=1).
+  Expected e2e of the F4a desk as-scoped (draft-arm retune, +15-20%): NOT AVAILABLE from this
+  lever — the premise (misretuned draft arm) was already cured by the 2026-09-17 flip; this row
+  closes the loop with the isolated proof.
+
+Provenance: w7_draft_arm_bench.cu + W7_draftarm_run{1,2}.log (this dir); prose ids
+results/amd/w7_f1a/prose_ids_live_20260918.json + banked serve logs; LMHEAD_flip_row /
+W8_LMHEAD_row / VERIFY_DECOMP_row (same dir); docs/amd/W7_DECODERETUNE_RESUME.md (running note).

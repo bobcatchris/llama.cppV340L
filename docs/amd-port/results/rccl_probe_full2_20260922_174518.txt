@@ -1,0 +1,21 @@
+rccl_probe: ranks=3 devs=0,1,2, iters=2000 seeds=64
+hip: ndev=4 driver=60241133
+canAccessPeer(0->1) = 0
+canAccessPeer(0->2) = 0
+canAccessPeer(1->0) = 0
+canAccessPeer(1->2) = 0
+canAccessPeer(2->0) = 0
+canAccessPeer(2->1) = 0
+rccl version: 22005
+INIT: OK in 654 ms (run with RCCL_DEBUG=INFO to see transport)
+RCCL          32 KB x2000: avg 94.0 us  min 86.6 us  max 138.5 us
+BUTTERFLY     32 KB x2000: avg 212.0 us  min 203.4 us  max 6338.0 us
+ratio butterfly/rccl: 2.26x  (delta 118.0 us/boundary)
+RCCL         128 KB x2000: avg 152.4 us  min 135.7 us  max 170.1 us
+BUTTERFLY    128 KB x2000: avg 340.3 us  min 333.2 us  max 364.3 us
+ratio butterfly/rccl: 2.23x  (delta 187.9 us/boundary)
+bit-exactness vs butterfly ADD order ((r0+r2)+r1):
+  ne=8192: seeds 0/64 bit-exact on ALL ranks; rank0 mismatched elems 18278/524288 (3.486%) max ULP 64; cross-rank identical 64/64
+  ne=32768: seeds 0/64 bit-exact on ALL ranks; rank0 mismatched elems 91421/2097152 (4.359%) max ULP 256; cross-rank identical 64/64
+DONE
+probe-exit: 0
