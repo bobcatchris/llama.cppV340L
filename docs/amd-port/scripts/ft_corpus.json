@@ -1,0 +1,43 @@
+{
+  "corpus_id": "ft-corpus-v1",
+  "note": [
+    "Fixed-text acceptance corpus (W34 instrument). 6 items, ASCII only.",
+    "T-10 population law: per-text acceptance varies enormously by text",
+    "type, so the corpus spans kinds (prose / repetitive / list / code /",
+    "factual / dialogue). Items are PROMPTS; the frozen continuation of",
+    "record is generated once by the CONTROL cell (FT-GEN) and then fed",
+    "back as fixed token-id prefixes by every cell's FT-CASCADE pass."
+  ],
+  "items": [
+    {
+      "id": "p1_prose",
+      "kind": "prose",
+      "prompt": "Write a clear explanatory paragraph about how a heat pump moves thermal energy from a cold outdoor environment into a warmer indoor space, mentioning refrigerant, compression, and the heat exchanger coils."
+    },
+    {
+      "id": "p2_repeat",
+      "kind": "repetitive",
+      "prompt": "Continue this log exactly in the same format, one line per record:\nrecord 001: status=ok packets=128 latency=4ms\nrecord 002: status=ok packets=128 latency=4ms\nrecord 003: status=ok packets=128 latency=4ms\nrecord 004:"
+    },
+    {
+      "id": "p3_list",
+      "kind": "list",
+      "prompt": "List the steps for changing a flat tire on a passenger car, numbered, one short sentence per step, starting with step 1."
+    },
+    {
+      "id": "p4_code",
+      "kind": "code",
+      "prompt": "Complete this Python function with a body that returns the running maximum of the input list without using built-in max, keeping the same style:\n\ndef running_max(xs):\n    best = None\n"
+    },
+    {
+      "id": "p5_factual",
+      "kind": "factual",
+      "prompt": "Answer in two sentences: why do coastal cities usually have milder winters than cities far inland at the same latitude?"
+    },
+    {
+      "id": "p6_dialog",
+      "kind": "dialogue",
+      "prompt": "Write a short dialogue between a warehouse manager and a new forklift operator about the daily safety checklist. Format each line as \"Name: sentence\".\nManager: Good morning, before you touch anything we walk the bay.\nOperator:"
+    }
+  ]
+}

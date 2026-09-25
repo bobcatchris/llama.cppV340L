@@ -1,0 +1,9 @@
+# STALE LOCK REMOVAL EVIDENCE - W15 deep-census desk 2026-09-23 20:45:39
+lock content: desk=widelaunch arm=P0-matrix cell=attn ctx=0 ts=1790213516 pid=60372
+/proc/60372: ls: cannot access '/proc/60372': No such file or directory
+processes: 4 matching lines (excl. grep)
+die 0000:05:00.0 vram_used 18599936
+die 0000:08:00.0 vram_used 18575360
+die 0000:0d:00.0 vram_used 18575360
+die 0000:10:00.0 vram_used 18575360
+lock age at removal: 823 s; waiting chains: tsab s1a (root 61544), W15 window script (73269)

@@ -1,0 +1,33 @@
+rccl_tp4_boundary_probe: single-die isolation, visible devices = 1
+
+==== n=4 ranks on one die ====
+INIT: FAILED rc=5 (invalid usage (run with NCCL_DEBUG=WARN for details)) after 0 ms (n=4 on one device)
+
+==== n=3 ranks on one die ====
+INIT: FAILED rc=5 (invalid usage (run with NCCL_DEBUG=WARN for details)) after 0 ms (n=3 on one device)
+
+==== n=2 ranks on one die ====
+INIT: FAILED rc=5 (invalid usage (run with NCCL_DEBUG=WARN for details)) after 0 ms (n=2 on one device)
+
+==== n=1 ranks on one die ====
+INIT: OK in 218 ms (n=1, one device)
+SYNC    n=1     16 KB x2000: avg     0.3 us  med     0.3  min     0.3  halves     0.3/    0.3 spread 0.07%
+PIPE16  n=1     16 KB x 125: avg     0.1 us/op  med     0.1  halves     0.1/    0.1 spread 0.97%
+GROUP16 n=1     16 KB x 125: avg     0.0 us/op  med     0.0  halves     0.1/    0.0 spread 8.34%  [SPREAD-FAIL]
+SYNC    n=1     32 KB x2000: avg     0.2 us  med     0.2  min     0.2  halves     0.2/    0.2 spread 1.47%
+PIPE16  n=1     32 KB x 125: avg     0.1 us/op  med     0.1  halves     0.1/    0.1 spread 0.41%
+GROUP16 n=1     32 KB x 125: avg     0.0 us/op  med     0.0  halves     0.0/    0.0 spread 0.42%
+SYNC    n=1     64 KB x2000: avg     0.2 us  med     0.2  min     0.2  halves     0.2/    0.2 spread 0.08%
+PIPE16  n=1     64 KB x 125: avg     0.1 us/op  med     0.1  halves     0.1/    0.1 spread 0.72%
+GROUP16 n=1     64 KB x 125: avg     0.0 us/op  med     0.0  halves     0.0/    0.0 spread 3.17%  [SPREAD-FAIL]
+SYNC    n=1     80 KB x2000: avg     0.2 us  med     0.2  min     0.2  halves     0.2/    0.2 spread 2.59%
+PIPE16  n=1     80 KB x 125: avg     0.1 us/op  med     0.1  halves     0.1/    0.1 spread 0.41%
+GROUP16 n=1     80 KB x 125: avg     0.0 us/op  med     0.0  halves     0.0/    0.0 spread 0.03%
+SYNC    n=1     96 KB x2000: avg     0.2 us  med     0.2  min     0.2  halves     0.2/    0.2 spread 0.09%
+PIPE16  n=1     96 KB x 125: avg     0.1 us/op  med     0.1  halves     0.1/    0.1 spread 0.21%
+GROUP16 n=1     96 KB x 125: avg     0.0 us/op  med     0.0  halves     0.0/    0.0 spread 9.34%  [SPREAD-FAIL]
+SYNC    n=1    128 KB x2000: avg     0.2 us  med     0.2  min     0.2  halves     0.2/    0.2 spread 0.38%
+PIPE16  n=1    128 KB x 125: avg     0.1 us/op  med     0.1  halves     0.1/    0.1 spread 0.39%
+GROUP16 n=1    128 KB x 125: avg     0.0 us/op  med     0.0  halves     0.0/    0.0 spread 0.37%
+
+DONE

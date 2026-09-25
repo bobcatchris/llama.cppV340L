@@ -1,0 +1,13 @@
+=== KV/CHUNK LADDER Sat Sep 19 12:38:14 PM CDT 2026 | ws=1024 MiB (default arena) | matched ctx 16384 | probes 3x plen-2075
+=== KV/CHUNK LADDER Sat Sep 19 12:45:30 PM CDT 2026 | ws=1024 MiB (default arena) | matched ctx 8192 (VRAM sacrificed per principal) | probes 3x plen-2075
+cfg 128/ws1024/ctx16k: BOOT-FAIL
+cfg 256/ws1024/ctx16k: BOOT-FAIL
+cfg 512/ws1024/ctx16k: BOOT-FAIL
+=== LADDER DONE Sat Sep 19 12:56:38 PM CDT 2026 — restoring canonical
+=== RESTORED: FAST PROBE: PASS wall=18.8s finish=stop
+=== KV/CHUNK LADDER v2 Sat Sep 19 12:58:29 PM CDT 2026 | ws=1024 | ctx=8192 EXPLICIT (VRAM sacrificed) | probes 3x plen-2075
+cfg 128/ws1024/ctx8192: BOOT-FAIL
+cfg 256/ws1024/ctx8192: BOOT-FAIL
+cfg 512/ws1024/ctx8192: walls= 35.57 18.69 18.86
+=== LADDER v2 DONE Sat Sep 19 01:08:27 PM CDT 2026 — restoring canonical
+=== RESTORED: FAST PROBE: PASS wall=23.2s finish=stop

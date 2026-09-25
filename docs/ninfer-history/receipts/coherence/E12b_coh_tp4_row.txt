@@ -1,0 +1,27 @@
+== MANIFEST 2026-09-16T21:58:26Z grant G-AMD-E12b bin 1f068ea7aa8a6aa2 legs[k4,k5,k36,k4glass] mt=64 ==
+KFD raw:
+
+
+============================ ROCm System Management Interface ============================
+===================================== KFD Processes ======================================
+No KFD PIDs currently running
+==========================================================================================
+================================== End of ROCm SMI Log ===================================
+pid 2141049 pgid 2141049
+== ENV-VERIFY listener pid 2141049
+NINFER_ALLOW_NVFP4_TP2=1
+NINFER_COH_ALLOC=/tmp/coh_e12b/alloc
+NINFER_COH_IDS=1
+NINFER_COH_OPS=1
+NINFER_COH_PTRS=1
+alloc_tables_open=20
+e12leg tag=k4_t64 http=200 wall_s=8.1 prompt=66 gen=43 fin=stop mojibake=False VERDICT=PASS content[:48]='BLUE'
+e12leg tag=k5_t65 http=200 wall_s=8.1 prompt=67 gen=41 fin=stop mojibake=True VERDICT=FAIL content[:48]=''
+e12leg tag=k36_t96 http=200 wall_s=6.4 prompt=98 gen=19 fin=stop mojibake=True VERDICT=FAIL content[:48]=''
+e12leg tag=k4_glass http=200 wall_s=9.7 prompt=66 gen=43 fin=stop mojibake=False VERDICT=PASS content[:48]='BLUE'
+== RELEASE 2026-09-16T21:59:31Z
+KFD=0
+0
+105M	/tmp/coh_e12b/dumps
+banked=24 files
+E12 window complete; dumps remain in /tmp/coh_e12b/dumps for the analyzer
