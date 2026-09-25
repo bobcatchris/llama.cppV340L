@@ -1,0 +1,11 @@
+[slice4-KVarN] T1 prompt@0                  T=1 Wc=2 splits=1 pp=0 tail= 1 win=  1 : max_err=0.00195312 tol=0.014 PASS
+[slice4-KVarN] T1 decode@40 all-tail        T=1 Wc=2 splits=8 pp=0 tail=41 win= 41 : max_err=0.000634297 tol=0.0112959 PASS
+[slice4-KVarN] T1 decode@130 mixed          T=1 Wc=2 splits=8 pp=2 tail= 3 win=131 : max_err=0.0125505 tol=0.0275513 PASS
+[slice4-KVarN] T1 decode@189 tail=62        T=1 Wc=2 splits=8 pp=2 tail=62 win=190 : max_err=0.00670619 tol=0.0191905 PASS
+[slice4-KVarN] T6 prompt@0 all-tail         T=6 Wc=4 splits=1 pp=0 tail= 6 win=  6 : max_err=0.00267801 tol=0.014 PASS
+[slice4-KVarN] T5 verify@10 all-tail        T=5 Wc=4 splits=1 pp=0 tail=15 win= 15 : max_err=0.00187706 tol=0.0124761 PASS
+[slice4-KVarN] T5 verify@200 mixed          T=5 Wc=4 splits=8 pp=3 tail=13 win=205 : max_err=0.00658198 tol=0.024936 PASS
+[slice4-KVarN] T4 verify@100 tail=40        T=4 Wc=4 splits=8 pp=1 tail=40 win=104 : max_err=0.00782052 tol=0.0259251 PASS
+[slice4-KVarN] T3 verify@42 all-tail        T=3 Wc=4 splits=8 pp=0 tail=45 win= 45 : max_err=0.000712821 tol=0.0113866 PASS
+[slice4-KVarN] T2 tile-boundary key63/64    T=2 Wc=4 splits=4 pp=1 tail= 1 win= 65 : max_err=0.00849063 tol=0.0231436 PASS
+ninfer_slice4_kvarn_test: PASS

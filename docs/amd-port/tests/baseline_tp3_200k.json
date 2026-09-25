@@ -1,0 +1,65 @@
+{
+  "description": "Baseline gates for llama-server TP3 200k (Qwen3.8-27B-ASCII-P1M, draft-mtp)",
+  "source": "PLOG-101 canonical 200k boot receipt & W0 census decode receipt",
+  "ratchets": 1,
+  "config": {
+    "server_script": "/home/chris/launch_tp3_200k.sh",
+    "model": "/media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf",
+    "ctx_max": 200000,
+    "tp": 3,
+    "spec": "draft-mtp",
+    "kv_dtype": "q4_0",
+    "fa": "on",
+    "batch_size": 512,
+    "ubatch_size": 512,
+    "temperature": 0.0,
+    "untraced_no_spec_reference_tps": 12.24
+  },
+  "thresholds": {
+    "decode_tps_warn_pct": 5.0,
+    "decode_tps_fail_pct": 10.0,
+    "prefill_tps_warn_pct": 5.0,
+    "prefill_tps_fail_pct": 10.0,
+    "mtp_accept_fail_threshold": 0.63,
+    "mtp_accept_warn_threshold": 0.65
+  },
+  "cells": {
+    "prefill_2k": {
+      "prompt_tokens_target": 2075,
+      "prompt_per_second": 115.21,
+      "description": "Prefill throughput on 2k prompt (promoted ub512 config)"
+    },
+    "prefill_8k": {
+      "prompt_tokens_target": 7857,
+      "prompt_per_second": 82.17,
+      "description": "Prefill throughput on 8k prompt (PLOG-101 200k boot receipt)"
+    },
+    "decode_8k_10k": {
+      "ctx_target": 7857,
+      "completion_tokens": 128,
+      "decode_per_second": 14.94,
+      "mtp_accept_ratio": 0.667,
+      "mtp_mean_len": 3.0,
+      "description": "Decode throughput at 8k-10k primed context with draft-mtp (PLOG-101)"
+    },
+    "mtp_canary": {
+      "min_acceptance_ratio": 0.63,
+      "expected_acceptance_ratio": 0.667,
+      "description": "MTP speculative draft acceptance canary gate (fail < 0.63)"
+    },
+    "determinism_greedy": {
+      "completion_tokens": 64,
+      "description": "Within-world bit-identical determinism test across two consecutive greedy runs at temp 0"
+    },
+    "needle_recall_8k": {
+      "depths": [
+        0.25,
+        0.5,
+        0.75
+      ],
+      "target_tokens": 8000,
+      "description": "Long-context needle retrieval at 25%, 50%, and 75% depth (exact 5-digit match)"
+    }
+  },
+  "last_ratchet_ts": "2026-09-21T17:26:33.979747"
+}

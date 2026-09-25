@@ -1,0 +1,18 @@
+== MANIFEST 2026-09-17T02:13:23Z night E1ORACLE (WO_MTP_1 acceptance: byte-identity oracle, two serial boots, GRAPHS OFF) bin 07ad7eccc0b97cc0
+grant: user order "start on it now, full velocity" (blanket GPU grant 2026-09-16 stands)
+boot A: --no-cuda-graph --spec mtp --draft-tokens 2 (MTP, maximally eager); boot B: --no-cuda-graph, NO spec flags (non-MTP); both: TP4 --devices 0,1,2,3 port=8100 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16
+probe: count600 temp=0 on both; GREEN = [ids] lines byte-identical; RED = correctness datum, banked loud, no fix this window
+note: machine warm (~65-85C) after COOL10K — thermal state is a RATE axis, not a correctness axis; E1 compares token streams, immune to clocks
+KFD precondition: 0
+== BOOT A (MTP k=2 graphs-OFF): count600 wall 51.12s, finish=length, content coherent 1..165-cut; [ids] banked E1A_ids.txt (265 B)
+== BOOT B (non-MTP graphs-OFF): count600 wall 158.32s, finish=length, content coherent 1..165-cut; [ids] banked E1B_ids.txt (268 B)
+== E1 VERDICT: RED — token streams DIVERGE. First divergence ~token 30 of the dump: MTP emitted '486' where non-MTP emitted '1472 220' (same greedy temp-0 request, same binary, same shape). Both completions remain coherent counting (no mojibake, no derail).
+== CONTROL (same non-MTP boot, repeat fire): E1B vs E1B2 [ids] BYTE-IDENTICAL (268 B both) — the non-MTP path is run-to-run deterministic; the divergence is MTP-ARM-SPECIFIC, not engine nondeterminism.
+== INTERPRETATION BOUNDARY (honest): two hypotheses remain unresolved tonight —
+   (a) verify-batch GEOMETRY numerics: MTP verify runs T=k+1=3 batched forward vs non-MTP T=1; different reduction orders can flip argmax at near-tie numeral positions, OR
+   (b) genuine mis-acceptance: the MTP accept step admits a draft token the target's argmax would not.
+   Both are consistent with tonight's data. NOT fixed (mission law: bank loud, do not fix in-window).
+   NEXT-WINDOW FALSIFIER (in order): (1) non-MTP vs non-MTP ACROSS boots (isolate boot-level determinism); (2) MTP k=1 arm (T=2 verify — geometry sensitivity probe); (3) logit-dump arm on the first divergence position (needs the TP2 debug hooks); (4) compare MTP decode against its own target-argmax replay.
+== E1 ACCORDING TO WO_MTP_1'S BAR (byte-identity): FAILED tonight on 07ad7eccc0b97cc0 graphs-OFF. Coherence ladder stays the per-window gate; E1 joins as a named pending cell.
+== GRADE: E1 RED (datum banked, deterministic control banked, no fix attempted)
+== RELEASE 2026-09-17T02:22:35Z: boot B killed exact-PID anchored (sole match); no serve remains; KFD=0 verified
