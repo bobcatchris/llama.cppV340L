@@ -1,0 +1,20 @@
+== MANIFEST 2026-09-17T01:34:41Z night THARM1 (thermal A/B on count600, clock-VERIFIED arms, one boot) bin 07ad7eccc0b97cc0
+grant: user order "start on it now, full velocity" (blanket GPU grant 2026-09-16 stands)
+config: TP4 --devices 0,1,2,3 --spec mtp --draft-tokens 2 GRAPHS-ON port=8100 NINFER_TP2_TIMING=1 NINFER_WORKSPACE_MIB=96 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16
+DESIGN NOTE (B1a as ordered vs as executed): forced-clock pinning is IMPOSSIBLE for chris on this box — rocm-smi set verbs (--setperflevel/--setclock/--setperfdeterminism/--setfan/power1_cap) are root-gated, sudo has NO NOPASSWD (sudo -n -l fails), and docs/amd/v340l/01_amd_phase_gate_test_lane_work_order.md:38-41 codifies it ("No passwordless sudo here... Nothing in a gate may require clock pinning"). Executed instead: clock-VERIFIED observational A/B on one boot:
+  ARM-HIGH: cold-start count600 (machine idle since ~20:30, edge ~38-40C) — sampler must show clocks >=991 MHz through the run
+  WARM-UP: 3x back-to-back 1279-tok filler prefills (~3.5 min sustained load, soak to 84C)
+  ARM-THROTTLED: count600 again hot — sampler must show 560-775 MHz throttle during run
+KFD precondition: 0. serial TP4 boot, sole GPU user.
+== EXECUTION NOTE: serve log initially landed in shared checkout (shell cwd quirk: 'cd X && sampler &' backgrounds the cd; the later serve redirect used the main shell cwd). Corrected: final log copied into worktree, stray removed from shared checkout after server release. No writes other than that one log file touched the shared checkout.
+== ARM-HIGH (cold, edge 30-33C at sampler start): count600 decode 43.52 s = 13.79 tok/s, 213.25 ms/round (Verify 196.64 = 92.2%, AR chain 7.62 = 3.6%), acc 0.97 t/r 2.94 rounds 204; client wall 46.58 s; BLUE PASS. Reproduces cold TIMING1 (211.95 ms/round).
+== WARM-UP x3 (same 1279-tok prompt, back-to-back, NO gaps): tp2 prefill 66.20 -> 109.06 -> 126.17 s; blocks 444.47 -> 613.07 -> 644.10 ms/round — monotonic soak.
+== ARM-THROTTLED (84C edge, immediately after 5.5 min continuous load): count600 decode 122.70 s = 4.89 tok/s, 606.44 ms/round (Verify 538.18 = 88.7%, AR chain 33.01 = 5.4% — both swell ~2.7-4.3x), acc 0.99; client wall 130.06 s = 2.79x cold arm; BLUE PASS.
+== ARM-THROTTLED-2 (edge 84-85C, BUT ~3 min idle before): count600 decode 45.18 s = 13.28 tok/s, 222.62 ms/round (Verify 204.89 = 92.0%, AR chain 8.12 = 3.6%) — FULL RECOVERY; sysfs sampler THARM1_clocks2.log shows sclk 991-1500 MHz (levels 3-7) during the run at 84-85C edge.
+== VERDICT (B1a, clock-verified arms; forced pinning impossible per manifest note):
+   1. EDGE TEMPERATURE IS EXONERATED as the direct throttle control: 84C runs 2.82x slow (no-gap) and full speed (3-min gap) in the same boot, same hour.
+   2. The trigger is a MINUTES-SCALE INTEGRATOR OF SUSTAINED LOAD (junction/hotspot, board power stages, or rolling power-cap accounting — not edge temp, not KV depth): ~5.5 min continuous TP4 load trips it; ~3 min idle clears it.
+   3. Operating rule for every future benchmark: log idle-gaps between legs; heavy legs must either stay under ~60 s continuous or take ~2-3 min idle gaps to hold the 24 tok/s prefill / ~13.8 tok/s decode regime.
+   4. Clock proof: throttled-arm sclk collapse carried by TIMINGPF2_clocks.log (560-775 MHz at knee, banked); THARM1_clocks.log (type-ambiguous capture, banked raw); THARM1_clocks2.log (sysfs pp_dpm_sclk, explicit) proves 991-1500 MHz during recovered run at 84C.
+== GRADE: THARM1 PASS — all arms BLUE PASS; thermal A/B verdict decisive
+== RELEASE 2026-09-17T01:51:41Z: sampler PIDs 2418175+2441853 stopped (own); serve killed exact-PID anchored 2418179 (sole match); no serve remains; KFD=0 verified
