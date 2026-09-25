@@ -1,0 +1,23 @@
+== MANIFEST 2026-09-17T02:48:55Z night E1K1 (C1a: k=1 geometry probe for the E1 RED divergence) bin 07ad7eccc0b97cc0
+grant: user order continuation (blanket GPU grant 2026-09-16 stands)
+boot A: --no-cuda-graph --spec mtp --draft-tokens 1 (verify T=2 geometry); boot B: --no-cuda-graph non-MTP fired TWICE (same-boot + cross-boot determinism vs E1B)
+probe: count600 temp=0 all arms; references: E1A_ids.txt (MTP k=2), E1B_ids.txt (non-MTP, deterministic on its boot)
+logic: k1-vs-base divergence point moves vs k2's (~token 30, 486 vs 1472+220) => verify-batch GEOMETRY numerics; identical point => accept-path suspicion -> C1b audit tap
+KFD precondition: 0
+== C1a RESULTS (all count600 temp=0, graphs-OFF, bin 07ad7eccc0b97cc0):
+  cross-boot non-MTP determinism: new boot [ids] BYTE-IDENTICAL to E1B (268 B) — ground truth boot-stable
+  same-boot non-MTP repeat: BYTE-IDENTICAL (268 B, E1K1B2_ids.txt)
+  k1-MTP vs base:  LCP=42, similarity 0.954 — first divergence at dump pos 42 (K1A '874 4799 1414' vs base '1534 1132 1103')
+  k2-MTP vs base:  LCP=29, similarity 0.923 — first divergence at dump pos 29 ('486' vs '1472 220')
+  k1-MTP vs k2-MTP: LCP=29, similarity 0.969 — DIVERGENCE POINT MOVES WITH K
+  KEY: at pos 29 k1-MTP agrees with non-MTP (only k2 flips); at pos 42 BOTH MTP arms agree with each other against base — per-geometry near-tie flips, not a fixed accept bug
+== C1b RESULTS (accept-audit tap, bin c6361bde8bc0dcc1, NINFER_ACCEPT_AUDIT=1, MTP k=2 graphs-OFF):
+  VOID ROW (first attempt): spawned while the E1K1B control server still held the GPUs (KFD=1 at spawn — my process hygiene miss, logged honestly); audit boot clean-failed on 816 MiB free VRAM; curl was answered by the survivor. All arms re-run after full release + KFD-0.
+  clean run: 206 ACCEPT-AUDIT rounds (204 count600 + 2 warmup), MISACCEPT LINES = 0 — every retained token equals its round's target argmax, every round
+  tap passive: audit-arm count600 [ids] BYTE-IDENTICAL to E1A (265 B)
+== C1 VERDICT (geometry vs mis-accept):
+  ACCEPT PATH EXONERATED — 0 retained-mismatches across 204 rounds / 600 tokens; by kernel construction (speculative_accept_greedy_drafts_kernel greedy branch: drafts kept only when equal to target argmax, correction token IS the argmax) and now by measurement.
+  THE E1 DIVERGENCE IS BATCHED-VERIFY GEOMETRY NUMERICS: the T=k+1 verify forward's logits/argmax differ from the T=1 path at a handful of near-tie numeral positions; flips MOVE with k (k2 flips gen-pos ~2, k1 flips gen-pos ~15; k1+k2 concur at the second site). Both streams remain coherent counting (no derailment). Delta size: LCP 29/42 of 65, ratios 0.923/0.954.
+  E1 BAR RE-SCOPED (banked in BUGTRACK E-17): (i) same-geometry identity across boots/binaries — HOLDS byte-level; (ii) acceptance never exceeds target argmax — HOLDS (tap); (iii) cross-geometry delta characterized, flips confined to numeral near-ties. Margin print (top-2 logit gap at flip positions) = named follow-up via existing NINFER_D22_PDBG hook.
+== GRADE: C1 COMPLETE — E1 reclassified: NOT a correctness bug in accept; a geometry-numerics property, characterized and bounded
+== RELEASE 2026-09-17T03:07:24Z: E1K1A boot killed (anchored), E1K1B boot killed 2568608, void audit boot 2581112 already dead (clean-fail), clean audit boot 2584571 killed; all anchored sole-match; KFD=0 verified after each

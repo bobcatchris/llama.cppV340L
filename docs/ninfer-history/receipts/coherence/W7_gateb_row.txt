@@ -1,0 +1,10 @@
+=== W7 GATE-B decode baselines (round-wall desk NEXT leg, executed INLINE by coordinator — agents dead on platform usage limit) ===
+ts: 2026-09-18 23:05-23:12 CDT | boot: canonical cure bin 07fcf7a5d98dea7d + NINFER_H2D_PINNED_STAGE=1 (runbook config of record, PLOG-059)
+server: :8100 healthy before AND after; clocks: sclk parked 300 MHz between requests (auto DVFS; no load sample taken — these are decode-phase rates from the [tp2] engine line, not thermally normalized)
+count600 x2 (plen-2075 BLUE stem, mt=600, temp0): BOTH finished=stop at completion=52 — probe-shape lesson: greedy on this stem emits EOS; NOT a 600-token decode. 2k-context decode rates: 2.24 s/54 gen=24.1 t/s and 2.71 s/54 gen=19.9 t/s; acceptance 0.82, tok/round 2.70
+mt-slope x3 (counting prompt 'Count from 1 to 500, one number per line.', temp0, finish=length all three — forced-length class works):
+  mt=100: decode 2.46 s / 100 tok = 40.7 t/s | acceptance 0.69 tok/round 2.38 (matches the banked ~41 t/s decode anchor => that anchor is a SHORT-generation number)
+  mt=300: decode 9.75 s / 300 tok = 30.8 t/s | acceptance 0.89 tok/round 2.78
+  mt=600: decode 22.24 s / 600 tok = 27.0 t/s | acceptance 0.94 tok/round 2.87
+finding: decode t/s decays ~34% from 100->600 generated tokens (KV-attention growth); acceptance RISES with length in the counting class (drafter nails the predictable register) — the decode-wall fire order (W4AR > align/embed > non-GEMV) must be evaluated at TARGET generation length, not at the 41 t/s anchor point
+provenance: resp_c600_{1,2}.json + resp_m{100,300,600}.json + serve log /home/chris/serve_10k.log [tp2] lines + this row; baselines for the W4AR (Branch-B sync-removal) serve-leg A/B

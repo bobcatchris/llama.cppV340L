@@ -1,0 +1,34 @@
+{
+  "arm": "T1 (in-split campaign boot, LLAMA_SPEC_TIMELINE=1 LLAMA_DECODE_TIMELINE=1)",
+  "phase": "boot-ready (server listening, no probe yet)",
+  "stamp": "20260922_131407",
+  "map": "HIP0=card1 HIP1=card3 HIP2=card0 HIP3=card4",
+  "dies": [
+    {
+      "card": "card1",
+      "vram_used_mib": 7809.7,
+      "vram_total_mib": 8176.0
+    },
+    {
+      "card": "card3",
+      "vram_used_mib": 7591.8,
+      "vram_total_mib": 8176.0
+    },
+    {
+      "card": "card0",
+      "vram_used_mib": 7643.9,
+      "vram_total_mib": 8176.0
+    },
+    {
+      "card": "card4",
+      "vram_used_mib": 18.0,
+      "vram_total_mib": 8176.0
+    }
+  ],
+  "labels": [
+    "HIP0",
+    "HIP1",
+    "HIP2",
+    "HIP3"
+  ]
+}

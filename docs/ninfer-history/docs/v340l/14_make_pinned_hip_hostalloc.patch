@@ -1,0 +1,29 @@
+--- a/src/core/host_kv_arena.cpp
++++ b/src/core/host_kv_arena.cpp
+@@ -4,7 +4,7 @@
+ #include <stdexcept>
+ #include <utility>
+ 
+-#ifdef NINFER_HAS_CUDA
++#if defined(NINFER_HAS_CUDA) || defined(__HIP__)
+ #include <cuda_runtime.h>
+ #endif
+ 
+@@ -21,7 +21,7 @@
+ }
+ 
+ HostKVArena HostKVArena::make_pinned(std::size_t bytes) {
+-#ifdef NINFER_HAS_CUDA
++#if defined(NINFER_HAS_CUDA) || defined(__HIP__)
+     void* p = nullptr;
+     const cudaError_t e = cudaHostAlloc(&p, bytes, cudaHostAllocDefault);
+     if (e != cudaSuccess || p == nullptr) { throw std::bad_alloc(); }
+@@ -58,7 +58,7 @@
+ 
+ HostKVArena::~HostKVArena() {
+     if (base_ == nullptr) { return; }
+-#ifdef NINFER_HAS_CUDA
++#if defined(NINFER_HAS_CUDA) || defined(__HIP__)
+     if (pinned_mem_) { cudaFreeHost(base_); return; }
+ #endif
+     std::free(base_);
