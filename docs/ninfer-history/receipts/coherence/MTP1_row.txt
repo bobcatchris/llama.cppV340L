@@ -1,0 +1,2 @@
+== MANIFEST 2026-09-17T00:04:47Z grant G-AMD-MTP (user order 2026-09-16: serve with MTP now) bin b864220912aec151 --spec mtp --draft-tokens 2 port=8100
+listener=2301875

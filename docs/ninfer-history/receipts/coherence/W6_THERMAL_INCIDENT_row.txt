@@ -1,0 +1,27 @@
+W6 THERMAL INCIDENT row — die 1 stuck-state, window TERMINATED for GPU work (stop-and-bank), 2026-09-18 07:2x-07:4x
+TIMELINE:
+  06:52 armD  (GGATE+GQA) boot+probe OK but deep droop band (mclk 0-2 samples, edge 84-85C)
+  07:00 armD2 (identical env) BOOT WEDGE at warmup: dies 1/2/3 pinned 100% 10+ min, log frozen pre-listening;
+        anchored TERM honored; KFD=0; per-die gpureset 1/2/3 "Successfully reset"
+  07:17 promote re-leg (GGATE default, new bin 93515c1f): boots, probe completes (route proof + parity PASS),
+        but FULL throttle collapse during probe (mclk levels 0-2, edge 84-85C, wall 2x arm B)
+  07:21-07:26 retire + 300 s idle: die 1 edge PINNED 84-85C, junction 91-92C at IDLE
+  07:2x DIAGNOSIS at idle, KFD EMPTY (no compute processes anywhere), all dies 0% use:
+        GPU1 power 79-82 W (baseline idle: 24-28 W; die0 39 W elevated — board-1 partner),
+        GPU1 junction 91-92C stable-not-decaying over 10+ min, GPU1 fan level 194/76% (controller responding
+        to REAL heat); boards (0,1) vs (2,3): board 2 healthy idle 25-28 W / 47-48C
+  07:3x gpureset -d 1 -> "Successfully reset" -> draw UNCHANGED 79-82 W
+  07:3x ALL-DIE reset 0/1/2/3 -> all "Successfully reset" -> draw UNCHANGED 82 W, junction 92C
+  kernel log (sudo dmesg): zero amdgpu/kfd faults; only kfd_process_wq_release CPU-hog churn (teardown class
+  from this window's boot cycles). The stuck state is BELOW the OS reset level — firmware/microcode class.
+INTERPRETATION: die 1 (board 1) is dissipating ~80 W with no host process, surviving every OS-visible reset —
+  a firmware-level stuck state (the armD2 wedge's device-side leftovers are the suspected origin: the wedge
+  wedged 1/2/3; 2/3 cleared, 1 did not). ONLY a host reboot / board power cycle plausibly clears it.
+ACTIONS TAKEN (authority envelope): all OS-level resets fired and banked; NO further timing legs (clean-band
+  premise dead — the promote leg's collapse is now explained); NO serving boot fired (booting die 1 into load at
+  92C junction idle = baking the die past the MELTDOWN manifest's own 92C abort edge; hardware safety > mission
+  step 6). WINDOW ENDS HERE for GPU work; coordinator/user must reboot the host, then re-fire
+  `bash /home/chris/serve_10k.sh` (certified 409450b8, or the promoted 93515c1f after a fresh battery).
+LEARNINGS FOR THE DESKS: (a) the armD2 flaky warmup wedge left device state that OS reset missed — "Successfully
+  reset" must be followed by an idle-power check (~25-30 W/die) before declaring recovery; (b) wedge-class boots
+  poison MORE than the poisoned-VM class of PLOG-047 — the recovery playbook needs the power-draw postcondition.

@@ -1,0 +1,84 @@
+W7 FINALIZE BRACKET ROW — window 7, 2026-09-18, agent session (GPU-owner desk, continuation)
+=============================================================================================
+STATUS: PARTIAL — wedge detour consumed the window; bracket readout owed on bin
+6a684e7f2988adf7 post-reboot. Everything below is banked evidence; resume file:
+docs/amd/W7_FINALIZE_DESK_RESUME.md
+
+LEGS RUN (band notes: pre-pin = auto clock band; post-pin = power_dpm_force_performance_level=high
+pinned by operator ~13:2x; post-gpureset = after root gpureset of all 4 dies ~13:38):
+- 12:03 W7_dn_default_serve   bin 1e03e5af5fb438b9  pre-pin  GREEN (full probe, banked log)
+- 12:08 W7_optrace3_serve     bin (dn class)        pre-pin  GREEN (full probe, OPTRACE=3,
+                                                             staircase source, resp 'BLUE'/stop/52)
+- 12:48 (cancelled leg)       bin c1c6b4cb          pre-pin  WEDGE (boot VM fault, pid 228137)
+- 12:53 finbracket leg 1      bin c1c6b4cb          pre-pin  WEDGE (boot VM fault, pid 234744)
+- 13:19 finbracket leg 2      bin 8dce792f (v2)     post-pin WEDGE (boot VM fault, pid 269501)
+- 13:32 green-bin control     bin 1e03e5af5fb438b9  post-pin WEDGE (boot VM fault, pasid 545)
+- 13:41 finbracket leg 3      bin 8dce792f (v2)     post-pin+post-gpureset GREEN (full probe,
+                                                             content 'BLUE', finish=stop, 52 tok,
+                                                             prefill 110.0 tok/s, mtp 2.65 tok/round)
+
+WEDGE DIAGNOSIS (box-state, NOT code):
+- Signature: every boot 12:47-13:33 wedged deterministically at the FIRST full
+  worker-MTP-prefill-redo (tp2_backend.cpp:2300 "kvarn reset mtp inflight"), fault firing ~2 ms
+  after the redo's launch_draft_head print, i.e. mid-execution of the queued mtp_forward_batch
+  (the LMHEAD print is post-enqueue). Health never came up; 3 dies spin 100% on the collective
+  interlock. kern.log receipts (all no-retry TCP-read VM faults, VM_L2_PROTECTION_FAULT_STATUS
+  0x00801031, ring:24, RW=0): 12:48:03 pid 228137 (0000:0d:00.0), 12:53:20 pid 234744 (0000:0d),
+  13:19:17 pid 269501 (0000:05:00.0 post-renumber), 13:32:55 pasid 545 (0000:05:00.0).
+- Exoneration matrix (identical script W7_finbracket_serve.sh, env NINFER_PREFILL_OPTRACE=2,
+  same args, same model): bin 1e03e5af GREEN at 12:03 pre-pin AND WEDGE at 13:32 post-pin;
+  bin c1c6b4cb (HEAD +25-line event-record commit) WEDGE 2/2; bin 8dce792f (v2: fin marks
+  rehomed into gemm-bank slots 317-319, ZERO new hipEventCreate) WEDGE 1/1. =>
+  binary-independent, commit-independent, env-independent, survives process restarts
+  (fresh pasid/vmid each boot), invisible in the boot prologue (byte-identical preflight:
+  free=8160 MiB, required 8159/usable 8160).
+- Verdict: persistent box/GPUVM state, onset 12:47 immediately after the pk16 bench GPU session
+  (~12:1x-12:2x, 256 MiB copy-hammer loops + kernels) — poisoning-class hypothesis (bench
+  teardown/aborts leaving GPUVM state). Clock pin EXONERATED (12:48/12:53 wedges pre-pin).
+  Fault VAs (0x74126671c000, 0x78d6b3b7a000) are host-VA-class addresses — device reading an
+  unmapped/host VA; consistent with IOMMU DMA-FQ translation state (runbook 408d04a4d:
+  AMD-Vi full-translation DMA-FQ, 39 groups, iommu=pt is the operator's one-reboot fix).
+- Cure: root `sudo rocm-smi --gpureset -d 0/1/2/3` (coordinator/owner, ~13:38) -> dmesg "GPU
+  reset succeeded / device wedged, but recovered through reset" -> boot postcondition GREEN.
+  FLR not needed. PLAYBOOK v3 UPDATE: gpureset per die clears this poisoning class; the boot
+  (health endpoint) is the postcondition test.
+
+V2 HARDENING (kept, commit inside 7807e9904/HEAD content): dedicated ev_fin[2][3] bank =
+24 extra hipEventCreate = 24 device signal allocations in a boot that preflights at 1 MiB
+headroom (required 8159 / usable 8160) — a real hazard class even though exonerated for THIS
+wedge. Fin marks now record into the gemm bank's top slots (kFinSlots=3, kFinSlotBase=317,
+slots unused: ngemm=192 max observed vs 320; gemm recording guarded < kFinSlotBase). Zero new
+allocations when env set; byte-identical when unset.
+
+BRACKET DATA (leg 3, bin 8dce792f, plen-2075 probe, post-pin post-gpureset):
+- Chunk 16 (steady, tok=128): wall 1021.7/1022.5/1021.8/1022.3 (r1/r0/r2/r3), gap ~19.3-20.2 —
+  steady gap CONFIRMED at the plan's 15-30 target, again.
+- Chunk 17 (finalize, tok=27) [PREFILL-OP] (rank: wall / gemm / ar / body / gap):
+    r2: 1362.259 / 467.459 / 36.270 / 162.299 / 696.232   t=14097936.520
+    r0: 1376.295 / 448.837 / 47.052 / 170.156 / 710.250   t=14097950.538
+    r3: 1717.060 / 450.968 / 48.442 / 166.595 / 1051.055  t=14098291.348
+    r1: 2052.620 / 449.900 / 48.062 / 168.133 / 1386.525  t=14098626.734
+- [PREFILL-FIN] printed ZEROS on all ranks: leg 3 ran with mtp_proposal_extent_==0 — the
+  is_last finalize took the ELSE branch (no proposal forward, no ar-step loop; marks 1/2 were
+  is_last-branch-only). COROLLARY (big): the ar-step loop the desk ranked candidate (a) DOES
+  NOT RUN AT ALL in this configuration — the worker MTP prefill redo (which --no-prefix-reuse
+  forces on every request) owns MTP seeding. The 1394 ms staircase is NOT ar-steps.
+- STAIRCASE STRUCTURE: the wall SET {1362, 1376, 1717, 2053} reproduces the 12:08 leg's
+  {1373, 1703, 1716, 2051} near-exactly but on DIFFERENT ranks (slowest was r0 then, r1 now).
+  Quantized: base ~700 ms GPU-idle + {0, ~14, ~351, ~687} ms extras — a ~350 ms QUANTUM taken
+  0/1/2 times per rank, rank-assignment random per leg. Named work identical on all ranks
+  (~666 ms). So the staircase is per-rank HOST-side stalls in the finalize region, quantum ~350 ms.
+- Prime suspect for the quantum: host stall in the prep region (cudaStreamSynchronize return /
+  sync D2H / H2D / work_.alloc) with an IOMMU-DMA-FQ-dependent cost — the runbook's iommu=pt
+  lever targets exactly this class (DMA path). The v3 brackets (6a684e7f) split prep vs
+  draft-chunk vs tail on BOTH branches and will decide.
+- GQA print flood: 64 per-launch [GQA] printf+fflush lines in the chunk-17 window (geometry
+  change 128->27 tok) — one-time per geometry change, bounded host cost, not the quantum.
+
+PARITY: leg 3 content 'BLUE', finish=stop, 52 completion tokens — identical to the 12:08 leg
+(stop 'BLUE', 52). Byte-parity holds through v2 instrumentation.
+
+FILES: results/amd/coherence/W7_finbracket_serve.{sh,log}, W7_finbracket_resp.json (leg 3),
+W7_optrace3_serve.log (12:08, staircase source), kern.log receipts quoted above (host-side,
+not copied — quoted verbatim in this row).
+NEXT: see docs/amd/W7_FINALIZE_DESK_RESUME.md (boot 6a684e7f2988adf7, read brackets, decide fix).
