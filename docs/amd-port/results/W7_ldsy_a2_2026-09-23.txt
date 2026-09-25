@@ -1,0 +1,140 @@
+== iq3_s 4 base,share,s2r,ldsy,ldsys2r,base 30 4
+bench_mmvq_real: iq3_s K=5120 N=17408 T=4 niter=30 reps=4 arms=base,share,s2r,ldsy,ldsys2r,base
+base           us: 787.7 787.9 794.7 788.4 | med 788.4 spread 0.89%
+share          ORACLE BITEXACT
+share          us: 691.2 691.4 693.2 688.2 | med 691.4 spread 0.73%
+s2r            ORACLE BITEXACT
+s2r            us: 667.2 673.0 680.9 673.7 | med 673.7 spread 2.03% SPREAD-FAIL
+ldsy           ORACLE FAIL
+ldsy           us: 1987.4 1990.8 1997.2 1981.2 | med 1990.8 spread 0.81%
+ldsys2r        ORACLE FAIL
+ldsys2r        us: 1990.0 1991.0 1977.2 1997.8 | med 1991.0 spread 1.03%
+base           ORACLE BITEXACT
+base           us: 789.7 800.4 800.9 800.4 | med 800.4 spread 1.41% SPREAD-FAIL
+oracle: DEFECT - do not use timing
+== q4_K 4 base,share,s2r,ldsy,ldsys2r,base 30 4
+bench_mmvq_real: q4_K K=5120 N=17408 T=4 niter=30 reps=4 arms=base,share,s2r,ldsy,ldsys2r,base
+base           us: 1108.2 1111.7 1104.4 1112.0 | med 1111.7 spread 0.68%
+share          ORACLE BITEXACT
+share          us: 840.0 843.9 839.8 834.0 | med 840.0 spread 1.17% SPREAD-FAIL
+s2r            ORACLE BITEXACT
+s2r            us: 837.8 833.5 841.7 847.5 | med 841.7 spread 1.67% SPREAD-FAIL
+ldsy           ORACLE FAIL
+ldsy           us: 2139.5 2137.5 2139.3 2138.0 | med 2139.3 spread 0.09%
+ldsys2r        ORACLE FAIL
+ldsys2r        us: 2147.3 2141.9 2147.5 2141.7 | med 2147.3 spread 0.27%
+base           ORACLE BITEXACT
+base           us: 1104.7 1098.8 1106.2 1111.7 | med 1106.2 spread 1.17% SPREAD-FAIL
+oracle: DEFECT - do not use timing
+== iq3_xxs 4 base,share,s2r,ldsy,ldsys2r,base 30 4
+bench_mmvq_real: iq3_xxs K=5120 N=17408 T=4 niter=30 reps=4 arms=base,share,s2r,ldsy,ldsys2r,base
+base           us: 799.2 799.2 798.9 799.7 | med 799.2 spread 0.09%
+share          ORACLE BITEXACT
+share          us: 779.7 780.0 781.9 785.6 | med 781.9 spread 0.76%
+s2r            ORACLE BITEXACT
+s2r            us: 726.2 736.2 730.3 736.3 | med 736.2 spread 1.37% SPREAD-FAIL
+ldsy           ORACLE FAIL
+ldsy           us: 1957.8 1954.8 1955.4 1958.6 | med 1957.8 spread 0.20%
+ldsys2r        ORACLE FAIL
+ldsys2r        us: 1957.5 1948.2 1953.3 1948.1 | med 1953.3 spread 0.48%
+base           ORACLE BITEXACT
+base           us: 805.8 799.9 799.3 799.9 | med 799.9 spread 0.81%
+oracle: DEFECT - do not use timing
+== iq4_xs 4 base,share,s2r,ldsy,ldsys2r,base 30 4
+bench_mmvq_real: iq4_xs K=5120 N=17408 T=4 niter=30 reps=4 arms=base,share,s2r,ldsy,ldsys2r,base
+base           us: 560.9 567.3 567.0 567.0 | med 567.0 spread 1.13% SPREAD-FAIL
+share          ORACLE BITEXACT
+share          us: 811.0 810.3 811.0 810.4 | med 811.0 spread 0.08%
+s2r            ORACLE BITEXACT
+s2r            us: 593.3 597.0 583.4 593.4 | med 593.4 spread 2.30% SPREAD-FAIL
+ldsy           ORACLE FAIL
+ldsy           us: 1532.0 1538.6 1536.8 1534.5 | med 1536.8 spread 0.43%
+ldsys2r        ORACLE FAIL
+ldsys2r        us: 1535.5 1540.5 1534.9 1538.2 | med 1538.2 spread 0.36%
+base           ORACLE BITEXACT
+base           us: 567.4 568.7 557.4 567.3 | med 567.4 spread 2.00% SPREAD-FAIL
+oracle: DEFECT - do not use timing
+== q5_K 4 base,share,s2r,ldsy,ldsys2r,base 30 4
+bench_mmvq_real: q5_K K=5120 N=12288 T=4 niter=30 reps=4 arms=base,share,s2r,ldsy,ldsys2r,base
+base           us: 797.4 792.8 786.6 788.5 | med 792.8 spread 1.37% SPREAD-FAIL
+share          ORACLE BITEXACT
+share          us: 634.7 635.1 634.2 632.7 | med 634.7 spread 0.38%
+s2r            ORACLE BITEXACT
+s2r            us: 629.1 637.5 629.1 632.4 | med 632.4 spread 1.33% SPREAD-FAIL
+ldsy           ORACLE FAIL
+ldsy           us: 1554.4 1566.9 1561.1 1566.0 | med 1566.0 spread 0.80%
+ldsys2r        ORACLE FAIL
+ldsys2r        us: 1577.1 1579.2 1581.8 1587.2 | med 1581.8 spread 0.64%
+base           ORACLE BITEXACT
+base           us: 790.9 794.7 783.2 790.2 | med 790.9 spread 1.45% SPREAD-FAIL
+oracle: DEFECT - do not use timing
+== iq3_s 2 base,share,s2r,ldsy,ldsys2r,base 30 4
+bench_mmvq_real: iq3_s K=5120 N=17408 T=2 niter=30 reps=4 arms=base,share,s2r,ldsy,ldsys2r,base
+base           us: 501.6 500.2 500.6 500.4 | med 500.6 spread 0.29%
+share          ORACLE BITEXACT
+share          us: 506.0 500.0 499.4 500.5 | med 500.5 spread 1.33% SPREAD-FAIL
+s2r            ORACLE BITEXACT
+s2r            us: 501.9 505.4 498.3 501.2 | med 501.9 spread 1.40% SPREAD-FAIL
+ldsy           ORACLE FAIL
+ldsy           us: 1207.6 1215.0 1207.7 1207.8 | med 1207.8 spread 0.62%
+ldsys2r        ORACLE FAIL
+ldsys2r        us: 1215.1 1199.8 1203.2 1202.0 | med 1203.2 spread 1.27% SPREAD-FAIL
+base           ORACLE BITEXACT
+base           us: 493.6 496.8 503.0 497.5 | med 497.5 spread 1.89% SPREAD-FAIL
+oracle: DEFECT - do not use timing
+== q4_K 2 base,share,s2r,ldsy,ldsys2r,base 30 4
+bench_mmvq_real: q4_K K=5120 N=17408 T=2 niter=30 reps=4 arms=base,share,s2r,ldsy,ldsys2r,base
+base           us: 491.5 486.5 488.4 490.6 | med 490.6 spread 1.01%
+share          ORACLE BITEXACT
+share          us: 412.1 411.5 410.2 410.0 | med 411.5 spread 0.52%
+s2r            ORACLE BITEXACT
+s2r            us: 409.8 407.0 410.8 413.8 | med 410.8 spread 1.65% SPREAD-FAIL
+ldsy           ORACLE FAIL
+ldsy           us: 970.5 971.2 970.1 970.5 | med 970.5 spread 0.11%
+ldsys2r        ORACLE FAIL
+ldsys2r        us: 974.4 974.4 968.1 971.7 | med 974.4 spread 0.65%
+base           ORACLE BITEXACT
+base           us: 490.8 496.9 491.0 496.6 | med 496.6 spread 1.22% SPREAD-FAIL
+oracle: DEFECT - do not use timing
+== iq3_xxs 2 base,share,s2r,ldsy,ldsys2r,base 30 4
+bench_mmvq_real: iq3_xxs K=5120 N=17408 T=2 niter=30 reps=4 arms=base,share,s2r,ldsy,ldsys2r,base
+base           us: 482.0 484.0 481.6 488.1 | med 484.0 spread 1.35% SPREAD-FAIL
+share          ORACLE BITEXACT
+share          us: 503.9 503.8 501.6 504.0 | med 503.9 spread 0.48%
+s2r            ORACLE BITEXACT
+s2r            us: 487.3 491.0 491.7 490.6 | med 491.0 spread 0.90%
+ldsy           ORACLE FAIL
+ldsy           us: 1217.0 1204.2 1206.4 1207.8 | med 1207.8 spread 1.07% SPREAD-FAIL
+ldsys2r        ORACLE FAIL
+ldsys2r        us: 1211.5 1209.5 1209.3 1213.1 | med 1211.5 spread 0.31%
+base           ORACLE BITEXACT
+base           us: 482.0 485.6 482.3 482.5 | med 482.5 spread 0.74%
+oracle: DEFECT - do not use timing
+== iq4_xs 2 base,share,s2r,ldsy,ldsys2r,base 30 4
+bench_mmvq_real: iq4_xs K=5120 N=17408 T=2 niter=30 reps=4 arms=base,share,s2r,ldsy,ldsys2r,base
+base           us: 267.2 274.4 274.4 274.0 | med 274.4 spread 2.65% SPREAD-FAIL
+share          ORACLE BITEXACT
+share          us: 273.9 273.9 274.2 274.1 | med 274.1 spread 0.11%
+s2r            ORACLE BITEXACT
+s2r            us: 270.9 270.9 277.5 277.6 | med 277.5 spread 2.41% SPREAD-FAIL
+ldsy           ORACLE FAIL
+ldsy           us: 846.6 848.8 844.0 848.8 | med 848.8 spread 0.56%
+ldsys2r        ORACLE FAIL
+ldsys2r        us: 844.6 845.4 846.4 845.4 | med 845.4 spread 0.22%
+base           ORACLE BITEXACT
+base           us: 281.8 285.0 282.0 273.7 | med 282.0 spread 4.01% SPREAD-FAIL
+oracle: DEFECT - do not use timing
+== q5_K 2 base,share,s2r,ldsy,ldsys2r,base 30 4
+bench_mmvq_real: q5_K K=5120 N=12288 T=2 niter=30 reps=4 arms=base,share,s2r,ldsy,ldsys2r,base
+base           us: 359.3 367.6 358.8 360.5 | med 360.5 spread 2.45% SPREAD-FAIL
+share          ORACLE BITEXACT
+share          us: 323.5 327.8 322.9 326.7 | med 326.7 spread 1.50% SPREAD-FAIL
+s2r            ORACLE BITEXACT
+s2r            us: 326.5 325.5 323.8 322.7 | med 325.5 spread 1.16% SPREAD-FAIL
+ldsy           ORACLE FAIL
+ldsy           us: 742.3 737.7 733.3 733.4 | med 737.7 spread 1.22% SPREAD-FAIL
+ldsys2r        ORACLE FAIL
+ldsys2r        us: 735.4 737.7 741.4 739.2 | med 739.2 spread 0.82%
+base           ORACLE BITEXACT
+base           us: 359.9 361.9 361.0 354.5 | med 361.0 spread 2.05% SPREAD-FAIL
+oracle: DEFECT - do not use timing

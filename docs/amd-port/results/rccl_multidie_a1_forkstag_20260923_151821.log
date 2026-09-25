@@ -1,0 +1,14 @@
+W0 hip-ok
+W1 hip-ok
+W2 hip-ok
+W3 hip-ok
+W3 init-start
+W2 init-start
+W1 init-start
+W0 init-start
+RCCL version 2.20.5+hip6.2 HEAD:45b618a+
+NCCL error 1 (unhandled cuda error (run with NCCL_DEBUG=INFO for details)) at docs/amd-port/tests/rccl_multidie_probe.cu:264: ncNCCL error 1 (unhandled cuda error (run with NCCL_DEBUG=INFO for details)) at docs/amd-port/tests/rccl_multidie_probe.cu:264: ncclCommInitRank(&comm, MAX_RANKS, sh->uid, rank)
+clCommInitRank(&comm, MAX_RANKS, sh->uid, rank)
+NCCL error 1 (unhandled cuda error (run with NCCL_DEBUG=INFO for details)) at docs/amd-port/tests/rccl_multidie_probe.cu:264: ncclCommInitRank(&comm, MAX_RANKS, sh->uid, rank)
+NCCL error 1 (unhandled cuda error (run with NCCL_DEBUG=INFO for details)) at docs/amd-port/tests/rccl_multidie_probe.cu:264: ncclCommInitRank(&comm, MAX_RANKS, sh->uid, rank)
+a worker FAILED

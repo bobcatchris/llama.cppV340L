@@ -1,0 +1,25 @@
+Mon Sep 21 01:43:56 PM CDT 2026
+====================================== Temperature =======================================
+GPU[0]		: Temperature (Sensor edge) (C): 22.0
+GPU[0]		: Temperature (Sensor junction) (C): 24.0
+GPU[0]		: Temperature (Sensor memory) (C): 26.0
+GPU[1]		: Temperature (Sensor edge) (C): 26.0
+GPU[1]		: Temperature (Sensor junction) (C): 26.0
+GPU[1]		: Temperature (Sensor memory) (C): 29.0
+GPU[2]		: Temperature (Sensor edge) (C): 22.0
+GPU[2]		: Temperature (Sensor junction) (C): 24.0
+GPU[2]		: Temperature (Sensor memory) (C): 29.0
+GPU[3]		: Temperature (Sensor edge) (C): 26.0
+GPU[3]		: Temperature (Sensor junction) (C): 27.0
+GPU[3]		: Temperature (Sensor memory) (C): 30.0
+GPU[0]		: mclk clock level: 0: (167Mhz)
+GPU[0]		: sclk clock level: 0: (300Mhz)
+GPU[0]		: socclk clock level: 0: (600Mhz)
+GPU[0]		: pcie clock level: 0 (8.0GT/s x8)
+GPU[1]		: mclk clock level: 0: (167Mhz)
+GPU[1]		: sclk clock level: 0: (300Mhz)
+GPU[1]		: socclk clock level: 0: (600Mhz)
+GPU[2]		: mclk clock level: 0: (167Mhz)
+GPU[2]		: sclk clock level: 0: (300Mhz)
+GPU[2]		: socclk clock level: 0: (600Mhz)
+GPU[3]		: mclk clock level: 0: (167Mhz)
