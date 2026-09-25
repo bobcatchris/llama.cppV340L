@@ -1,0 +1,23 @@
+flowchart TB
+    subgraph BUILD["BUILD-TIME (once, per model)"]
+        HF["HF checkpoint<br/>Qwen3.8-27B (BF16)"] --> GG["convert_hf_to_gguf<br/>(llama.cpp)"]
+        GG --> MAT["Materializer<br/>tools/convert/qwen3_8_27b"]
+        MAT --> Q["Quantize: Q4_1 weights<br/>W8G32 output head<br/>INT4 MTP draft head"]
+        MAT --> BA["Bake in: hybrid topology<br/>(16 attn + 48 GDN), tokenizer,<br/>MTP head, draft vocab (40k),<br/>TP2 sharding plan"]
+        Q --> ART[(".ninfer artifact<br/>(self-contained model bundle)")]
+        BA --> ART
+    end
+    subgraph RUN["RUNTIME — TP2 (2× RTX 5060 Ti)"]
+        ART --> LD["TP2 sharded loader<br/>(6.8 s)"]
+        LD --> R0["Rank 0 · GPU 0<br/>arena: half weights + KV pages"]
+        LD --> R1["Rank 1 · GPU 1<br/>arena: half weights + KV pages"]
+        HTTP["OpenAI-compatible HTTP (serve)"] --> ENG["TPEngine → TpBackend"]
+        ENG --> PRE["Prefill (T=1 per token,<br/>~32 t/s — the M6 wall)"]
+        PRE --> DR["MTP drafter k=3<br/>(draft head, 40k vocab)"]
+        DR --> VF["Verify T=4<br/>(target model, Q4 GEMV)"]
+        VF --> ARED["Allreduce per verify step<br/>(NCCL, oneshot)"]
+        ARED --> ACC["Accept ~85.6% · else plain decode"]
+        ACC -->|next round| DR
+        ACC --> OUT["Tokens → SSE stream"]
+        PRE -. "prefix cache hit: restore GDN slot<br/>+ mtp_ph, skip re-prefill (default on)" .-> DR
+    end
