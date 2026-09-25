@@ -1,0 +1,11 @@
+=== W7 PAIRED SAME-WINDOW A/B — pinned-staging cure vs unset control (reopen-if A/B half CLOSED) ===
+ts: 2026-09-18 23:2x-23:4x CDT | bin: 07fcf7a5d98dea7d BOTH arms (only the env differs) | fresh boot per arm, identical life-story (boot -> auto warmup -> 3x 2k probes plen-2075 mt64 temp0, ordinal-paired)
+ARM A (NINFER_H2D_PINNED_STAGE=1): 18.4 / 18.6 / 18.8 s  (flat, +-1%)
+ARM B (env unset, legacy pageable): 22.6 / 25.5 / 27.9 s  (rising +23% across series — thermal integrator compounding the per-chunk stall)
+paired deltas: ordinal1 -18.6% | ordinal2 -27.1% | ordinal3 -32.6% (pinned faster everywhere; >> the +-2% band)
+parity: BLUE/stop all 6 (A arm verified in its boot logs, B arm re-verified from resp jsons)
+mechanism note: the ~995 ms/chunk blocked enqueue does not just add device idle — it lengthens each request's thermal load so the minutes-scale clock integrator compounds it; the pinned arm's shorter requests + inter-request idle keep the integrator drained. This explains BOTH earlier signals (10k soak +13%, 2k flat-vs-decay) in one picture.
+reopen-if remaining half: rocprof timeline on the cure bin (AR-overlap hypothesis; needs the ar-bracket trace fix first for an honest ar column — fix SPEC below)
+=== ar-bracket trace fix SPEC (deferred, executed cold by any fresh session) ===
+site: VerifyLayerTrace in text_context_impl.h (grep ev_ar/ar_begin/ar_end; post-PLOG-059 line drift ~+98 vs desk numbering). Mechanism: ev_ar[layer][slot][2] holds ONE ar pair per (layer, pass-slot); FOUR ar_begin/end sites per layer pass (attn o_proj AR, gdn out AR, mlp AR, +1) each RE-RECORD the same pair, so the pair measures only the LAST AR of the layer and the others fall out of ar into body->unbr (desk measured ar column 60.3 vs nccl device busy 119.5).
+fix: add an ar-subslot ring per (layer,pass-slot) — ev_ar[l][kArPerLayer][slot][2], kArPerLayer=8, an ar_seq counter incremented in ar_begin (mod kArPerLayer), recorded[] flags, report() sums elapsed over subs with both events recorded; update the pass_slot consumer (~:1398 area) to sum likewise. Trace-only, env-gated (zero cost unset). VERIFY (R6): OPTRACE boot must show ar column ~120 ms/chunk (2x the old 60.3) with wall unchanged +-2%.

@@ -1,0 +1,95 @@
+== GEMV TUNING ROW — NVFP4 decode GEMV (nvfp4_gemv_hip.cu) vs read ceiling, one change at a time
+== law: EXTRACTING_NUMBERS Part A (compile -O3 LAW, 5 s mclk hammer warm-up in bench, KFD=0
+== pre/post, one bench process at a time, <60 s GPU busy per stretch). Correctness bar:
+== bit-equality vs ORIGINAL kernel on results/amd/coherence/nvfp4_gemv_bitcheck.cu
+== (15 problems x 2 passes — "fin" finite x/scales = accumulation-ORDER bar, "raw" full-range
+== decode/NaN coverage), reference bits /tmp/gemv_bits_ref.bin captured 2026-09-17 from the
+== pre-edit kernel (deterministic: two runs BIT-EQUAL YES). Branch amd/tp4-cure.
+== bench: results/amd/coherence/nvfp4_roofline_bench.cu, dev0, gfx900, ROCm 6.2.0.
+==
+== iter  technique                          AttnInput   GdnInput   MlpGateUp  Resid6144   bit-equal
+BASE    (original kernel, this row's ref)  155.4       153.7      159.8      125.9       Y (is ref)
+        read ceiling this row: 381.8 GB/s -> 40.7%  40.3%      41.9%      33.0%
+        (prior ROOFLINE_row.txt: 152.0/153.7/156.4/122.9 @ 377.9 — reproduced within noise)
+iter1   codes as ONE u64/group (was 8x u8) 155.7       153.8      158.2      122.7       YES  FLAT
+iter2   x as 2x uint4/group (was 8x u32)   157.4       153.4      158.0      123.1       YES  FLAT
+        ^ ISA (--save-temps) showed why: 16 dynamic-index GLOBAL table loads per group
+          (e2m1 16-entry table compiled to global memory) + 64-bit VGPR address math each
+          = the dominant instruction cluster (~110 of ~160 slots/group); the 24 data loads
+          were never the limiter. VGPR=25, occupancy already max.
+iter3   e2m1 PAIR table in LDS (2 KB,      235.0       235.7      236.1      192.9       YES  +52%
+        filled FROM amd::e2m1_bits; 1 ds_read_b64 per code byte) — read ceiling 389.4 ->
+        60.3/60.5/60.6/49.5%
+iter4   8 warps/block (was 4)              244.8       247.8      243.8      175.4       YES  +4%/-9%
+iter5   2 rows/warp (4w x 2r, 8 rows/blk)  237.2       241.2      251.1      184.3       YES  mixed
+iter6   4 warps x 2 rows (=iter5 grid,     242.3       247.1      271.6      182.2       YES  Mlp+8%
+        8-row blocks; 4-row blocks retest)
+iter7   + #pragma unroll 2 on g-loop       231.4       234.0      248.1      193.9       YES  REGRESS
+        (Resid6144 likes it: its best 193.9; K=5120 hates it — reverted; per-geometry
+        conditional unroll is available since kGroups is compile-time, not landed)
+iter8   + scale QUAD loads (u32 per 4      253.3       257.4      272.9      170.3       YES  +5%
+        groups; (g&3)==(lane&3) invariant) — MlpGateUp crosses the 70% bar
+iter9   2 warps x 2 rows (4-row blocks)    254.2       250.2      270.1      189.7       YES  ~wash
+iter10  16w x 2r 32-row blocks (full       256.0       250.6      263.6      161.9       YES  REGRESS
+        row_mod32 band; occupancy -20% ate the sector-efficiency gain)
+iter11  PERSISTENT grid (10 blocks/CU      221.0       225.2      218.6      186.3       YES  REGRESS
+        rowgroup loop) — cross-rg pipelining loss >> tail gain; reverted
+iter12  4 rows/warp                        115.0       107.6      113.2      109.0       YES  COLLAPSE
+        (VGPR blowup collapsed occupancy; reverted)
+iter13  + e4m3 table in LDS (1 KB, from    267.3       276.1      290.9      208.8       YES  +6%
+        amd::e4m3_lut_decode) — replaces ~20 closed-form int ops/group/2rows
+iter14  8 warps x 2 rows (16-row blocks)   282.4       289.5      295.1      211.8       YES  LANDED
+== FINAL (iter14, two confirmation runs 45 s apart):
+==   run A: 282.4 / 289.5 / 295.1 / 211.8 GB/s @ read 381.7 = 74.0/75.8/77.3/55.5%
+==   run B: 281.7 / 290.7 / 287.9 / 211.8 GB/s @ read 385? = 73.2/75.5/74.8/55.0%
+==   LANDING BAR (>=70% read on MlpGateUp AND AttnInput): MET — 74-77% and 73-74%.
+==   Speedup vs BASE: AttnInput 1.81x, GdnInput 1.88x, MlpGateUp 1.82x, Resid6144 1.68x.
+==   v100-skinny reference 78.5%: we land 73-77% on the big K=5120 shapes — the same class.
+==
+== BENCH ARTIFACT/INCIDENT NOTE: during the iter14 sequence one transient
+== "HW Exception by GPU node-1 ... GPU Hang" appeared between the bitcheck and bench
+== processes; NEITHER reproduces on rerun (bitcheck rc=0 BIT-EQUAL YES, bench stable x2,
+== KFD=0 pre/post, showpids clean). Attributed: ROCm 6.2 teardown race between rapid
+== successive GPU process launches, not the kernel (same kernel then ran bitcheck + 3
+== benches clean). Watch-class, not a blocker; flagged here per stop-condition honesty.
+==
+== WHY NOT 100%: BW scales with row count at fixed K (MlpGateUp 4352 blocks 77% >
+== MlpLocal 68% > MlpW4 63% > AttnW4 57% at 448 blocks — all-15 local sweep): per-launch
+== ramp+drain is a fixed ~10-20 us tax that shrinks apparent BW on short kernels. In
+== PRODUCTION the decode GEMVs run back-to-back in a stream/graph, so adjacent kernels
+== absorb the drain — the in-isolation bench UNDERSTATES the production gain. W4/Local
+== shapes (the TP4 production dims) inherit the same tuned kernel; their isolated numbers
+== are drain-limited, not kernel-limited.
+== WHAT'S LEFT (for a future pass): 22-27% gap on the big shapes is DRAM mixed-stream
+== efficiency + drain; the banned-by-contract levers (split-K across warps, lane->group
+== remap, extra accumulator chains) are each worth an estimated 3-8% [inference] and need
+== the documented re-scope of nvfp4_amd_codec.h's contract text + a new digest gate before
+== anyone lands them. x-in-LDS measured floor: b128 reads are >=4-way bank-conflicted even
+== with index-only XOR swizzles (simulated) — L1-hit x (current) is not the limiter.
+== SERVE WINDOW (banked tuned binary, TP4 world=4, healthy window 05:55-06:06Z):
+== bin: /home/chris/artifacts_bin/ninfer-serve_e341a2072c6f5078.bin (sha256 e341a2072c6f5078;
+==      rebuild from the tuned commit REPRODUCES this sha byte-identical — verified 06:15)
+== boot: --allow-nvfp4-weights --spec mtp --draft-tokens 2 --port 8100 --devices 0,1,2,3
+==      --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy
+==      model /media/chris/EMTEC256/qwen3_8_27b_nvfp4.ninfer (96.7% resident, 19 s load)
+== BOOT_BATTERY_20260917_055635: OVERALL GREEN — guard 5/5, route-parity PASS,
+==      halves-contract PASS, ladder PASS (row + 27-sample clocks sideband banked)
+== sky-blue probe (PLOG-014 prompt "Explain why the sky is blue in three short paragraphs.",
+== mt=300 temp=0, stream): server window accounting (authoritative; MTP packs ~2.33 tok/delta):
+==      req15 (post-battery, hot): decode 10.1 tok/s, prefill 25.3, MTP 2.33 tok/round (66.7%)
+==      req16 (steady):            decode 11.2 tok/s, prefill 25.9, MTP 2.33 tok/round (66.7%)
+== BEFORE (prior window, same prompt family mt=300 k=2, REALK23_row / PLOG-026): 10.79 tok/s
+==      honest delta: ~+4% end-to-end (Part C predicts ~1.1x: GEMV is ~18% of the verify
+==      round; a 1.85x kernel win saves ~17 ms of ~210 ms -> within cross-window thermal
+==      noise; the clean same-boot A/B is BLOCKED, see incident below)
+== INCIDENT (attribution complete, REPORTED, boot work stopped per stop-condition law):
+==      06:07 kill of window 1; from 06:10 EVERY TP4 serve warmup faults on GPU node-3
+==      ("Memory access fault ... Page not present", address varies = layout-dependent),
+==      5/5 across BOTH binaries: pre-tuning 6c1fe9366f0ef83d (byte-reproducible from
+==      9751436f6, verified) 4/4 incl --no-cuda-graph, tuned e341a2072c6f5078 1/1 at 06:26
+==      + 1/1 at 06:32 after 5-min settle. Same tuned bytes booted GREEN 05:55. Host RAM
+==      fine (54G avail), VRAM clean (18 MB/die), KFD=0 throughout, single-die bench at
+==      FULL ceiling (copy 369.3 / read 385.1) after the faults began -> the degradation
+==      is specific to the TP4 multi-die warmup path (node-3 die), driver-level, developed
+==      after ~6 rapid kill/boot cycles; needs a root driver reset/reboot before the next
+==      TP4 window. NOT a kernel regression: bitcheck + bench clean throughout.
