@@ -1,0 +1,36 @@
+0.00.045.416 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.046.923 I srv    load_model: loading model '/media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf'
+0.01.584.312 W common_fit_params: failed to fit params to free device memory: llama_params_fit is not implemented for SPLIT_MODE_TENSOR, abort
+0.15.860.872 I srv    load_model: initializing, n_slots = 4, n_ctx_slot = 32768, kv_unified = 'true'
+0.15.860.958 W set_sampler: backend sampling not supported with SPLIT_MODE_TENSOR; using CPU
+0.15.860.960 W spec common_specu: backend offload failed for seq_id=0; using CPU sampler
+0.15.860.962 W spec common_specu: backend offload failed for seq_id=1; using CPU sampler
+0.15.860.963 W spec common_specu: backend offload failed for seq_id=2; using CPU sampler
+0.15.860.963 W spec common_specu: backend offload failed for seq_id=3; using CPU sampler
+0.15.904.155 I srv          init: chat template supports preserving reasoning, consider enabling it via --reasoning-preserve
+0.15.904.193 I srv  llama_server: model loaded
+0.15.904.196 I srv  llama_server: listening on http://127.0.0.1:8083
+0.19.983.302 I slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
+0.19.983.355 I slot launch_slot_: id  3 | task 0 | processing task, is_child = 0
+0.24.854.136 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   1066, progress = 0.15, t =   4.87 s / 218.86 tokens per second
+0.27.114.334 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   1578, progress = 0.23, t =   7.13 s / 221.29 tokens per second
+0.29.426.934 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   2090, progress = 0.30, t =   9.44 s / 221.32 tokens per second
+0.31.830.507 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   2602, progress = 0.37, t =  11.85 s / 219.63 tokens per second
+0.34.340.888 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   3114, progress = 0.45, t =  14.36 s / 216.89 tokens per second
+0.36.951.410 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   3626, progress = 0.52, t =  16.97 s / 213.70 tokens per second
+0.39.671.903 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   4138, progress = 0.59, t =  19.69 s / 210.17 tokens per second
+0.42.498.929 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   4650, progress = 0.67, t =  22.52 s / 206.52 tokens per second
+0.45.425.206 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   5162, progress = 0.74, t =  25.44 s / 202.89 tokens per second
+0.48.450.414 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   5674, progress = 0.81, t =  28.47 s / 199.32 tokens per second
+0.51.585.383 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   6186, progress = 0.89, t =  31.60 s / 195.75 tokens per second
+0.53.531.464 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   6452, progress = 0.93, t =  33.55 s / 192.32 tokens per second
+0.56.779.077 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =   6960, progress = 1.00, t =  36.80 s / 189.15 tokens per second
+1.00.937.271 I slot print_timing: id  3 | task 0 | prompt eval time =   37042.64 ms /  6964 tokens (    5.32 ms per token,   188.00 tokens per second)
+1.00.937.273 I slot print_timing: id  3 | task 0 |        eval time =    3911.14 ms /    98 tokens (   39.91 ms per token,    25.06 tokens per second)
+1.00.937.274 I slot print_timing: id  3 | task 0 |       total time =   40953.78 ms /  7062 tokens
+1.00.937.277 I slot print_timing: id  3 | task 0 |    graphs reused =         30
+1.00.937.280 I slot print_timing: id  3 | task 0 | draft acceptance = 0.75556 (   68 accepted /    90 generated), mean len =  3.27
+1.00.937.409 I slot      release: id  3 | task 0 | stop processing: n_tokens = 7062, truncated = 0
+1.00.943.417 I srv    operator(): operator(): cleaning up before exit...
+E20260923 12:19:37.645306 135963495708544 output_file.cpp:69] Opened result file: /media/chris/ssd128/llamacpp/llama.cpp/docs/amd-port/results/TP4_kernel_census_2026-09-23_agent_info.csv
+E20260923 12:19:37.705155 135963495708544 output_file.cpp:69] Opened result file: /media/chris/ssd128/llamacpp/llama.cpp/docs/amd-port/results/TP4_kernel_census_2026-09-23_kernel_trace.csv

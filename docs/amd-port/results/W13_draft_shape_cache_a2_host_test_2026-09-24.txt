@@ -1,0 +1,12 @@
+# A2 host replicate-test transcript (run from wt-draft-cache @ 9c229b3ae tree, 2026-09-24 ~01:23Z)
+# Suite: docs/amd-port/tests/test_draft_shape_cache_host.cpp (committed 9c229b3ae, restored from HEAD after working-tree truncation was found)
+# Compile: /opt/rocm-6.2.0/bin/hipcc -O2 -std=c++17 -DGGML_COMMON_DECL_HIP -DGGML_USE_HIP -I ggml/include -I ggml/src <src> -o /tmp/test_draft_shape_cache_host -pthread
+# COMPILE-EXIT:0
+# RUN-EXIT:0
+
+DEFECT replicated: single-slot steady round reused = 0,0,1,1 (2 misses/round, 20 graph + meta rebuilds in 10 rounds, per-die uids churn)
+FIX proven: shape-cache steady round reused = 1,1,1,1 (0 misses/round, 2 total builds, 18 cached re-splits, per-die uids stable)
+SCHEDULE identity: cached re-entry signature 't4_st4_sq1_o4_g1' matches the fresh build; shape-A built once, uid stable (121); single-slot rebuilt every round (12 builds)
+INVALIDATION: memory update resets both slots -> both shapes rebuild, then reuse resumes
+PREDICATE safety: unseen shape misses (degrades to today's rebuild), no stale hit
+ALL PASS: draft shape cache host suite
