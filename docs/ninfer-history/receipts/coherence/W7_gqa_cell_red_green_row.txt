@@ -1,0 +1,45 @@
+W7 ROW — GQA-SPLITK device cell harness fix: RED→GREEN closed (RED/GREEN CLOSURE LAW cell), 2026-09-18, window 7 (lane amd/wo-w7-body)
+tree: lane at amd/main 7245244e6 + the one-line Rng fix (this commit); pre-fix cell source = 7245244e6's tools/v340l/gqa_splitk_cell.cu byte-identical to amd/tp4-cure's (diff-verified)
+
+ROOT CAUSE (isolated by device bisection, not by reading alone):
+  The cell's Rng::uniform() computed `static_cast<float>(next() % 20001 - 10000)` — UNSIGNED
+  arithmetic: whenever (next() % 20001) < 10000 (~half of all draws) the subtraction wraps to
+  ~1.8e19, and /10000.0f yields ~1.8e15 "uniform" values. Inputs poisoned at ~1e15 -> phase-A
+  dot products ~1e31 -> softmax inf/nan -> every device comparison -nan. The production kernels
+  were NEVER wrong: the window-6 verdict "cell harness defect class" was correct; the mechanism
+  is now NAMED (this row) and the class generalized (see CLASS note).
+  Isolation chain: host-side shim conversion probes CORRECT (bf16(0.5)=0x3f00 etc., incl. full
+  kernel-header chain + using-namespace) -> device input readback bit-exact -> kernel-internal
+  probes showed LDS raw bits = 0x58d2 (= 1.847e15 as bf16, NOT a [-1,1] value) -> score ~1.3e31
+  -> the fill, not the kernel. First-principles check of the Rng line reproduced 1.84718e15
+  exactly (unsigned wraparound).
+
+RED CAPTURE (pre-fix artifact, deterministic):
+  bin /tmp/gqa_splitk_cell (pre-fix source @7245244e6, hipcc -O3 -DNDEBUG -std=gnu++20,
+  production include set) sha16 5cd11fae257efc01
+  run log: W7_gqa_cell_prefix_RED_run.log — 29/29 FAIL all -nan, rc=1 (byte-identical class to
+  window-6's banked W6_gqa_cell_device_run.log; reproduced today on the healthy box, so the
+  -nan was never device-state-dependent).
+
+FIX (one line): cast the mod result to std::int64_t BEFORE the -10000.
+
+GREEN CAPTURE (post-fix artifact):
+  bin /tmp/gqa_splitk_cell_fixed (post-fix source, same flags) sha16 8f19b93a0c0d66cd
+  run log: W7_gqa_cell_postfix_GREEN_run.log — GQA-SPLITK CELL: ALL PASS, rc=0.
+    4 host policy asserts PASS; 4 cases x (base-vs-oracle + 3 splits x 2) + RED falsifier:
+    base-vs-oracle relL2 1.61e-3..1.68e-3 (fp64 oracle, shipped production kernel — first
+    device validation of the shipped simt prefill kernel against an oracle);
+    splitk-vs-base 0.0e0..2.85e-3, splitk-vs-oracle 1.61e-3..2.41e-3 (all << 1e-2 gate);
+    RED falsifier (V row 3 +0.75): 1.639e-1 EXCEEDS gate — comparator proven able to fail.
+
+CLASS (generalized per RED/GREEN law): "a cell-authored PRNG whose scalar pipeline mixes
+  unsigned wraparound into the generated range" — any cell/test harness that derives random
+  floats from unsigned integer arithmetic must prove its range, not assert it in a comment.
+  The bug hid for a full window because the HOST policy asserts (pure functions) passed while
+  every DEVICE number was -nan, and -nan looked 'device-shaped'. Any future all-{-nan} cell
+  run: FIRST check input-generation range on host (printf min/max), before touching kernels.
+
+IMPLICATION: unblocks the pre-registered next step (handoff/PREFILL_1K_PLAN W1+2): with the
+  cell GREEN, FIX-C (NINFER_GQA_SPLITK) promotion evidence is complete on the cell side
+  (route proofs + 1.95x + byte-identical parity were already banked in W6 rows; serve-leg
+  acceptance <20 missed is a PERF judgment, not a correctness one — see promotion row).

@@ -1,0 +1,74 @@
+[
+ {
+  "k": 1,
+  "prompt": 63,
+  "gen": 40,
+  "fin": "stop",
+  "ok": true,
+  "content": "BLUE",
+  "reason": "We need reply to user. User says: \"Reply"
+ },
+ {
+  "k": 2,
+  "prompt": 64,
+  "gen": 35,
+  "fin": "stop",
+  "ok": true,
+  "content": "BLUE",
+  "reason": "We need answer user's request: \"Reply wi"
+ },
+ {
+  "k": 3,
+  "prompt": 65,
+  "gen": 41,
+  "fin": "stop",
+  "ok": true,
+  "content": "BLUE",
+  "reason": "We need to reply with exactly single wor"
+ },
+ {
+  "k": 4,
+  "prompt": 66,
+  "gen": 43,
+  "fin": "stop",
+  "ok": true,
+  "content": "BLUE",
+  "reason": "We need to reply with exactly single wor"
+ },
+ {
+  "k": 5,
+  "prompt": 67,
+  "gen": 41,
+  "fin": "stop",
+  "ok": false,
+  "content": "",
+  "reason": " Runnerropa_tol\u4ec0ariatften\u6d6e9\u62a5\u8b66\u8e6cF Orb\u5982\u6b64ain"
+ },
+ {
+  "k": 6,
+  "prompt": 68,
+  "gen": 4,
+  "fin": "stop",
+  "ok": false,
+  "content": "",
+  "reason": "ashianenn forwardsillage"
+ },
+ {
+  "k": 7,
+  "prompt": 69,
+  "gen": 7,
+  "fin": "stop",
+  "ok": false,
+  "content": "",
+  "reason": "\u95b2GWderaholz\u62b1ila\u2026"
+ },
+ {
+  "k": 8,
+  "prompt": 70,
+  "gen": 19,
+  "fin": "stop",
+  "ok": false,
+  "content": "",
+  "reason": "acob\u54c9\u5c0f\u7f161usa\u62d3ijkstrampp\u1ee8ado\u0435\u0448\u0435holz\u5230\u671f\u4ece\u6b64\u65bdz\u7ecf"
+ }
+]
