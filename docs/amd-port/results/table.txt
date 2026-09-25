@@ -1,0 +1,68 @@
+== mtpgain_F1_20260922_133446.log: 12144 timeline events ==
+  decode-only table (no [launch-timeline] meta lines; boot with
+  LLAMA_LAUNCH_TIMELINE=1 for the launch/replay split):
+  draft (n=2): n=3
+  issue (whole ubatch)                         n=3     med   215.247 ms  min    16.716  p90   287.857  max   287.857
+  build (graph reuse)                          n=3     med     0.057 ms  min     0.000  p90     0.404  max     0.404
+  inputs (host setup)                          n=3     med     0.028 ms  min     0.004  p90     0.052  max     0.052
+  catchup (n=4, issue<=40): n=85
+  issue (whole ubatch)                         n=85    med    11.661 ms  min     8.275  p90    12.993  max    14.993
+  build (graph reuse)                          n=85    med     0.029 ms  min     0.024  p90     0.033  max     0.049
+  inputs (host setup)                          n=85    med     0.026 ms  min     0.009  p90     0.030  max     0.034
+  verify (n=4, issue>40): n=85
+  issue (whole ubatch)                         n=85    med   163.158 ms  min   138.053  p90   168.830  max   344.029
+  build (graph reuse)                          n=85    med     0.000 ms  min     0.000  p90     0.000  max     0.443
+  inputs (host setup)                          n=85    med     0.040 ms  min     0.022  p90     0.045  max     0.051
+  drain (per call)                             n=11677 med     0.001 ms  min     0.000  p90     0.015  max     2.269
+  drain (sum per log, ms)                      n=1     med   475.434 ms  min   475.434  p90   475.434  max   475.434
+== mtpgain_F2_20260922_134057.log: 11892 timeline events ==
+  decode-only table (no [launch-timeline] meta lines; boot with
+  LLAMA_LAUNCH_TIMELINE=1 for the launch/replay split):
+  draft (n=2): n=3
+  issue (whole ubatch)                         n=3     med   218.508 ms  min    17.352  p90   347.465  max   347.465
+  build (graph reuse)                          n=3     med     0.059 ms  min     0.000  p90     0.406  max     0.406
+  inputs (host setup)                          n=3     med     0.028 ms  min     0.005  p90     0.053  max     0.053
+  catchup (n=4, issue<=40): n=85
+  issue (whole ubatch)                         n=85    med    11.541 ms  min    10.075  p90    13.001  max    15.149
+  build (graph reuse)                          n=85    med     0.029 ms  min     0.026  p90     0.032  max     0.041
+  inputs (host setup)                          n=85    med     0.027 ms  min     0.009  p90     0.030  max     0.033
+  verify (n=4, issue>40): n=85
+  issue (whole ubatch)                         n=85    med   162.304 ms  min   136.974  p90   168.252  max   383.515
+  build (graph reuse)                          n=85    med     0.000 ms  min     0.000  p90     0.000  max     0.434
+  inputs (host setup)                          n=85    med     0.039 ms  min     0.023  p90     0.045  max     0.051
+  drain (per call)                             n=11425 med     0.001 ms  min     0.000  p90     0.008  max     2.273
+  drain (sum per log, ms)                      n=1     med   438.043 ms  min   438.043  p90   438.043  max   438.043
+== mtpgain_F3_20260922_134819.log: 12144 timeline events ==
+  decode-only table (no [launch-timeline] meta lines; boot with
+  LLAMA_LAUNCH_TIMELINE=1 for the launch/replay split):
+  draft (n=2): n=3
+  issue (whole ubatch)                         n=3     med   216.961 ms  min    16.854  p90   321.609  max   321.609
+  build (graph reuse)                          n=3     med     0.060 ms  min     0.000  p90     0.399  max     0.399
+  inputs (host setup)                          n=3     med     0.025 ms  min     0.004  p90     0.051  max     0.051
+  catchup (n=4, issue<=40): n=85
+  issue (whole ubatch)                         n=85    med    11.174 ms  min     6.544  p90    12.097  max    14.810
+  build (graph reuse)                          n=85    med     0.029 ms  min     0.021  p90     0.031  max     0.048
+  inputs (host setup)                          n=85    med     0.026 ms  min     0.008  p90     0.030  max     0.034
+  verify (n=4, issue>40): n=85
+  issue (whole ubatch)                         n=85    med   162.392 ms  min   137.287  p90   167.797  max   367.080
+  build (graph reuse)                          n=85    med     0.000 ms  min     0.000  p90     0.000  max     0.429
+  inputs (host setup)                          n=85    med     0.040 ms  min     0.023  p90     0.046  max     0.054
+  drain (per call)                             n=11677 med     0.001 ms  min     0.000  p90     0.012  max     2.245
+  drain (sum per log, ms)                      n=1     med   449.602 ms  min   449.602  p90   449.602  max   449.602
+== mtpgain_F4_20260922_135525.log: 11892 timeline events ==
+  decode-only table (no [launch-timeline] meta lines; boot with
+  LLAMA_LAUNCH_TIMELINE=1 for the launch/replay split):
+  draft (n=2): n=3
+  issue (whole ubatch)                         n=3     med   216.658 ms  min    16.604  p90   330.476  max   330.476
+  build (graph reuse)                          n=3     med     0.052 ms  min     0.000  p90     0.397  max     0.397
+  inputs (host setup)                          n=3     med     0.026 ms  min     0.003  p90     0.051  max     0.051
+  catchup (n=4, issue<=40): n=85
+  issue (whole ubatch)                         n=85    med    11.635 ms  min     5.079  p90    13.035  max    14.924
+  build (graph reuse)                          n=85    med     0.029 ms  min     0.025  p90     0.032  max     0.040
+  inputs (host setup)                          n=85    med     0.027 ms  min     0.009  p90     0.030  max     0.040
+  verify (n=4, issue>40): n=85
+  issue (whole ubatch)                         n=85    med   161.769 ms  min   137.285  p90   166.273  max   367.770
+  build (graph reuse)                          n=85    med     0.000 ms  min     0.000  p90     0.000  max     0.445
+  inputs (host setup)                          n=85    med     0.040 ms  min     0.023  p90     0.046  max     0.055
+  drain (per call)                             n=11425 med     0.001 ms  min     0.000  p90     0.009  max     2.272
+  drain (sum per log, ms)                      n=1     med   439.022 ms  min   439.022  p90   439.022  max   439.022
