@@ -1,0 +1,28 @@
+== UNCHUNK kernel-only (median us/compute over last 60 computes)
+shape          ks    gemm us  gemm TF/s   route us route TF/s
+ffn_gate        4     1177.3       6.41     1662.7       4.54
+ffn_up          4     1163.6       6.49     1646.6       4.59
+ffn_down        8     1082.3       6.85     1591.1       4.66
+gdn_qkv         8      661.6       6.59      947.9       4.60
+ssm_out         8      448.1       5.84      644.1       4.06
+gdn_gate        8      439.5       6.11      637.5       4.21
+attn_q+gate     4      924.2       5.81     1306.2       4.11
+attn_out        8      451.0       5.80      648.9       4.03
+attn_k          8      104.6       3.21      143.0       2.35
+attn_v          8      104.6       3.21      143.0       2.35
+   route call-weighted: 4.48 TF/s
+
+== NSPAN kernel-only (median us/compute over last 60 computes)
+shape          ks    gemm us  gemm TF/s   route us route TF/s
+ffn_gate        4     1189.9       6.35     1672.7       4.51
+ffn_up          4     1186.9       6.36     1675.6       4.51
+ffn_down        8     1087.0       6.82     1589.6       4.66
+gdn_qkv         8      662.7       6.58      945.7       4.61
+ssm_out         8      466.7       5.61      659.3       3.97
+gdn_gate        8      442.6       6.07      638.2       4.21
+attn_q+gate     4      938.8       5.72     1317.9       4.07
+attn_out        8      464.4       5.64      656.6       3.99
+attn_k          8      105.8       3.17      143.4       2.34
+attn_v          8      105.8       3.17      143.4       2.34
+   route call-weighted: 4.44 TF/s
+

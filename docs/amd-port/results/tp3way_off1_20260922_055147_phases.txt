@@ -1,0 +1,21 @@
+[05:51:47] === tp3way arm=off rep=1 stamp=20260922_055147 ctx=10000 port=8083 idle_wait=180 ===
+tree HEAD 355d28c83 2026-09-22 01:31:15 -0500
+[05:51:47] LOCK held by TP3-threeway arm=off1 pid=1325120
+[05:51:47] thermal edge card0/1/2 = 21.0/25.0/21.0 C
+[05:51:47] thermal gate PASS (<=35C)
+[05:51:47] PHASE preboot
+[05:51:47] [boot] arm=off launching llama-server -> /media/chris/ssd128/llamacpp/llama.cpp/docs/amd-port/results/tp3way_off1_20260922_055147_server.log
+[05:52:07] BOOT_READY t=1790074327
+[05:52:15] PHASE boot_ready
+[05:52:15] PHASE probe_battery
+1 battery_exit
+[06:00:12] PHASE postprobe
+[06:00:12] PHASE teardown_start
+[06:00:13] PHASE postteardown
+[06:00:13] PHASE session_end
+[06:00:13] [done] arm=off rep=1; artifacts:
+[06:00:13]   /media/chris/ssd128/llamacpp/llama.cpp/docs/amd-port/results/tp3way_off1_20260922_055147_server.log
+[06:00:13]   /media/chris/ssd128/llamacpp/llama.cpp/docs/amd-port/results/tp3way_off1_20260922_055147_vram.log
+[06:00:13]   /media/chris/ssd128/llamacpp/llama.cpp/docs/amd-port/results/tp3way_off1_20260922_055147_battery.jsonl
+[06:00:13]   /media/chris/ssd128/llamacpp/llama.cpp/docs/amd-port/results/tp3way_off1_20260922_055147_phases.txt
+[06:00:14] LOCK released
