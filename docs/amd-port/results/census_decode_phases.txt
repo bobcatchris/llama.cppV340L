@@ -1,0 +1,25 @@
+span 38.18 s, events 1724807
+idle gaps > 0.5 s:
+      1.61s ->     2.12s  (0.51 s)
+      2.41s ->     3.45s  (1.04 s)
+      3.73s ->     4.77s  (1.04 s)
+      5.06s ->     5.59s  (0.52 s)
+      5.59s ->     6.10s  (0.51 s)
+      6.39s ->     7.43s  (1.04 s)
+      7.72s ->     8.51s  (0.79 s)
+      8.52s ->     9.05s  (0.53 s)
+      9.05s ->    10.54s  (1.49 s)
+     10.98s ->    11.49s  (0.51 s)
+     11.50s ->    12.01s  (0.52 s)
+     12.30s ->    13.34s  (1.04 s)
+
+phase kernel ranking (top 8 per phase, phases > 2 s only):
+-- seg 12: 13.3s..38.2s  kernel_total 34.73s  events 1724353
+      7111.6ms  20.5%  76329x  93170.1us/call  void mul_mat_vec_q<(ggml_type)21, 1, false, false>(void const*, void const*, int
+      3639.2ms  10.5%  38550x  94400.9us/call  void mul_mat_vec_q<(ggml_type)18, 1, false, false>(void const*, void const*, int
+      2884.1ms   8.3%  11565x 249381.1us/call  void mul_mat_vec_q<(ggml_type)18, 1, true, false>(void const*, void const*, int 
+      2684.1ms   7.7%  64250x  41776.5us/call  void mul_mat_vec_q<(ggml_type)12, 1, false, false>(void const*, void const*, int
+      2616.1ms   7.5%  55512x  47127.3us/call  void mul_mat_vec_q<(ggml_type)23, 1, false, false>(void const*, void const*, int
+      2328.1ms   6.7%   9252x 251630.7us/call  void mul_mat_vec_q<(ggml_type)21, 1, true, false>(void const*, void const*, int 
+      1570.2ms   4.5% 358413x   4380.9us/call  quantize_q8_1(float const*, void*, long, long, long, long, long, unsigned int, H
+      1113.0ms   3.2%  11565x  96236.1us/call  void mul_mat_vec_q<(ggml_type)11, 1, false, false>(void const*, void const*, int
