@@ -1,0 +1,7 @@
+rccl_multidie_probe: fork mode, world 4, dies 0 1 2 3, ne 20480 (80 KB fp32), iters 10, burst 0, pid 327901
+RCCL version 2.20.5+hip6.2 HEAD:45b618a+
+NCCL error 1 (unhandled cuda error (run with NCCL_DEBUG=INFO for details)) at docs/amd-port/tests/rccl_multidie_probe.cu:238: ncclGroupEnd()
+NCCL error 1 (unhandled cuda error (run with NCCL_DEBUG=INFO for details)) at docs/amd-port/tests/rccl_multidie_probe.cu:238: ncclGroupEnd()
+NCCL error 1 (unhandled cuda error (run with NCCL_DEBUG=INFO for details)) at docs/amd-port/tests/rccl_multidie_probe.cu:238: ncclGroupEnd()
+NCCL error 1 (unhandled cuda error (run with NCCL_DEBUG=INFO for details)) at docs/amd-port/tests/rccl_multidie_probe.cu:238: ncclGroupEnd()
+a worker failed

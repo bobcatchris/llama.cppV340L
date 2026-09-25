@@ -1,0 +1,6 @@
+== N7 PROOF 2026-09-17T09:14:14Z bin 6c1fe9366f0ef83d — arm A: no flag no env, expect both-numbers refusal
+== N7 arm C: flag-only boot (--allow-nvfp4-weights, NO env), bin 6c1fe9366f0ef83d
+== arm C: boot READY via flag ONLY (env verified absent), battery GREEN: guard 5/5 + route-parity device PASS + halves-contract device PASS + ladder 14/14 (row BOOT_BATTERY_20260917_041518)
+== arms A/B: both-numbers refusal + value-parse refusal banked above; KFD=0 after release
+KFD=0
+0

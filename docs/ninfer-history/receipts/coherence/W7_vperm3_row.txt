@@ -1,0 +1,108 @@
+W7 VPERM-3BLOCKS ROW — the co-residency push desk (v_perm register-LUT decode, 2->3 blocks/CU),
+2026-09-18, window 7, lane amd/wo-w7-body
+bin: /tmp/w7v3desk/w7_vperm3_bench (law flags: clang++ -O3 -DNDEBUG -std=gnu++20
+  --offload-arch=gfx900 -DNINFER_HIP_ROSTER=1 -DNINFER_NVFP4_SIMT_LANE=1 -D__HIP_PLATFORM_AMD__=1
+  -D__HIP_ROCclr__=1 -I src/common/hip_shim -I include -I src -I third_party; source
+  tools/v340l/w7_vperm3_bench.cu = COPY of banked tools/v340l/w7_repack_bench.cu (banked file
+  NOT mutated; it also carries an uncommitted concurrent writer's edit, see PROVENANCE).
+  core sources src/core/{device.cu,tensor.cpp,dtype.cpp} linked (cuda_check).
+method: w7_pk16/w7_repack methodology verbatim (5 s mclk hammer, 256 MiB copy ceiling, hipEvent
+  3 warmup + 20 iters, rel-L2 vs REF, M=128, four full geometries). BAND: HIP_VISIBLE_DEVICES=0,1,
+  bench die = physical die 1 (NINFER_W7_GPU=1); serving instance (7c11c3ac, port 8100) runs
+  --devices 0,1,2,3 = shares ALL dies; decode-retune desk owns 2,3 today; box was BUSY (copy
+  ceiling 143-148 GB/s vs the repack row's 370 — absolute GF/s band-contaminated BY DESIGN;
+  ALL VERDICTS are same-window ratios vs the in-process V0 anchor).
+PRE-REGISTERED GATE (unchanged post-numbers): V3/V0 mean >= 1.30 PASS (promote) | 1.15-1.30
+  AMBER (bank, serve-leg decides) | < 1.15 = co-residency hypothesis FALSIFIED.
+  Correctness: rel-L2 vs REF < 1e-2 + V3 BIT-EXACT vs V (re-shape invariance) on PATTERNED
+  position-varying data. Census-first kill-switch: no bench of any >96-VGPR or spilled variant.
+
+CENSUS (kill-switch; w3_census.py on the -S compile; law flags; post-fix .s =
+  /tmp/w7v3desk/bench_census_v3.s — pre- and post-fix VGPR counts IDENTICAL, the fixes fold
+  into existing address scalars; STILES 80/96 bodies identical):
+  BEFORE (banked V arm):                                     113 VGPR, 0 B scratch = 2 blocks/CU
+  a  <64,4,32,32,256,1> kS=2:            90 VGPR, 0 B, LDS 4096 -> alloc 92 = 2 blocks/CU (NOT 3)
+  b  <64,4,64,32,512,1> kS=2, 512 thr:   92 VGPR, 0 B, LDS 8192 -> 512-thr cannot place 3
+  c  <32,2,64,32,256,1> KTPR=2,KTM=32:   71 VGPR, 0 B, LDS 8192 -> SURVIVOR, 3 blocks/CU
+  d  <64,2,64,32,512,1> KTPR=2, 512 thr: 70 VGPR, 0 B, LDS 8192 -> census-GREEN, placement-wrong
+  f  <32,2,32,32,256,1>:                161 VGPR, 0 B, LDS 4096 -> CENSUS-RED (unroll pathology:
+      static pk=128 = 4x the rolled expectation; the kS=2,KTPR=2 point re-opens the pk16-v2
+      cross-group-unroll lesson; killed pre-bench by the census, again)
+  e  <64,4,64,32,256,3> MINB=3 forcing:  84 VGPR, 104 B SPILL -> probe did its job: forcing V's
+      exact shape into 3 blocks/CU costs spill => the honest 3-block bar is <= 84 VGPR at
+      0 scratch, NOT 96. (96 -> alloc 96 = 98,304 B/block vs 256 KB/CU = 2.67 -> still 2.)
+  Survivor = 'c' per the pre-registered rule (lowest VGPR at 0 scratch, tie-break 256-thr
+  4-wave blocks over 512-thr; d's 8-wave blocks cannot even co-reside 2: 4 waves/SIMD x
+  18,432 B = 73.7 KB > 64 KB). c post-fix: 71 VGPR / 0 B / 8 KB LDS.
+  MEASURED co-residency (hipOccupancyMaxActiveBlocksPerMultiprocessor, not assumed):
+    V  = 2 blocks/CU | V3c = 3 blocks/CU | V3e = 3 (with spill) | a = 2 | b,d,f = 1.
+  LDS at 3x c: 24 KB of 64 KB — LDS was never the limiter.
+
+CORRECTNESS — TWO REAL BUGS FOUND AND CLOSED (RED/GREEN per closure law; receipts:
+  W7_vperm3_parity_RED.log, W7_vperm3_parity_GREEN.log; the patterned-data parity cell caught
+  BOTH; both are invisible on the uniform bench data that gated the banked repack row):
+  BUG 1 (positional-x stage): V/PV/V3 stage read x row `t` (block-local) instead of
+    `blockIdx.y*TN + t` -> with grid.y = m/TN every block y>0 computed from block 0's x rows:
+    token tau got x[tau mod TN]. On real (non-uniform) requests, m/TN of the output columns
+    are wrong. RED: V3a/f vs V differ on EXACTLY the tokens where (tau mod 32)!=(tau mod 64)
+    = half the array (917504/1835008); fraction arithmetic named the mechanism. V0 is correct
+    by construction (never tiles M: grid = n/64, TN = whole M). FIX: stage row =
+    blockIdx.y*TN + t (V, PV, V3; P and REF are 1-D-grid and were left byte-identical).
+  BUG 2 (decode/x word swap): w7v_decode_word emits wa=(k0,k4) wb=(k2,k6) wc=(k1,k5)
+    wd=(k3,k7) but the reader fed x words s=0,1,2,3 = (k0,k4),(k1,k5),(k2,k6),(k3,k7):
+    words 1 and 2 swapped -> within every 8-value span half the pair-products mispaired.
+    RED: post-bug-1-fix parity anchor relL2(V,REF) = 5.46e-01. FIX: reader order s=0,2,1,3
+    — exactly the header's own DECLARED consumption order "0,4,2,6,1,5,3,7".
+  GREEN (post both, current binary): relL2(V, REF) = 1.866e-03 (gate 1e-2 PASS, fp16-window
+    rounding class); ALL six variants BIT-EXACT vs V; --debug receipt V0==V==V3c element-wise
+    and in SUM. VGPR census unchanged (fixes are address-scalars).
+  IMPACT STATEMENT: the BANKED repack row's V arm (and PV) carries both bugs in its banked
+    source (tools/v340l/w7_repack_bench.cu); its "relL2 0.0 / bitdiff 0 vs V0" receipts were
+    uniform-data artifacts. Its TIMING (AMBER 1.136x) measured the same work either way and
+    stands as a resourcing number, but NO promotion of V-class kernels may happen without
+    this fix. Banked file left untouched (owner's); the fix lives in
+    tools/v340l/w7_vperm3_bench.cu lines ~410/565/733 (stage) and the three reader blocks.
+
+MEASURED (M=128, same-window xV0, THREE back-to-back runs, raw: W7_vperm3_runs.log):
+  RUN 1 (sclk 991MHz after): V3c 0.95 / 1.14 / 1.01 / 1.11 per geometry -> MEAN 1.055x
+       (V 1.06/1.16/0.94/1.13 -> 1.071x | P 0.944x | PV 1.023x)
+  RUN 2 (sclk 775MHz):       V3c -> MEAN 0.990x (V 0.971x)
+  RUN 3 (sclk 560MHz):       V3c -> MEAN 1.004x (V 1.071x)
+  V3c/V0 3-run mean 1.016x, run-to-run spread +-3.3% (max mean 1.055x).
+
+VERDICT — FALSIFIED (pre-registered < 1.15): raising v_perm-decode co-residency 2 -> 3
+  blocks/CU (MEASURED, occupancy API; 71 VGPR / 0 scratch / 24 KB LDS at 3 blocks) does NOT
+  multiply throughput: V3c tracks V's own profile per geometry (0.95/1.14/1.01/1.11 vs V's
+  1.06/1.16/0.94/1.13 on run 1) instead of scaling with occupancy. The hypothesis "the V win
+  is access-pattern-latency-limited, so co-residency multiplies it" is closed BY
+  MEASUREMENT: at this tile shape the limiter is NOT co-residency (the ksplit limiter kit's
+  "access-pattern latency at fixed co-residency" wall now has its co-residency axis measured
+  too: moving the axis alone buys ~0). Corollary: the v_perm V lever's AMBER ~1.1x is the
+  whole lever at every achievable co-residency; its PASS bar (1.15 / 1.30) is unreachable by
+  resourcing. Remaining v_perm-class upside would have to come from a DIFFERENT axis (MAC
+  density, decode width), not blocks/CU. No promotion; serve-leg question MOOT.
+
+WHY e/a/b/d/f were not benched (pre-registration scope): the gate tests the SURVIVOR
+  (pre-registered selection rule) at 3 measured blocks/CU — done. a measures 2 blocks/CU
+  (it cannot test the hypothesis), b/d/f measure 1 (512-thr placement / 161 VGPR), e is the
+  spilled forcing probe (a different mechanism — spill traffic — not a clean 3-block point).
+  Their occupancy receipts are banked in the parity log.
+
+PROVENANCE / COLLISION NOTE: a concurrent writer (no desk file; possibly the "dead" prior
+  instance) edited tools/v340l/w7_repack_bench.cu at 19:22:52 (run_v3parity + V3 bench arm +
+  NINFER_W7_V3 override + V3 BARS print — the SAME design this desk pre-registered), built
+  /tmp/w7_vperm3_census.s (19:23) and /tmp/w7_vperm3_bench (19:28, rebuilt 19:51 hipcc), and
+  NEVER ran a bench or wrote a row as of 19:55. This desk's harness COPY (created 19:26,
+  after their edit) inherited their driver code; kernel bodies are the banked ones and this
+  desk's two fixes are IN THIS DESK'S COPY ONLY — the competitor's /tmp binary is built from
+  the UNFIXED source (timing-valid, correctness-invalid; do not compare its rows to this one
+  without the fixes). Coordinator should deconflict the duplicate dispatch.
+  NOTE: the OLD "die 2 / NINFER_W7_GPU default" band convention is superseded today: this
+  desk = devices 0,1 (mission pin; die 1 used), decode-retune desk = 2,3, server = all.
+
+FILES: row results/amd/coherence/W7_vperm3_row.txt | runs results/amd/coherence/W7_vperm3_runs.log
+  | parity GREEN W7_vperm3_parity_GREEN.log | parity RED W7_vperm3_parity_RED.log | desk
+  docs/amd/W7_VPERM3_desk.md | harness tools/v340l/w7_vperm3_bench.cu | censuses
+  /tmp/w7v3desk/bench_census{,_postfix,_v3}.s | bin /tmp/w7v3desk/w7_vperm3_bench
+DESK LAW: numbers here are reproducible from the harness source + flags above; every counted
+  number carries its sclk or occupancy annotation in this row or the logs.

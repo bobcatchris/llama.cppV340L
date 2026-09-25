@@ -1,0 +1,10 @@
+W7 P2P ROW — peer access ABSENT on all pair classes under iommu=pt (fresh measurement, post-reboot platform), 2026-09-18
+method: tools/tp2/p2p_probe.cu (HIP, gfx900) re-run under the new platform (iommu=pt live, 39 groups identity)
+  with HIP_VISIBLE_DEVICES remaps covering all pair classes: 0-1, 0-2, 0-3 (same-board and cross-board).
+result: canAccess=0 on ALL pairs both directions; staged (host-relayed) transport 3.14-3.17 GiB/s symmetric,
+  10-KiB staged latency 13.90-14.32 us — stable across pairs (all inter-die traffic flows through host).
+CONSEQUENCE: the mx-llama.cpp peer-write AllReduce design (decode +9% on 4x MI50) requires P2P peer writes —
+  NOT APPLICABLE on this platform. The decode AR stays on the host-staged/RCCL path (W7_b1_ar_floor_row: at
+  measured floor for its class; F-BISECT gated). The V340 display-controller PCI class does not expose P2P.
+NOTE: this also explains the structural AR costs seen all campaign (host-relay is the only transport).
+playbook: any future peer-write/port design must FIRST run this probe per pair class; on this box: dead.
