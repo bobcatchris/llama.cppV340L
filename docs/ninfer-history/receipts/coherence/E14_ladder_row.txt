@@ -1,0 +1,8 @@
+== MANIFEST 2026-09-16T22:23:20Z grant G-AMD-E14 (user blanket grant 2026-09-16, E-12) bin b864220912aec151 (fixed __low2bfloat16) ladder --long mt=64 port=8100
+KFD: 0
+0
+listener=2174671
+real_listener=2174671
+KFD=1
+KFD=0
+0

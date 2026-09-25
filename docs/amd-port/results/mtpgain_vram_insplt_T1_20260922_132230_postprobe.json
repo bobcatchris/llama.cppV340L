@@ -1,0 +1,30 @@
+{
+  "arm": "T1 in-split",
+  "phase": "post-probe (5x 7857-token probe + 128 decode each)",
+  "stamp": "20260922_132230",
+  "map": "HIP0=card1 HIP1=card3 HIP2=card0 HIP3=card4",
+  "dies": [
+    {
+      "card": "card1",
+      "vram_used_mib": 8166.5
+    },
+    {
+      "card": "card3",
+      "vram_used_mib": 8069.9
+    },
+    {
+      "card": "card0",
+      "vram_used_mib": 8122.0
+    },
+    {
+      "card": "card4",
+      "vram_used_mib": 18.0
+    }
+  ],
+  "labels": [
+    "HIP0",
+    "HIP1",
+    "HIP2",
+    "HIP3"
+  ]
+}

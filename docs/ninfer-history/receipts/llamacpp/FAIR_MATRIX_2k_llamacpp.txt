@@ -1,0 +1,50 @@
+=== llama.cpp TP4-layer no-spec @2k 17:04:31 ===
+no-spec: pp 90.1 | decode 8.98 | gen 31
+=== llama.cpp TP4-layer draft-mtp @2k 17:05:13 ===
+draft-mtp: pp 87.6 | decode 11.93 | gen 90
+RESTORED OK
+DONE
+=== llama.cpp TP2-q4_0-nospec @2k 17:10:46 ===
+BOOT FAILED: 0.01.481.434 I srv    operator(): operator(): cleaning up before exit...
+0.01.482.253 E srv  llama_server: exiting due to model loading error
+=== llama.cpp TP4-bf16kv-nospec @2k 17:14:49 ===
+BOOT FAILED: 0.01.760.869 I srv    operator(): operator(): cleaning up before exit...
+0.01.761.672 E srv  llama_server: exiting due to model loading error
+=== llama.cpp TP4-bf16kv-mtp @2k 17:18:53 ===
+=== llama.cpp TP2-q4_0-nospec @2k 17:20:58 ===
+TP2-q4_0-nospec: pp 0 | decode 0 | gen None
+TP4-bf16kv-mtp: pp 0 | decode 0 | gen None
+=== llama.cpp TP4-bf16kv-nospec @2k 17:21:48 ===
+=== llama.cpp TP2-bf16kv-nospec @2k 17:21:48 ===
+TP4-bf16kv-nospec: pp 0 | decode 0 | gen None
+TP2-bf16kv-nospec: pp 0 | decode 0 | gen None
+=== llama.cpp TP4-bf16kv-mtp @2k 17:22:39 ===
+TP4-bf16kv-mtp: pp 87.1 | decode 11.6 | gen 88
+=== llama.cpp TP2-bf16kv-nospec @2k 17:23:21 ===
+TP2-bf16kv-nospec: pp 100.9 | decode 8.67 | gen 26
+NINFER RESTORED OK
+DONE
+NINFER RESTORED OK
+DONE
+=== llama.cpp TP2-q4_0-nospec @2k 17:30:54 ===
+TP2-q4_0-nospec: pp 102.9 | decode 8.92 | gen 31
+=== llama.cpp TP4-bf16kv-nospec @2k 17:31:24 ===
+TP4-bf16kv-nospec: pp 90.0 | decode 8.82 | gen 26
+=== llama.cpp TP2-bf16kv-mtp @2k 17:32:01 ===
+TP2-bf16kv-mtp BOOT FAILED: 0.04.011.626 E ggml_backend_cuda_buffer_type_alloc_buffer: allocating 197.00 MiB on device 1: cudaMalloc failed: out of memory
+NINFER RESTORED OK 17:37:02
+DONE2
+=== llama.cpp TP4-bf16kv-mtp draft-n-max=2 17:40:17 ===
+draft-n-max=2: pp 86.4 | decode 11.02 | gen 88
+draft acceptance = 0.67568 (   50 accepted /    74 generated), mean len =  2.35
+=== llama.cpp TP4-bf16kv-mtp draft-n-max=3 17:40:59 ===
+draft-n-max=3: pp 86.4 | decode 11.5 | gen 88
+draft acceptance = 0.63333 (   57 accepted /    90 generated), mean len =  2.90
+NINFER RESTORED OK
+DONE3
+=== llama.cpp TP2-q4_0-nospec-CLEAN @2k 17:50:13 ===
+TP2-q4_0-nospec-CLEAN: pp 103.2 | decode 8.95 | gen 31
+=== llama.cpp TP4-bf16kv-nospec-CLEAN @2k 17:50:48 ===
+TP4-bf16kv-nospec-CLEAN: pp 90.4 | decode 8.87 | gen 26
+NINFER RESTORED OK
+DONE4

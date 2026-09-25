@@ -1,0 +1,23 @@
+diff --git a/src/runtime/tp2/host_kv_parked.cpp b/src/runtime/tp2/host_kv_parked.cpp
+index 0a08e82b..8fd28181 100644
+--- a/src/runtime/tp2/host_kv_parked.cpp
++++ b/src/runtime/tp2/host_kv_parked.cpp
+@@ -423,6 +423,18 @@ std::size_t capture_slot_image(TpRankState& st, HostKVArena& arena, cudaStream_t
+     } alloc_guard{arena, &out.allocation};
+     try {
+         for (const auto& f : fixed) {
++            if (f.kind == HostKVParkedSlotImage::LinearConv) {
++                // T2 FIX (docs/156 §18.11): mask the parked conv state to zeros
++                // — normal decode consumes a constant (all-zero) conv slot at
++                // this flow point, so restoring the live (nonzero) prefill-end
++                // conv state perturbs logits from the first restored token.
++                check_cuda(cudaMemsetAsync(arena.byte_view(out.allocation, out.components[ci].offset),
++                                           0, f.t.bytes(), stream),
++                           "capture conv mask");
++                done += f.t.bytes();
++                ++ci;
++                continue;
++            }
+             d2h(out.components[ci].offset, f.t.data, f.t.bytes());
+             ++ci;
+         }
