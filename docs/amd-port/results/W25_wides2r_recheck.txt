@@ -1,0 +1,36 @@
+bench_mmvq_real: iq4_xs K=5120 N=17408 T=4 niter=30 reps=6 arms=base,share,s2r,ws2r,base
+base           us: 633.7 639.5 644.8 639.4 633.4 633.4 | med 639.4 spread 1.77% SPREAD-FAIL
+share          ORACLE BITEXACT
+share          us: 579.2 600.1 560.0 559.8 553.9 554.9 | med 560.0 spread 8.24% SPREAD-FAIL
+s2r            ORACLE BITEXACT
+s2r            us: 594.6 559.6 559.8 579.0 598.8 551.8 | med 579.0 spread 8.12% SPREAD-FAIL
+ws2r           ORACLE BITEXACT
+ws2r           us: 554.0 605.7 581.1 540.9 601.5 553.8 | med 581.1 spread 11.14% SPREAD-FAIL
+base           ORACLE BITEXACT
+base           us: 633.7 639.4 639.9 634.7 639.1 639.1 | med 639.1 spread 0.96%
+oracle: ALL BITEXACT
+step-exit:0
+bench_mmvq_real: iq3_s K=5120 N=17408 T=4 niter=30 reps=6 arms=base,share,s2r,ws2r,base
+base           us: 1923.2 1918.4 1921.8 1917.2 1923.7 1932.5 | med 1923.2 spread 0.80%
+share          ORACLE BITEXACT
+share          us: 777.6 750.8 761.3 765.2 782.8 750.8 | med 765.2 spread 4.18% SPREAD-FAIL
+s2r            ORACLE BITEXACT
+s2r            us: 767.0 766.2 751.3 798.8 797.8 766.5 | med 767.0 spread 6.19% SPREAD-FAIL
+ws2r           ORACLE BITEXACT
+ws2r           us: 802.0 768.7 801.5 796.0 781.4 768.2 | med 796.0 spread 4.25% SPREAD-FAIL
+base           ORACLE BITEXACT
+base           us: 1923.0 1918.6 1922.3 1919.7 1922.6 1921.6 | med 1922.3 spread 0.23%
+oracle: ALL BITEXACT
+step-exit:0
+bench_mmvq_real: iq3_xxs K=5120 N=17408 T=4 niter=30 reps=6 arms=base,share,s2r,ws2r,base
+base           us: 1995.1 1995.1 2000.6 2000.7 2002.3 1995.7 | med 2000.6 spread 0.36%
+share          ORACLE BITEXACT
+share          us: 728.7 728.2 723.4 743.2 743.3 728.2 | med 728.7 spread 2.73% SPREAD-FAIL
+s2r            ORACLE BITEXACT
+s2r            us: 724.1 725.0 720.5 740.8 740.2 726.7 | med 726.7 spread 2.79% SPREAD-FAIL
+ws2r           ORACLE BITEXACT
+ws2r           us: 756.6 741.4 752.2 741.3 741.2 741.7 | med 741.7 spread 2.08% SPREAD-FAIL
+base           ORACLE BITEXACT
+base           us: 1993.7 2000.0 1999.8 1994.6 2006.7 1999.0 | med 1999.8 spread 0.65%
+oracle: ALL BITEXACT
+step-exit:0

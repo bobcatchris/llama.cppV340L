@@ -1,0 +1,217 @@
+========================================================================
+PART A — arena allocation tables (owner-rank filtered epochs)
+
+-- alloc_7a0927400000.log (OPEN base=0x7a0927400000 cap=1338059008 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0987600000.log (OPEN base=0x7a0987600000 cap=5226071552 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0abf000000.log (OPEN base=0x7a0abf000000 cap=1338059008 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0b13200000.log (OPEN base=0x7a0b13200000 cap=50331648 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0b16400000.log (OPEN base=0x7a0b16400000 cap=100663296 owns=1 pid=2141049) owner=R3
+   epochs: [(2, 5), (53, 1), (66, 2), (67, 1), (98, 1)]
+   alloc-seq T66 n=1235 vs T67 n=1235
+   anomalies (non-proportional / align): 0
+   REUSE events T=2 epoch#0: 904 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#1: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#2: 9948 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#3: 4712 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#4: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=53 epoch#0: 174 (first: alloc off=0x7fa00 bytes=522240 inside restored [0x7fa00,0x2dd000))
+   REUSE events T=66 epoch#0: 222 (first: alloc off=0x2c7a00 bytes=196608 inside restored [0x2c7a00,0x3d8600))
+   REUSE events T=66 epoch#1: 222 (first: alloc off=0x2c7a00 bytes=196608 inside restored [0x2c7a00,0x3d8600))
+   REUSE events T=67 epoch#0: 222 (first: alloc off=0x2d3000 bytes=199680 inside restored [0x2d2f30,0x3e4400))
+   REUSE events T=98 epoch#0: 222 (first: alloc off=0x42b800 bytes=294912 inside restored [0x42b800,0x54c400))
+
+-- alloc_7a0b1f200000.log (OPEN base=0x7a0b1f200000 cap=5226071552 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0c56c00000.log (OPEN base=0x7a0c56c00000 cap=1338059008 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0ca9e00000.log (OPEN base=0x7a0ca9e00000 cap=50331648 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0cad000000.log (OPEN base=0x7a0cad000000 cap=100663296 owns=1 pid=2141049) owner=R2
+   epochs: [(2, 5), (53, 1), (66, 2), (67, 1), (98, 1)]
+   alloc-seq T66 n=1235 vs T67 n=1235
+   anomalies (non-proportional / align): 0
+   REUSE events T=2 epoch#0: 904 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#1: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#2: 9948 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#3: 4712 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#4: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=53 epoch#0: 174 (first: alloc off=0x7fa00 bytes=522240 inside restored [0x7fa00,0x2dd000))
+   REUSE events T=66 epoch#0: 222 (first: alloc off=0x2c7a00 bytes=196608 inside restored [0x2c7a00,0x3d8600))
+   REUSE events T=66 epoch#1: 222 (first: alloc off=0x2c7a00 bytes=196608 inside restored [0x2c7a00,0x3d8600))
+   REUSE events T=67 epoch#0: 222 (first: alloc off=0x2d3000 bytes=199680 inside restored [0x2d2f30,0x3e4400))
+   REUSE events T=98 epoch#0: 222 (first: alloc off=0x42b800 bytes=294912 inside restored [0x42b800,0x54c400))
+
+-- alloc_7a0cb6e00000.log (OPEN base=0x7a0cb6e00000 cap=5226071552 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0dee800000.log (OPEN base=0x7a0dee800000 cap=1338059008 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0e3e800000.log (OPEN base=0x7a0e3e800000 cap=50331648 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0e43c00000.log (OPEN base=0x7a0e43c00000 cap=50331648 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0e46e00000.log (OPEN base=0x7a0e46e00000 cap=100663296 owns=1 pid=2141049) owner=R1
+   epochs: [(2, 5), (53, 1), (66, 2), (67, 1), (98, 1)]
+   alloc-seq T66 n=1235 vs T67 n=1235
+   anomalies (non-proportional / align): 0
+   REUSE events T=2 epoch#0: 904 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#1: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#2: 9948 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#3: 4712 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#4: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=53 epoch#0: 174 (first: alloc off=0x7fa00 bytes=522240 inside restored [0x7fa00,0x2dd000))
+   REUSE events T=66 epoch#0: 222 (first: alloc off=0x2c7a00 bytes=196608 inside restored [0x2c7a00,0x3d8600))
+   REUSE events T=66 epoch#1: 222 (first: alloc off=0x2c7a00 bytes=196608 inside restored [0x2c7a00,0x3d8600))
+   REUSE events T=67 epoch#0: 222 (first: alloc off=0x2d3000 bytes=199680 inside restored [0x2d2f30,0x3e4400))
+   REUSE events T=98 epoch#0: 222 (first: alloc off=0x42b800 bytes=294912 inside restored [0x42b800,0x54c400))
+
+-- alloc_7a0e51c00000.log (OPEN base=0x7a0e51c00000 cap=100663296 owns=1 pid=2141049) owner=R0
+   epochs: [(2, 5), (53, 1), (66, 2), (67, 1), (98, 1)]
+   alloc-seq T66 n=1235 vs T67 n=1235
+   anomalies (non-proportional / align): 0
+   REUSE events T=2 epoch#0: 904 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#1: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#2: 9948 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#3: 4712 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=2 epoch#4: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events T=53 epoch#0: 174 (first: alloc off=0x7fa00 bytes=522240 inside restored [0x7fa00,0x2dd000))
+   REUSE events T=66 epoch#0: 222 (first: alloc off=0x2c7a00 bytes=196608 inside restored [0x2c7a00,0x3d8600))
+   REUSE events T=66 epoch#1: 222 (first: alloc off=0x2c7a00 bytes=196608 inside restored [0x2c7a00,0x3d8600))
+   REUSE events T=67 epoch#0: 222 (first: alloc off=0x2d3000 bytes=199680 inside restored [0x2d2f30,0x3e4400))
+   REUSE events T=98 epoch#0: 222 (first: alloc off=0x42b800 bytes=294912 inside restored [0x42b800,0x54c400))
+
+-- alloc_7a0e57e00000.log (OPEN base=0x7a0e57e00000 cap=5226071552 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0fcb810000.log (OPEN base=0x7a0fcb810000 cap=256 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0fcbc10000.log (OPEN base=0x7a0fcbc10000 cap=256 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0fe0410000.log (OPEN base=0x7a0fe0410000 cap=256 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+-- alloc_7a0fe0810000.log (OPEN base=0x7a0fe0810000 cap=256 owns=1 pid=2141049)
+   no OWNER handshake match — not a work arena; skipped
+
+========================================================================
+PART B — per-op bisect (layer-0 gidx0 prefill dumps)
+   ranks seen: [0, 1, 2, 3]
+
+-- rank 0: content-aligned prefix K(66 vs 67) = 59 (blocks 64/65; E-5 expects ~59)
+   stage   blocks66/67   first_div(0..K)  verdict
+   X0      64/65     (alignment reference)
+   HN      64/65      div=None   clean within prefix
+   G0      64/65      div=None   clean within prefix
+   B0      64/65      div=None   clean within prefix
+   QK      64/65      div=None   clean within prefix
+   QV      64/65      div=None   clean within prefix
+   ZB      64/65      div=None   clean within prefix
+   QC      64/65      div=0   CONVICTS THIS ORGAN
+   KC      64/65      div=0   CONVICTS THIS ORGAN
+   VC      64/65      div=0   CONVICTS THIS ORGAN
+   GB      64/65      div=None   clean within prefix
+   BB      64/65      div=None   clean within prefix
+   O0      64/65      div=0   CONVICTS THIS ORGAN
+   ON      64/65      div=0   CONVICTS THIS ORGAN
+   PA      64/65      div=0   CONVICTS THIS ORGAN
+   XA      64/65      div=0   CONVICTS THIS ORGAN
+   XL      64/65      div=0   CONVICTS THIS ORGAN
+   cross-check X0: aligned prefix K(67 vs 96) = 60 (E-8 law: early rows bit-identical across T>=65 ⇒ large K)
+   cross-check XA: first_div(67 vs 96 within K) = 8
+   cross-check O0: first_div(67 vs 96 within K) = None
+   cross-check QK: first_div(67 vs 96 within K) = None
+
+-- rank 1: content-aligned prefix K(66 vs 67) = 59 (blocks 64/65; E-5 expects ~59)
+   stage   blocks66/67   first_div(0..K)  verdict
+   X0      64/65     (alignment reference)
+   HN      64/65      div=None   clean within prefix
+   G0      64/65      div=None   clean within prefix
+   B0      64/65      div=None   clean within prefix
+   QK      64/65      div=None   clean within prefix
+   QV      64/65      div=None   clean within prefix
+   ZB      64/65      div=None   clean within prefix
+   QC      64/65      div=0   CONVICTS THIS ORGAN
+   KC      64/65      div=0   CONVICTS THIS ORGAN
+   VC      64/65      div=0   CONVICTS THIS ORGAN
+   GB      64/65      div=None   clean within prefix
+   BB      64/65      div=None   clean within prefix
+   O0      64/65      div=0   CONVICTS THIS ORGAN
+   ON      64/65      div=0   CONVICTS THIS ORGAN
+   PA      64/65      div=0   CONVICTS THIS ORGAN
+   XA      64/65      div=0   CONVICTS THIS ORGAN
+   XL      64/65      div=0   CONVICTS THIS ORGAN
+   cross-check X0: aligned prefix K(67 vs 96) = 60 (E-8 law: early rows bit-identical across T>=65 ⇒ large K)
+   cross-check XA: first_div(67 vs 96 within K) = 8
+   cross-check O0: first_div(67 vs 96 within K) = None
+   cross-check QK: first_div(67 vs 96 within K) = None
+
+-- rank 2: content-aligned prefix K(66 vs 67) = 59 (blocks 64/65; E-5 expects ~59)
+   stage   blocks66/67   first_div(0..K)  verdict
+   X0      64/65     (alignment reference)
+   HN      64/65      div=None   clean within prefix
+   G0      64/65      div=None   clean within prefix
+   B0      64/65      div=None   clean within prefix
+   QK      64/65      div=None   clean within prefix
+   QV      64/65      div=None   clean within prefix
+   ZB      64/65      div=None   clean within prefix
+   QC      64/65      div=0   CONVICTS THIS ORGAN
+   KC      64/65      div=0   CONVICTS THIS ORGAN
+   VC      64/65      div=0   CONVICTS THIS ORGAN
+   GB      64/65      div=None   clean within prefix
+   BB      64/65      div=None   clean within prefix
+   O0      64/65      div=0   CONVICTS THIS ORGAN
+   ON      64/65      div=0   CONVICTS THIS ORGAN
+   PA      64/65      div=0   CONVICTS THIS ORGAN
+   XA      64/65      div=0   CONVICTS THIS ORGAN
+   XL      64/65      div=0   CONVICTS THIS ORGAN
+   cross-check X0: aligned prefix K(67 vs 96) = 60 (E-8 law: early rows bit-identical across T>=65 ⇒ large K)
+   cross-check XA: first_div(67 vs 96 within K) = 8
+   cross-check O0: first_div(67 vs 96 within K) = None
+   cross-check QK: first_div(67 vs 96 within K) = None
+
+-- rank 3: content-aligned prefix K(66 vs 67) = 59 (blocks 64/65; E-5 expects ~59)
+   stage   blocks66/67   first_div(0..K)  verdict
+   X0      64/65     (alignment reference)
+   HN      64/65      div=None   clean within prefix
+   G0      64/65      div=None   clean within prefix
+   B0      64/65      div=None   clean within prefix
+   QK      64/65      div=None   clean within prefix
+   QV      64/65      div=None   clean within prefix
+   ZB      64/65      div=None   clean within prefix
+   QC      64/65      div=0   CONVICTS THIS ORGAN
+   KC      64/65      div=0   CONVICTS THIS ORGAN
+   VC      64/65      div=0   CONVICTS THIS ORGAN
+   GB      64/65      div=None   clean within prefix
+   BB      64/65      div=None   clean within prefix
+   O0      64/65      div=0   CONVICTS THIS ORGAN
+   ON      64/65      div=0   CONVICTS THIS ORGAN
+   PA      64/65      div=0   CONVICTS THIS ORGAN
+   XA      64/65      div=0   CONVICTS THIS ORGAN
+   XL      64/65      div=0   CONVICTS THIS ORGAN
+   cross-check X0: aligned prefix K(67 vs 96) = 60 (E-8 law: early rows bit-identical across T>=65 ⇒ large K)
+   cross-check XA: first_div(67 vs 96 within K) = 8
+   cross-check O0: first_div(67 vs 96 within K) = None
+   cross-check QK: first_div(67 vs 96 within K) = None
+
+========================================================================
+LEG VERDICTS (from resp_*.json)
+   resp_k36_t96.json: prompt=98 gen=19 content[:32]=''
+   resp_k4_glass.json: prompt=66 gen=43 content[:32]='BLUE'
+   resp_k4_t64.json: prompt=66 gen=43 content[:32]='BLUE'
+   resp_k5_t65.json: prompt=67 gen=41 content[:32]=''

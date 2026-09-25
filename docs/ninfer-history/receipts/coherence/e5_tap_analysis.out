@@ -1,0 +1,134 @@
+layers: T64=64 T65=64 -> comparing 64
+
+=== LAST-ROW NORM TRAJECTORY (T64 row63 vs T65 row64) + NaN ===
+layer    |x63|@T64    |x64|@T65  nan64     max|x64|
+    0       12.371      174.705      0     118.0000
+    1       14.859      193.305      0     119.0000
+    2       15.243      199.930      0      96.0000
+    3       15.806      210.433      0     106.5000
+    4       16.206      215.076      0     111.0000
+    5       21.818      245.035      0     128.0000
+    6       22.914      273.065      0     114.0000
+    7       23.176      290.431      0     115.0000
+    8       23.851      338.887      0     163.0000
+    9       27.089      363.462      0     167.0000
+   10       28.351      380.604      0     166.0000
+   11       28.887      391.214      0     159.0000
+   12       32.125      415.533      0     163.0000
+   13       35.935      435.741      0     148.0000
+   14       37.257      485.449      0     139.0000
+   15       37.366      521.074      0     135.0000
+   16       39.277      568.806      0     146.0000
+   17       40.308      603.537      0     163.0000
+   18       42.332      626.674      0     138.0000
+   19       40.420      633.018      0     121.0000
+   20       39.529      650.130      0     101.0000
+   21       49.321      666.745      0     105.0000
+   22       53.051      701.655      0      91.0000
+   23       51.075      722.727      0      89.5000
+   24       48.789      759.347      0     101.0000
+   25       51.079      779.440      0      86.0000
+   26       53.706      805.526      0      79.0000
+   27       54.428      815.873      0      80.0000
+   28       53.078      833.518      0      83.0000
+   29       52.266      847.747      0      88.0000
+   30       56.209      867.061      0      77.5000
+   31       58.531      869.772      0      75.0000
+   32       56.438      880.474      0      72.0000
+   33       58.444      886.503      0      69.5000
+   34       63.166      898.404      0      69.5000
+   35       73.223      903.876      0      70.0000
+   36       67.080      910.603      0      71.5000
+   37       68.798      913.944      0      69.5000
+   38       73.880      919.784      0      70.5000
+   39       76.566      921.599      0      71.0000
+   40       73.659      931.951      0      71.0000
+   41       70.690      935.624      0      70.5000
+   42       78.764      937.000      0      71.5000
+   43       80.472      936.688      0      70.0000
+   44       82.173      944.280      0      71.5000
+   45       85.328      951.458      0      74.5000
+   46       91.874      960.732      0      77.5000
+   47       93.813      960.745      0      75.5000
+   48       97.386      966.472      0      75.0000
+   49      102.921      970.564      0      77.5000
+   50      103.182      976.274      0      79.5000
+   51      123.479      985.499      0      81.5000
+   52      136.991      999.267      0      83.5000
+   53      138.781     1012.055      0      85.5000
+   54      179.756     1023.899      0      85.5000
+   55      174.778     1029.810      0      83.5000
+   56      178.406     1037.768      0      86.0000
+   57      186.538     1047.067      0      86.5000
+   58      192.328     1058.787      0      88.0000
+   59      239.885     1069.303      0      91.0000
+   60      265.300     1070.283      0      79.5000
+   61      296.299     1074.730      0      79.0000
+   62      295.418     1080.369      0      81.0000
+   63      362.482     1068.209      0      75.5000
+
+=== PREFIX DIFF (identical tokens, rows 0..62): first LARGE divergence ===
+layer  0: worst-row  2 mism  5120/5120 maxd 81.2500  <-- LARGE
+layer  1: worst-row  0 mism  5120/5120 maxd 17.5000  <-- LARGE
+layer  2: worst-row  0 mism  5120/5120 maxd 17.0000  <-- LARGE
+layer  3: worst-row  0 mism  5120/5120 maxd 17.2266  <-- LARGE
+layer  4: worst-row  0 mism  5120/5120 maxd 17.2344  <-- LARGE
+layer  5: worst-row  0 mism  5120/5120 maxd 18.1406  <-- LARGE
+layer  6: worst-row  4 mism  5120/5120 maxd 20.7393  <-- LARGE
+layer  7: worst-row  6 mism  5120/5120 maxd 19.6777  <-- LARGE
+layer  8: worst-row  3 mism  5120/5120 maxd 125.2500  <-- LARGE
+layer  9: worst-row  0 mism  5120/5120 maxd 21.8125  <-- LARGE
+layer 10: worst-row  0 mism  5120/5120 maxd 43.6562  <-- LARGE
+layer 11: worst-row  0 mism  5120/5120 maxd 43.7812  <-- LARGE
+layer 12: worst-row  2 mism  5120/5120 maxd 33.8945  <-- LARGE
+layer 13: worst-row  1 mism  5120/5120 maxd 29.0312  <-- LARGE
+layer 14: worst-row  3 mism  5120/5120 maxd 145.0000  <-- LARGE
+layer 15: worst-row  0 mism  5120/5120 maxd 49.0000  <-- LARGE
+layer 16: worst-row  1 mism  5120/5120 maxd 33.8906  <-- LARGE
+layer 17: worst-row  3 mism  5120/5120 maxd 166.5000  <-- LARGE
+layer 18: worst-row  2 mism  5120/5120 maxd 62.8438  <-- LARGE
+layer 19: worst-row  2 mism  5120/5120 maxd 64.9375  <-- LARGE
+layer 20: worst-row  0 mism  5120/5120 maxd 100.0938  <-- LARGE
+layer 21: worst-row  2 mism  5120/5120 maxd 71.2812  <-- LARGE
+layer 22: worst-row  0 mism  5120/5120 maxd 205.7500  <-- LARGE
+layer 23: worst-row  2 mism  5120/5120 maxd 77.1953  <-- LARGE
+layer 24: worst-row  2 mism  5120/5120 maxd 83.0820  <-- LARGE
+layer 25: worst-row  0 mism  5120/5120 maxd 222.7500  <-- LARGE
+layer 26: worst-row  2 mism  5120/5120 maxd 91.7500  <-- LARGE
+layer 27: worst-row  0 mism  5120/5120 maxd 228.2500  <-- LARGE
+layer 28: worst-row  2 mism  5120/5120 maxd 100.2734  <-- LARGE
+layer 29: worst-row  2 mism  5120/5120 maxd 98.5391  <-- LARGE
+layer 30: worst-row  0 mism  5120/5120 maxd 221.3750  <-- LARGE
+layer 31: worst-row  0 mism  5120/5120 maxd 223.1875  <-- LARGE
+layer 32: worst-row  0 mism  5120/5120 maxd 225.0000  <-- LARGE
+layer 33: worst-row  0 mism  5120/5120 maxd 222.6875  <-- LARGE
+layer 34: worst-row  0 mism  5120/5120 maxd 218.2500  <-- LARGE
+layer 35: worst-row  2 mism  5120/5120 maxd 115.8906  <-- LARGE
+layer 36: worst-row  0 mism  5120/5120 maxd 218.5000  <-- LARGE
+layer 37: worst-row  0 mism  5120/5120 maxd 216.3750  <-- LARGE
+layer 38: worst-row  0 mism  5120/5120 maxd 215.7500  <-- LARGE
+layer 39: worst-row  0 mism  5120/5120 maxd 211.5000  <-- LARGE
+layer 40: worst-row  0 mism  5120/5120 maxd 207.7500  <-- LARGE
+layer 41: worst-row  0 mism  5120/5120 maxd 207.5000  <-- LARGE
+layer 42: worst-row  0 mism  5120/5120 maxd 201.6250  <-- LARGE
+layer 43: worst-row  2 mism  5120/5120 maxd 118.6367  <-- LARGE
+layer 44: worst-row  0 mism  5120/5120 maxd 194.8750  <-- LARGE
+layer 45: worst-row  0 mism  5120/5120 maxd 192.1250  <-- LARGE
+layer 46: worst-row  0 mism  5120/5120 maxd 181.5000  <-- LARGE
+layer 47: worst-row  0 mism  5120/5120 maxd 161.0000  <-- LARGE
+layer 48: worst-row  0 mism  5120/5120 maxd 130.1250  <-- LARGE
+layer 49: worst-row  1 mism  5120/5120 maxd 54.7500  <-- LARGE
+layer 50: worst-row  8 mism  5120/5120 maxd 91.0000  <-- LARGE
+layer 51: worst-row  3 mism  5120/5120 maxd 58.6250  <-- LARGE
+layer 52: worst-row  0 mism  5120/5120 maxd 69.1250  <-- LARGE
+layer 53: worst-row  5 mism  5120/5120 maxd 43.0312  <-- LARGE
+layer 54: worst-row 10 mism  5120/5120 maxd 159.1250  <-- LARGE
+layer 55: worst-row  0 mism  5120/5120 maxd 57.8125  <-- LARGE
+layer 56: worst-row  0 mism  5120/5120 maxd 58.1875  <-- LARGE
+layer 57: worst-row  2 mism  5120/5120 maxd 447.2500  <-- LARGE
+layer 58: worst-row  9 mism  5120/5120 maxd 49.9688  <-- LARGE
+layer 59: worst-row  0 mism  5120/5120 maxd 70.2500  <-- LARGE
+layer 60: worst-row  3 mism  5120/5120 maxd 47.6250  <-- LARGE
+layer 61: worst-row 11 mism  5120/5120 maxd 82.5000  <-- LARGE
+layer 62: worst-row  3 mism  5120/5120 maxd 46.8906  <-- LARGE
+layer 63: worst-row 18 mism  5120/5120 maxd 95.7500  <-- LARGE

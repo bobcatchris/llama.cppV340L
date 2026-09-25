@@ -1,0 +1,100 @@
++ /tmp/bench_mmvq_real_w25 /media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf iq4_xs 4 base,share,s2r,ws2r,base 30 4
+bench_mmvq_real: iq4_xs K=5120 N=17408 T=4 niter=30 reps=4 arms=base,share,s2r,ws2r,base
+base           us: 705.5 707.1 686.5 686.6 | med 705.5 spread 2.91% SPREAD-FAIL
+share          ORACLE BITEXACT
+share          us: 629.7 634.5 634.4 634.6 | med 634.5 spread 0.77%
+s2r            ORACLE BITEXACT
+s2r            us: 635.3 633.5 646.2 634.2 | med 635.3 spread 2.01% SPREAD-FAIL
+ws2r           ORACLE BITEXACT
+ws2r           us: 636.4 658.7 636.2 636.4 | med 636.4 spread 3.54% SPREAD-FAIL
+base           ORACLE BITEXACT
+base           us: 706.3 686.5 673.5 710.8 | med 706.3 spread 5.28% SPREAD-FAIL
+oracle: ALL BITEXACT
+step-exit:0
++ /tmp/bench_mmvq_real_w25 /media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf q4_K 4 base,share,s2r,ws2r,base 30 4
+bench_mmvq_real: q4_K K=5120 N=17408 T=4 niter=30 reps=4 arms=base,share,s2r,ws2r,base
+base           us: 1199.9 1200.5 1197.1 1195.6 | med 1199.9 spread 0.41%
+share          ORACLE BITEXACT
+share          us: 962.6 963.7 962.7 963.5 | med 963.5 spread 0.11%
+s2r            ORACLE BITEXACT
+s2r            us: 960.7 961.7 960.1 961.5 | med 961.5 spread 0.16%
+ws2r           ORACLE BITEXACT
+ws2r           us: 957.6 956.5 954.2 952.9 | med 956.5 spread 0.49%
+base           ORACLE BITEXACT
+base           us: 1207.0 1187.4 1193.3 1194.4 | med 1194.4 spread 1.64% SPREAD-FAIL
+oracle: ALL BITEXACT
+step-exit:0
++ /tmp/bench_mmvq_real_w25 /media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf iq3_s 4 base,share,s2r,ws2r,base 30 4
+bench_mmvq_real: iq3_s K=5120 N=17408 T=4 niter=30 reps=4 arms=base,share,s2r,ws2r,base
+base           us: 1975.5 1992.2 1991.4 1977.6 | med 1991.4 spread 0.84%
+share          ORACLE BITEXACT
+share          us: 839.0 839.1 856.0 839.7 | med 839.7 spread 2.03% SPREAD-FAIL
+s2r            ORACLE BITEXACT
+s2r            us: 838.7 853.2 838.6 840.1 | med 840.1 spread 1.74% SPREAD-FAIL
+ws2r           ORACLE BITEXACT
+ws2r           us: 857.5 824.7 824.6 841.8 | med 841.8 spread 3.91% SPREAD-FAIL
+base           ORACLE BITEXACT
+base           us: 1978.6 1989.7 1986.5 1982.9 | med 1986.5 spread 0.56%
+oracle: ALL BITEXACT
+step-exit:0
++ /tmp/bench_mmvq_real_w25 /media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf iq3_xxs 4 base,share,s2r,ws2r,base 30 4
+bench_mmvq_real: iq3_xxs K=5120 N=17408 T=4 niter=30 reps=4 arms=base,share,s2r,ws2r,base
+base           us: 2103.4 2101.2 2090.8 2115.4 | med 2103.4 spread 1.17% SPREAD-FAIL
+share          ORACLE BITEXACT
+share          us: 837.8 838.0 837.4 838.7 | med 838.0 spread 0.15%
+s2r            ORACLE BITEXACT
+s2r            us: 803.0 837.1 839.0 836.1 | med 837.1 spread 4.30% SPREAD-FAIL
+ws2r           ORACLE BITEXACT
+ws2r           us: 837.4 836.9 837.9 804.1 | med 837.4 spread 4.04% SPREAD-FAIL
+base           ORACLE BITEXACT
+base           us: 2103.8 2098.7 2115.0 2111.3 | med 2111.3 spread 0.77%
+oracle: ALL BITEXACT
+step-exit:0
++ /tmp/bench_mmvq_real_w25 /media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf q5_K 4 base,share,s2r,ws2r,base 30 4
+bench_mmvq_real: q5_K K=5120 N=12288 T=4 niter=30 reps=4 arms=base,share,s2r,ws2r,base
+base           us: 895.7 899.5 894.9 895.3 | med 895.7 spread 0.52%
+share          ORACLE BITEXACT
+share          us: 701.8 708.7 708.1 712.9 | med 708.7 spread 1.56% SPREAD-FAIL
+s2r            ORACLE BITEXACT
+s2r            us: 707.3 701.9 700.5 701.9 | med 701.9 spread 0.97%
+ws2r           ORACLE BITEXACT
+ws2r           us: 709.4 705.7 704.2 703.6 | med 705.7 spread 0.82%
+base           ORACLE BITEXACT
+base           us: 894.7 895.2 899.7 897.4 | med 897.4 spread 0.56%
+oracle: ALL BITEXACT
+step-exit:0
++ /tmp/bench_mmvq_real_w25 /media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf iq4_xs 4 base,s2r,ws2r 1 1 --occupancy
+bench_mmvq_real: iq4_xs K=5120 N=17408 T=4 niter=1 reps=1 arms=base,s2r,ws2r
+OCC iq4_xs/base/T4: numRegs=84 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq4_xs/s2r/T4: numRegs=84 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq4_xs/ws2r/T4: numRegs=84 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+occupancy dump done
+step-exit:0
++ /tmp/bench_mmvq_real_w25 /media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf q4_K 4 base,s2r,ws2r 1 1 --occupancy
+bench_mmvq_real: q4_K K=5120 N=17408 T=4 niter=1 reps=1 arms=base,s2r,ws2r
+OCC q4_K/base/T4: numRegs=112 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q4_K/s2r/T4: numRegs=112 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q4_K/ws2r/T4: numRegs=112 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+occupancy dump done
+step-exit:0
++ /tmp/bench_mmvq_real_w25 /media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf iq3_s 4 base,s2r,ws2r 1 1 --occupancy
+bench_mmvq_real: iq3_s K=5120 N=17408 T=4 niter=1 reps=1 arms=base,s2r,ws2r
+OCC iq3_s/base/T4: numRegs=77 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq3_s/s2r/T4: numRegs=80 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq3_s/ws2r/T4: numRegs=79 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+occupancy dump done
+step-exit:0
++ /tmp/bench_mmvq_real_w25 /media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf iq3_xxs 4 base,s2r,ws2r 1 1 --occupancy
+bench_mmvq_real: iq3_xxs K=5120 N=17408 T=4 niter=1 reps=1 arms=base,s2r,ws2r
+OCC iq3_xxs/base/T4: numRegs=65 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq3_xxs/s2r/T4: numRegs=65 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq3_xxs/ws2r/T4: numRegs=68 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+occupancy dump done
+step-exit:0
++ /tmp/bench_mmvq_real_w25 /media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf q5_K 4 base,s2r,ws2r 1 1 --occupancy
+bench_mmvq_real: q5_K K=5120 N=12288 T=4 niter=1 reps=1 arms=base,s2r,ws2r
+OCC q5_K/base/T4: numRegs=113 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q5_K/s2r/T4: numRegs=113 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q5_K/ws2r/T4: numRegs=113 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+occupancy dump done
+step-exit:0
