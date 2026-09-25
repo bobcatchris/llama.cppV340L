@@ -1,0 +1,70 @@
+diff --git a/src/runtime/tp2/tp2_backend.cpp b/src/runtime/tp2/tp2_backend.cpp
+index c7891bf18..e10f849e7 100644
+--- a/src/runtime/tp2/tp2_backend.cpp
++++ b/src/runtime/tp2/tp2_backend.cpp
+@@ -3119,7 +3119,15 @@ TpRunStats run_tp2_request(TpBackend& backend,
+                     if (getenv("NINFER_D22_PDBG") && rank == 0 &&
+                         round < (getenv("NINFER_D22_PDBG_ROUNDS")
+                                      ? atoi(getenv("NINFER_D22_PDBG_ROUNDS")) : 8)) {
+-                        const int nv    = 2 * (int)st.verify_logits.ne[0];  // full-vocab domain
++                        // F1b d1-class fix (2026-09-19): full-vocab domain must come from the
++                        // full tensor (world * n_vocab), not the pair-era `2 *` local-shard
++                        // literal — at world=4 the old value read HALF of column 0 as column 1
++                        // (wrong stride) and computed p over half the vocab (wrong domain).
++                        const int nv    = (int)st.verify_logits_full.ne[0];
++                        // LOCAL-shard size for the DRAFT_OUTSIDE_LOCAL flag (rank 0 owns the
++                        // lowest shard under ColumnN sharding) — world-general, unlike the old
++                        // `2 * nv_l` upper-half test.
++                        const int nv_l  = (int)st.verify_logits.ne[0];
+                         const int cols2 = k + 1;
+                         std::vector<std::uint16_t> vlg((size_t)nv * cols2);
+                         CUDA_CHECK(cudaMemcpy(vlg.data(), st.verify_logits_full.data,
+@@ -3145,19 +3153,25 @@ TpRunStats run_tp2_request(TpBackend& backend,
+                                 if (x > m) { m = x; am = v; }
+                             }
+                             double sum = 0.0;
++                            const int d       = (j < k) ? dv2[j] : -1;
++                            const bool d_in   = (d >= 0 && d < nv);
++                            const float d_val = d_in ? bf(vlg[(size_t)j * nv + d]) : 0.0f;
++                            int d_rank        = -1;  // 1-based rank of draft under FULL logits
+                             for (int v = 0; v < nv; ++v) {
+-                                sum += exp((double)bf(vlg[(size_t)j * nv + v]) - m);
++                                const float x = bf(vlg[(size_t)j * nv + v]);
++                                sum += exp((double)x - m);
++                                if (d_in && v != d && x > d_val) { ++d_rank; }
+                             }
+                             const double p_am = 1.0 / sum;
+-                            const int d       = (j < k) ? dv2[j] : -1;
+                             double p_d        = 0.0;
+-                            if (d >= 0 && d < nv) {
+-                                p_d = exp((double)bf(vlg[(size_t)j * nv + d]) - m) / sum;
++                            if (d_in) {
++                                p_d = exp((double)d_val - m) / sum;
++                                ++d_rank;  // strictly-above count -> 1-based rank
+                             }
+                             std::printf("[PDBG] r%d col%d local_am=%d p_am=%.4f global_am=%d "
+-                                        "draft=%d p_draft=%.4f%s\n",
++                                        "draft=%d p_draft=%.4f%s rank=%d\n",
+                                         round, j, am, p_am, gt2[j], d, p_d,
+-                                        (d >= 0 && d >= nv) ? " DRAFT_OUTSIDE_LOCAL" : "");
++                                        (d >= 0 && d >= nv_l) ? " DRAFT_OUTSIDE_LOCAL" : "", d_rank);
+                         }
+                     }
+                     if (tail_trace.on) { tail_trace.op_begin(s, ninfer::tp2::VerifyTailTrace::AR_ARGMAX); }
+@@ -3179,7 +3193,15 @@ TpRunStats run_tp2_request(TpBackend& backend,
+                     ninfer::ops::speculative_accept_greedy_drafts(
+                         target_tokens_r, verify_logits_full_r, drafts2, st.extents, st.lengths,
+                         st.anchor, licensed_r, st.licensed_counts, st.accepted,
+-                        2 * (std::int32_t)st.verify_logits.ne[0], st.sample_cfg, st.work, s);
++                        // F1b d1 fix (2026-09-19): token_domain must be the FULL vocab domain of
++                        // verify_logits_full (= world * n_vocab; 248320 at world=4). The pair-era
++                        // literal `2 * verify_logits.ne[0]` is correct only at world=2 — at
++                        // world=4 the sampling branch scanned HALF the vocab: drafts with global
++                        // id >= 124160 got p_draft=0 (spurious reject) and correction/bonus draws
++                        // excluded the upper half. Matches the batched sites (:4470/:6954
++                        // `world() * nv_l`) and the wrapper's [1, logits.ne[0]] contract; greedy
++                        // branch is unaffected (returns before reading logits).
++                        (std::int32_t)st.verify_logits_full.ne[0], st.sample_cfg, st.work, s);
+                     if (tail_trace.on) { tail_trace.op_end(s, ninfer::tp2::VerifyTailTrace::ACCEPT_K); }
+ 
+                     const double tail_d2h0 = tail_trace.on ? tail_trace.host_now() : 0.0;

@@ -1,0 +1,156 @@
+== W7 F1b EXECUTION ROW — d1 domain fix + E-1/E-2 acceptance anatomy ==
+desk: F1b execution (Team Red, V340L, NVFP4@TP4) | date: 2026-09-19 | branch: amd/wo-w7-body
+work order: docs/amd/WO_F1B_DRAFTER_design.md | commits: 71c3706b9 (prep) 70a91d898 (pause)
+e9d6565a2 (d1 fix + tap v2) + this row's commit
+window: F1b-held after WO_ONESHOT_ROOTLOOK close (PLOG-070); one-shot route UNSET in every
+leg (canonical ring posture); all boots I_HOLD_THE_WINDOW-guarded; canonical restored at close.
+
+== TASK A — d1 DOMAIN FIX (closure-law package) ==
+BUG (WO map finding d1): src/runtime/tp2/tp2_backend.cpp single-seq MTP accept (:3182
+pre-fix) passed the pair-era literal `2 * st.verify_logits.ne[0]` (=124160 at world=4) as
+token_domain while the batched sites (:4470/:6954) pass the world-general `world() * nv_l`
+(=248320). At world=4 the SAMPLING branch (temp>0) saw HALF the vocab: drafts with global
+id >= 124160 got p_draft=0 (spurious reject) and correction/bonus draws excluded the upper
+half. Greedy branch unaffected (kernel returns before reading logits) — all banked greedy
+probes clean. FIX: one line — `(std::int32_t)st.verify_logits_full.ne[0]` (the full domain
+of the exact tensor passed; wrapper contract [1, logits.ne[0]]; matches the batched sites).
+CLASS SWEEP (closure law): live pair-era `2 *` full-vocab-domain literals in the file were
+exactly the accept site (:3182) + the NINFER_D22_PDBG tap (:3122) — both fixed. The other
+`2 *` hits are slot arithmetic or intentional GATE-3 capacity comments. Workspace safety:
+accept workspace is pre-sized with the FULL 248320 domain at :1278 — the fix adds no
+allocation and no refusal path (VRAM-law clean).
+SAME-CLASS INSTRUMENT FIXES (needed for E-1 at world=4):
+  (1) PDBG tap full-vocab domain (:3122) had the same `2 * nv_l` literal — at world=4 it
+      read HALF of column 0 as column 1 (wrong stride) and softmaxed half the vocab.
+  (2) Tap MOVED from pre-accept to after the accept D2H hard sync: at the old position its
+      logits/target reads raced the async LGATHER — MEASURED: it paired CURRENT drafts with
+      ONE-ROUND-STALE logits (counting showed 47% draft==argmax while the engine accepted
+      96%; shifting the pairing one round was ~exact). Post-sync placement + acc/lic outcome
+      fields make the tap exact (see E-1 below).
+CLOSEURE (RED/GREEN, closure law):
+  - Guard cell (zero-GPU, joins the farm step-0/PG-1 class):
+    tools/guards/check_accept_domain_pair_literal.py (P1 + PIN-1 + PIN-2, --selftest).
+    RED: rc=1 on the pre-fix tree @ commit 99bfac4ad58624e1 (findings P1:3122 P1:3182
+    PIN-1:3180 PIN-2:3122). GREEN: rc=0 on the post-fix tree @ e9d6565a2; --selftest PASS
+    (post-fix GREEN + two synthetic pre-fix mutations both RED).
+  - Device mechanism cell (joins the boot battery; tests/CMakeLists.txt target
+    ninfer_accept_domain_w4_cell; standalone-built at build-hip-amd/tests/ — this build
+    tree has BUILD_TESTING=OFF, cell-addition-only entry landed for tests-enabled trees):
+    tests/ops/test_accept_domain_w4_cell.cu at world=4 served geometry (physical_rows=248320,
+    k=2, multiblock sampling route). CELL PASS 6/6 (receipt:
+    results/amd/w7_f1b/d1_cell_GREEN_fdd9b68e.out): full domain ACCEPTS an upper-half draft
+    where the half domain SPURIOUSLY REJECTS it; correction reaches an upper-half argmax
+    only at full domain; greedy accepts under BOTH domains (byte-exact greedy property).
+    Honest scope: the cell pins kernel/launcher semantics; the call-site (artifact) witness
+    is the guard cell — the two close the class together.
+  - e2e witness (control bin = pre-fix, deterministic greedy): tap provenance
+    PRE-FIX-BROKEN-TAP (0/216 lines carry the post-fix `rank=` field), 63.4% of columns
+    local_am != global_am (world=4 corruption) — results/amd/w7_f1b/control_prefix_witness_pdbg.log.
+  THREE SHAS: pre-fix artifact = control bin ninfer-serve_9bc7d7e1f764e7cb.bin (built
+  13:11 from the shared tree, pre-d1; provenance note: tree carried the KV desk's
+  uncommitted edits, present EQUALLY in control and fix — the pair's only delta is the d1
+  patch, proven by mtime ordering: last non-d1 src edit 13:10:19 < control link 13:11 <
+  fix link). post-fix artifacts = ninfer-serve_fdd9b68e0cf14421.bin (d1 fix) and
+  ninfer-serve_4fb2d1ee4ec73890.bin (d1 fix + tap v2), both BANKED under
+  /home/chris/artifacts_bin/ per BANK-BEFORE-RELINK. Guard source shas above.
+REAL-WORLD EFFECT AT TP4 (measured, v2 tap over 12 greedy legs + sanity, 7218 evaluated
+slots): the 40960-id draft slice has only 5.0% of its ids in the upper half (2052/40960,
+range 0..248076); 0/5784 accepted draft slots proposed an id >= 124160; divergence-column
+argmaxes >= 124160: 0.57% (9/1566); bonus-column argmaxes >= 124160: 0.29% (12/4130).
+=> the truncation term of the bug (correction/bonus draws + upper-half drafts) is REAL but
+RARE on the served registers; d1 is a correctness close (distribution-correctness law), no
+tok/round claim needed or made.
+TEMP>0 EXPOSURE NOTE (honest): one WEDGE observed on the pre-fix bin's first-ever
+temp=0.5 request (fresh boot, mt=600: server entered decode then stopped answering;
+process alive, health dead; receipt results/amd/w7_f1b/d1_ab/before_serve.log from the
+first d1_ab attempt). NOT reproduced on retry (control served a mt=60 temp=0.5 probe clean
+2/2 afterward; fix bin served temp=0.5 clean 2/2). Logged as a 1-in-N transient on the
+sampling path — not claimed as a d1 delta (single observation, different mt/boot); the
+boot battery's sampling arm should watch for it.
+
+== TASK B — E-1/E-2 ACCEPTANCE ANATOMY (v2 exact-pairing tap, greedy, TP4 world=4) ==
+Instrument: NINFER_D22_PDBG=1 NINFER_D22_PDBG_ROUNDS=100000 + NINFER_VERIFY_DEPTH_LOG=1 +
+NINFER_VOCAB_COUNT_DIR on the canonical-arg serve line, bin 4fb2d1ee (d1 fix + tap v2).
+Legs: tools/v340l/w7_f1b_legs.sh — 4 registers x 3 probes, conc=1 sequential
+(counting mt=600 "Count from 1 to 500", prose mt=1200 sky-blue-family, reasoning mt=1200
+bat-and-ball, code mt=1200 fibonacci). PDBG perturbs round wall (host-side full-vocab pass)
+=> decode t/s from these legs is NOT comparable to clean legs (absolutes quarantined;
+structure only). NOTE (stdout buffering): PDBG lines are stdout-buffered and flush late, so
+per-probe byte brackets misattribute lines across probes — the anatomy is parsed from the
+WHOLE serve log with round-decrease request splitting (parser --whole-log), attributed to
+probes by flush order (= request order); validated: per-request slot acceptance matches the
+engine's per-request acceptance within ~1-2 pp (accounting definitions differ slightly).
+~5% of slot rows are lost to stdout/stderr mid-line interleaving (skipped, not misread).
+
+E-1 FLIP ANATOMY (per register; slots = evaluated draft positions; miss = divergence-column
+rejection; eps=0.05 pre-registered, sensitivity in the JSONs):
+
+register     slots   acc%   misses   OOS%   NEAR%   HEAD%
+counting     1219    95.65    53     0.00   9.43   90.57
+prose        2799    65.74   959    10.64   7.92   81.44
+reasoning     585    90.77    54     0.00  11.11   88.89
+code         2615    80.88   500     2.60   8.40   89.00
+ALL          7218    78.30  1566     7.34   8.24   84.42
+
+When the drafter misses, it is usually the target's RUNNER-UP token (head-miss draft rank
+under full logits: median 1-2, p90 3-18 by register) but at a LARGE probability gap
+(all-miss margin p_am - p_draft: median 0.24-0.35, p90 0.67-0.73). NEAR-MISS (margin <=
+0.05, the precision-flip-able band) is only 8-12% of misses; OOS (unproposable argmax,
+the F1a ceiling) is 0-11%.
+
+PRE-REGISTERED GATE READINGS:
+  GATE b (vocab top-up; OOS >= 30% of misses): DOES NOT FIRE on any register
+  (max 10.6% prose vs 30% bar). Confirms the WO's framing mechanically per-column:
+  the vocab slice is NOT the suppressor. Option b CLOSED at gate level (data-only
+  top-up would recover <= ~0.6% of prose slots even at perfect targeting).
+  GATE a1 (precision lever; NEAR-MISS >= 50% of misses): DOES NOT FIRE on any register
+  (max 11.1% reasoning vs 50% bar). Option a1 (draft-head slice W8->bf16) is DEAD AT
+  E-1 GATE LEVEL: its flip-able band is 8-12% of misses = ~5-9% of all slots at best,
+  far under its 50% pre-condition. E-3 (bf16 flip-rate measurement) is therefore MOOT
+  for a1's gate — not worth its window (cheap falsification before expensive
+  engineering); the E-3 spec remains banked in the WO should new evidence reopen a1.
+  CLASS-(iii) DOMINANT (84.4% of misses overall): the 1-layer MTP head's knowledge is
+  the acceptance ceiling — no in-tree precision or vocab lever moves it; remaining
+  cheap levers are d2 (ngram-mod, counting-like registers) and drafter-quality work
+  (out of F1b scope).
+
+E-2 PER-REGISTER ACCEPTANCE (engine per-request lines, greedy, bin 4fb2d1ee; PDBG-perturbed
+walls — structure only):
+  counting: acc 0.96 / 0.96 / 0.89, tok/round 2.91 / 2.91 / 2.78 (matches the banked
+            counting anchor 0.96/2.91 PLOG-066)
+  prose:    acc 0.55 / 0.53 / 0.53, tok/round 2.11 / 2.06 / 2.05 (prompt is a sky-blue
+            variant at mt=1200; the banked 0.65 anchor used mt=300 — not directly comparable)
+  reasoning: acc 0.87 / 0.87 / 0.87, tok/round 2.75 x3 (283 gen, finish=stop)
+  code:     acc 0.73 / 0.71 / 0.74, tok/round 2.46 / 2.41 / 2.47
+  Register spread CONFIRMS: counting 0.96 >> reasoning 0.87 > code 0.73 > prose 0.54.
+  First-miss histograms banked per probe (legs_v2/*_stats.txt); vocab coverage line:
+  [vocab] coverage=98.460% accepted_tokens=10002 (in-window flush).
+
+== BONUS d1 BEFORE/AFTER (temp=0.5, the only branch the bug touches) ==
+See the A/B block appended below (arm BEFORE = 9bc7d7e1 pre-fix, arm AFTER = 4fb2d1ee).
+
+== FILES BANKED ==
+docs/amd/W7_F1B_d1_fix.patch; tools/guards/check_accept_domain_pair_literal.py;
+tools/v340l/w7_f1b_pdbg_parse.py (v2); tools/v340l/w7_f1b_boot.sh;
+tools/v340l/w7_f1b_legs.sh; tools/v340l/w7_f1b_d1_ab.sh;
+tests/ops/test_accept_domain_w4_cell.cu (+ CMake entry);
+results/amd/w7_f1b/: d1_cell_GREEN_fdd9b68e.out, control_prefix_witness_pdbg.log,
+legs_v2/ (12 probes: per-probe PDBG + stats + JSONs), d1_ab/ (A/B probes + logs).
+Bins banked: ninfer-serve_9bc7d7e1f764e7cb (control, pre-fix),
+ninfer-serve_fdd9b68e0cf14421 (fix), ninfer-serve_4fb2d1ee4ec73890 (fix + tap v2).
+
+== BONUS d1 A/B RESULT (appended 2026-09-19 ~15:5x CDT) ==
+Paired temp=0.5 arms (fresh boot per arm, BEFORE=9bc7d7e1 pre-fix / AFTER=4fb2d1ee fix,
+start-edge-temps ~44-47C both arms, ordinally paired counting/prose/reasoning):
+  accounting: IDENTICAL per register — counting 0.96/2.91 both arms; prose 0.55/2.11 both;
+  reasoning 0.87/2.75 both (same rounds, same gen).
+  streams: BIT-IDENTICAL across both channels (reasoning_content + content) in all three
+  registers (~2900 generated tokens total, similarity 1.0000 everywhere).
+  READ: d1's served-stream effect at TP4 on these registers is ZERO observed draws changed
+  (upper-half mass at decision columns is vanishingly small — see the 0%/0.57%/0.29%
+  measures above). The bug remains a correctness-law close on its class cells (guard +
+  device cell + tap witness); no behavior change was claimed or found at temp=0.5 on
+  counting/prose/reasoning. Registers with heavier upper-half proposal mass (if any exist
+  in other workloads) remain the theoretical exposure; the guard + boot-battery cell stand
+  watch. The one pre-fix sampling-path WEDGE observation (1-in-N, unreproduced) is logged
+  above for the boot battery's sampling arm.

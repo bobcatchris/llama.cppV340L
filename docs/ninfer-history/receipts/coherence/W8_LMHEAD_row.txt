@@ -1,0 +1,50 @@
+W8_LMHEAD_row — window 3: lm_head route flip roofline A/B/C + count600 flip legs, 2026-09-17 GPU-OWNER window (amd/tp4-cure, HEAD 61c1ecc0b)
+Grant: coordinator window-3 mission (this session); scope CONCURRENCY-1 ONLY.
+
+== Step 0: retired standing posture ==
+PID 310132 (serve_10k posture boot, started 18:07:22, cmdline anchored
+^/home/chris/artifacts_bin/ninfer-serve_248630d1b110c2bf.bin) — TERM -> exited <5 s.
+/dev/kfd holders after: none. GPUs 0% all four dies.
+Pre-kill clocks: mclk level 3 (945 MHz TOP) x4, sclk level 7 (1500 MHz) x4 — FULL CLOCKS;
+temps edge 68/51/55/55 C (GPU0 warm from the 10k prefill, others cool).
+
+== Step 1: BANK-BEFORE-RELINK ==
+bin: /home/chris/artifacts_bin/ninfer-serve_6c8ae21399516750.bin
+sha256: 6c8ae213995167502bb9c111d0a239a38c87893abe89b1b6644ecb1eb6b8717c
+source: build-hip-amd/apps/ninfer-serve at HEAD 61c1ecc0b (LMHEAD ROUTE FLIP + P1 OPTRACE), built 19:24.
+strings gate: NINFER_LMHEAD_ARM / NINFER_LMHEAD_TRACE / NINFER_PREFILL_OPTRACE /
+  NINFER_VERIFY_TAIL_TRACE / NINFER_TILED_TRACE — ALL PRESENT (1 exact hit each).
+
+== Step 3: ROOFLINE A/B/C (w8_roofline_bench.cu, arms DIRECT, zero-serve; log W8_LMHEAD_roofline_run_20260917_2023.log) ==
+bench sha256 ba8ae5a99eab65e0896b5d2bbd3f2de991835bd62443fbd36a0f8b5d84907413 — BIT-IDENTICAL to the
+  CODE desk's compile-verify sha (recompiled this window at the exact -O3 LAW line, RC=0, 0 errors).
+Both runs print the house CEILING rows (read 340-373 GB/s) and the best-effort sysfs mclk print
+  read level 2 (800 MHz) at PRINT time in both runs — the instant-droop box; the bench's internal
+  5 s hammer + the 2-run agreement (<=2% spread) + the serving leg's sidebands carry the absolute
+  readout per PLOG-043 clean-band law. Rankings are thermal-robust.
+
+LMHEAD shard [62080,5120] W8G32_F16S = 337.7 MB/rank. GB/s over useful bytes; %read vs ceiling.
+
+                      run1 (ARM unset=smallt)              run2 (ARM=simt rerun)
+T=3  A small_t        60.11 ms  5.6 GB/s                   61.26 ms  5.5 GB/s
+     B simt_r8_c4      2.47 ms 137.0 GB/s  B/A 24.36x       2.48 ms 136.5 GB/s  B/A 24.73x
+     C mma_r64x16... 151.41 ms   2.2 GB/s  C/A 0.40x      157.86 ms   2.1 GB/s  C/A 0.39x
+T=1  A                58.60 ms  5.8 GB/s                   63.91 ms  5.3 GB/s
+     B                 1.45 ms 233.4 GB/s  B/A 40.49x       1.50 ms 225.3 GB/s  B/A 42.61x
+T=4  A                60.06 ms  5.6 GB/s                   65.66 ms  5.2 GB/s
+     B                 2.92 ms 115.9 GB/s  B/A 20.57x       3.00 ms 112.9 GB/s  B/A 21.92x
+rel-L2(A,B) 1.8e-05..3.3e-05, rel-L2(A,C) ~2.5e-03 — ALL PASS (bar 1e-2, statistical).
+ANCHOR draft-slice [10240,5120] T=3 simt_r8_c4: 0.405 ms 137.7 GB/s (serving propose field ~174 incl argmax+remap).
+DRAFT-FC [5120,10240] T=1 (both runs): A 6.00/6.51 ms (9.3/8.6 GB/s) vs B 0.253/0.270 ms (219.9/206.7 GB/s)
+  -> B/A 23.7-24.2x; the flip saves ~5.7 ms per draft forward ON THIS SEAM (fc is 1 of 5 draft linears).
+
+SELECTOR leg (real select_w8_a16_launch, driven per process env):
+  default:  lm_head(62080,5120) T=1/3/4 -> launch_w8_small_t; T=33 -> small_t; T=40 -> simt_r8_c4
+            (registered mma ladder under NINFER_NVFP4_SIMT_LANE=1 collapses to the simt arm — the
+            documented lane fallback, NOT a gate effect); draft-fc(5120,10240) T=1/3/4 -> small_t.
+  =simt:    lm_head T=1/3/4 -> launch_w8_simt_r8_c4 AND draft-fc T=1/3/4 -> simt_r8_c4 — BOTH CELLS FLIP;
+            T=33 -> small_t and T=40 -> simt lane-fallback UNCHANGED in both runs (flip scoped to verify widths).
+
+VERDICT (spec §4.1): B >= 10x over A at T=3 — GREEN at 24.4-24.7x, decisive. A reproduces RED
+  (~5.5 GB/s class, 60-66 ms — matches the 61.93 ms serving field = the kernel, not the box).
+  C does not win (0.39-0.40x A) as predicted. The flip is bench-LEGAL; serving parity gate = step 4.
