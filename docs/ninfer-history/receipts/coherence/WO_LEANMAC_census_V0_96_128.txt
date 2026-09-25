@@ -1,0 +1,20 @@
+====================================================================================================
+void ninfer::ops::detail::tiled_gemm_impl::nvfp4_tiled_gemm_hip_kernel<96, 128>(unsigned short const*, unsigned char const*, unsigned char const*, float, unsigned short*, int, int)
+  instructions=3143  vgpr(next_free)=128  privateB=80  groupB(LDS)=19456  sgpr=30  scratchVgprSpill=see_md
+    v_fma_f32              1024
+    v_mul_f32              144
+    v_bfe                  33
+    v_lshlrev              232
+    v_and_b32              181
+    v_or_b32               43
+    v_lshl_or              1
+    ds_read_b32            144
+    ds_read_b64            64
+    ds_write               6
+    buffer_load            8
+    buffer_store           16
+    s_waitcnt              212
+    s_waitcnt_lgkmcnt      198
+    s_waitcnt_vmcnt        15
+    s_barrier              2
+    (other: {'global_load': 11, 'v_mov(b32)_other': 127})

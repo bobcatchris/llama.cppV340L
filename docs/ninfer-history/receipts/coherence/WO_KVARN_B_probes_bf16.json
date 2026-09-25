@@ -1,0 +1,49 @@
+{
+ "label": "B_bf16_8192_bin18993c16",
+ "port": "8100",
+ "verdict": "GREEN",
+ "n_pass": 5,
+ "needle6k": true,
+ "rows": [
+  {
+   "probe": "P1_blue_2k",
+   "pass": true,
+   "finish": "stop",
+   "wall_s": 32.5,
+   "coherent": true,
+   "answer": "BLUE"
+  },
+  {
+   "probe": "P2_word_1k",
+   "pass": true,
+   "finish": "stop",
+   "wall_s": 22.0,
+   "coherent": true,
+   "answer": "ORANGE"
+  },
+  {
+   "probe": "P3_arith",
+   "pass": true,
+   "finish": "stop",
+   "wall_s": 8.5,
+   "coherent": true,
+   "answer": "391"
+  },
+  {
+   "probe": "P4_needle_3k",
+   "pass": true,
+   "finish": "stop",
+   "wall_s": 59.6,
+   "coherent": true,
+   "answer": "ZEBRA-48213"
+  },
+  {
+   "probe": "P5_needle_6k",
+   "pass": true,
+   "finish": "stop",
+   "wall_s": 123.1,
+   "coherent": true,
+   "answer": "ZEBRA-73942"
+  }
+ ]
+}
