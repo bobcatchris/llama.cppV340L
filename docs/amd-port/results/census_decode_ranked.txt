@@ -1,0 +1,38 @@
+span 38.18 s | total kernel time 34.77 s | dispatches 1724807
+
+  #   total_ms  share   calls   us/call  kernel
+  0     7111.6  20.5%   76329   93170.1  void mul_mat_vec_q<(ggml_type)21, 1, false, false>(void const*, void const*, int const*, ggml_c
+  1     3639.2  10.5%   38550   94400.9  void mul_mat_vec_q<(ggml_type)18, 1, false, false>(void const*, void const*, int const*, ggml_c
+  2     2884.1   8.3%   11565  249381.1  void mul_mat_vec_q<(ggml_type)18, 1, true, false>(void const*, void const*, int const*, ggml_cu
+  3     2684.1   7.7%   64250   41776.5  void mul_mat_vec_q<(ggml_type)12, 1, false, false>(void const*, void const*, int const*, ggml_c
+  4     2616.1   7.5%   55512   47127.3  void mul_mat_vec_q<(ggml_type)23, 1, false, false>(void const*, void const*, int const*, ggml_c
+  5     2328.1   6.7%    9252  251630.7  void mul_mat_vec_q<(ggml_type)21, 1, true, false>(void const*, void const*, int const*, ggml_cu
+  6     1570.2   4.5%  358413    4380.9  quantize_q8_1(float const*, void*, long, long, long, long, long, unsigned int, HIP_vector_type<
+  7     1113.0   3.2%   11565   96236.1  void mul_mat_vec_q<(ggml_type)11, 1, false, false>(void const*, void const*, int const*, ggml_c
+  8      998.8   2.9%  236208    4228.5  void k_bin_bcast<&(op_add(float, float)), float, float, float, float const*>(float const*, floa
+  9      940.2   2.7%    6939  135495.0  void mul_mat_vec_q<(ggml_type)23, 1, true, false>(void const*, void const*, int const*, ggml_cu
+ 10      896.6   2.6%   12336   72683.5  void flash_attn_ext_vec<256, 1, (ggml_type)2, (ggml_type)2, false>(char const*, char const*, ch
+ 11      841.1   2.4%  100233    8391.9  void rms_norm_f32<1024, true, false>(float const*, float*, int, long, long, long, float, float 
+ 12      647.2   1.9%   10029   64529.6  void mul_mat_vec_q<(ggml_type)14, 1, false, false>(void const*, void const*, int const*, ggml_c
+ 13      599.4   1.7%     738  812153.0  void mul_mat_vec_q<(ggml_type)21, 8, false, false>(void const*, void const*, int const*, ggml_c
+ 14      524.4   1.5%   75369    6958.1  void k_get_rows_float<float, float>(float const*, int const*, float*, long, long, HIP_vector_ty
+ 15      446.7   1.3%   33410   13370.2  void mul_mat_vec_q<(ggml_type)13, 1, false, false>(void const*, void const*, int const*, ggml_c
+ 16      427.5   1.2%     480  890700.1  void mul_mat_vec_q<(ggml_type)18, 8, false, false>(void const*, void const*, int const*, ggml_c
+ 17      329.1   0.9%   37296    8824.7  void gated_delta_net_cuda<128, false, false>(float const*, float const*, float const*, float co
+ 18      326.0   0.9%     540  603638.1  void mul_mat_vec_q<(ggml_type)23, 8, false, false>(void const*, void const*, int const*, ggml_c
+ 19      323.8   0.9%   74592    4340.9  void l2_norm_f32<32>(float const*, float*, int, long, long, long, float)
+ 20      289.1   0.8%   59268    4877.6  void unary_gated_op_kernel<&(op_silu(float)), float>(float const*, float const*, float*, long, 
+ 21      279.3   0.8%    2313  120736.6  void mul_mat_vec_q<(ggml_type)16, 1, false, false>(void const*, void const*, int const*, ggml_c
+ 22      270.9   0.8%   62160    4357.6  void rms_norm_f32<256, true, false>(float const*, float*, int, long, long, long, float, float c
+ 23      267.7   0.8%   49728    5383.0  void cpy_scalar<&(void cpy_1_scalar<float, float>(char const*, char*))>(char const*, char*, lon
+ 24      250.1   0.7%   24864   10059.4  void rope_multi<true, false, float>(float const*, float*, int, int, int, int, int, int, int, in
+ 25      211.6   0.6%   24864    8510.9  _ZL16k_set_rows_quantIl10block_q4_0Li32ETnPFvPKfPT0_EXadL_ZL23quantize_f32_q4_0_blockS2_PS0_EEE
+ 26      187.4   0.5%   37296    5025.8  __amd_rocclr_copyBuffer
+ 27      177.6   0.5%   37008    4799.5  void concat_cont<unsigned int, 0>(unsigned int const*, unsigned int const*, unsigned int*, long
+ 28      174.1   0.5%     528  329720.6  void mul_mat_vec_q<(ggml_type)12, 8, false, false>(void const*, void const*, int const*, ggml_c
+ 29      173.7   0.5%   29298    5928.9  void mul_mat_vec_q<(ggml_type)8, 1, false, false>(void const*, void const*, int const*, ggml_cu
+ 30      163.1   0.5%   37296    4372.9  void unary_op_kernel<&(op_sigmoid(float)), float>(float const*, float*, int)
+ 31      158.4   0.5%   37296    4246.9  void ssm_conv_f32<true, 128ul, 4ul>(float const*, float const*, float const*, int, int, int, in
+ 32      154.5   0.4%   37008    4174.5  void unary_gated_op_kernel<&(op_softplus(float)), float>(float const*, float const*, float*, lo
+ 33      121.2   0.3%    3598   33672.2  void mul_mat_vec_q<(ggml_type)12, 1, false, true>(void const*, void const*, int const*, ggml_cu
+ 34      109.9   0.3%   24864    4421.3  void fwht_cuda<256>(float const*, float*, long, float)
