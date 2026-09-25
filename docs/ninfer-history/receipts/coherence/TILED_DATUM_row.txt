@@ -1,0 +1,35 @@
+== MANIFEST 2026-09-17T19:45Z T1 TILED-PREFILL-DATUM bin 409450b83ffa4be8 (banked; sha256 recomputed==stamp 409450b83ffa4be8) TP4 MTP k=2 GRAPHS-ON port=8100
+grant: coordinator work order T1-T3 (this session's tasking; serial GPU-owner discipline)
+purpose: T1 prefill deliverable — prefill tok/s with tiled GEMM dispatch (M>=64, default ON in this bin) at (a) sky-blue mt300 and (b) plen~2000 probe; then NINFER_A16_FORCE_SMALLT=1 re-probe (b) for the tiled-vs-smallt A/B. Baselines: 37.3 tok/s prefill (mt300-class count600, SMALLT2 boot) / 46.4 (sky-blue mt300, SMALLT2) / 11.3 mean@10k (cool long-prompt anchor).
+config: /media/chris/EMTEC256/qwen3_8_27b_nvfp4.ninfer --port 8100 --devices 0,1,2,3 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16 --spec mtp --draft-tokens 2 --allow-nvfp4-weights
+env: NINFER_ALLOW_NVFP4_TP2=1 NINFER_DRAFT_VOCAB=/home/chris/dual_5060_ti_ninfer/tests/multi_gpu/data/qwen38_draft_vocab_ids.json NINFER_WORKSPACE_MIB=96 NINFER_TP2_TIMING=1 NINFER_TILED_TRACE=1
+KFD pre: 0 (TILED_kfd_pre.txt captured in /tmp/gput1, "No KFD PIDs currently running"); GPUs 0-3 0% use; no serve pgrep
+serial discipline: sole GPU process; anchored kill (^/home/chris/artifacts_bin/ninfer-serve); <60s bursts / 150s idles; clocks sideband 2s banked
+
+== BOOT 1 (tiled dispatch default-ON, NINFER_TILED_TRACE=1): 19:46-19:51Z bin 409450b83ffa4be8
+health ok ~3 s (warmup [ids] 760 1156 1018 328 — identity anchor MATCH); "loaded 40960 draft vocabulary IDs" PRESENT
+(a) sky-blue mt300 temp 0 (prompt 58 tok, M<64 -> small_t chunk path as designed):
+  prefill 46.5 tok/s (anchor 46.4 SMALLT2 sky-blue — CONSISTENT), decode 17.4, MTP 2.23 t/r (61.3%), finish=stop_token
+  B1 (92 rounds): round=127.69 ms — VERIFY 111.36 (87.2%), align 8.41, AR-draft-chain 7.48
+(b) plen~2000 probe (BLUE body + 1938 space-separated alphas; /tmp request file lost in reboot, this
+    reconstruction measures plen=1996; mt 64, temp 0, finish=output_limit):
+  TILED ARM: ttft 26.36 s, PREFILL 75.7 tok/s, decode 15.4, B1 (30 rounds) round=132.60, AR 7.64
+  ROUTE PROOF (verbatim [TILED] lines, TILED1_serve.log): all five W4 problems rode nvfp4_tiled_gemm at M=128 —
+    n=4096 k=5120 / n=5120 k=1536 / n=8704 k=5120 / n=5120 k=4352 / n=3584 k=5120
+== BOOT 2 (NINFER_A16_FORCE_SMALLT=1, A/B arm; TILED trace silent, 0 [TILED] lines): 19:54-20:01Z
+health ok; warmup [ids] 760 1156 1018 328 MATCH
+(b) same request, same shape: ttft 47.41 s, PREFILL 42.1 tok/s (hot window, 68-80C edge)
+(b') cool-state re-probe SAME BOOT after 150 s idle (thermal confound bound): ttft 48.03 s,
+    PREFILL 41.6 tok/s (52-85C edge) — smallt arm thermally FLAT at this shape (42.1 vs 41.6)
+== T1 VERDICT (the prefill deliverable):
+  TILED vs SMALLT at plen=1996: 75.7 vs 42.1/41.6 tok/s = 1.80-1.82x serving-side win, direction
+  thermally robust (both arms sampled hot AND cool). vs the isolated-kernel 3.5x (TILED-GEMM-1
+  bench): the GEMM-only speedup dilutes to ~1.8x end-to-end because prefill ttft includes
+  attention + non-linear layer body + embed/logits outside the NVFP4 GEMMs.
+  vs long-prompt baseline 11.3 tok/s mean@10k: tiled = 6.7x, tuned-smallt = 3.7x (the SMALLT S1/S2
+  legacy-kernel tune already lifted the smallt prefill arm ~3.7x over the 11.3 anchor).
+  Short-prompt posture unchanged: 46.5 tok/s (M=58 rides small_t; tiled threshold M>=64 intact).
+sidebands: TILED_probe_{a,b,b2,b3}_clocks.tsv — no sclk collapse mid-arm (1138-1500 MHz under load);
+  probe b (tiled, cool window) 55-66C edge; probe b2/b3 (smallt) 68-85C edge; card0 = display card churn.
+KFD post: 0 both boots ("No KFD PIDs currently running"); disk 14G.
+release: anchored kills pid 32151 (boot1) + 42553 (boot2), pattern ^/home/chris/artifacts_bin/ninfer-serve

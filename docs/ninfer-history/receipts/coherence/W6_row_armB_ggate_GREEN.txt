@@ -1,0 +1,15 @@
+W6 ARM-B row — NINFER_GGATE_SIMT=1 — GREEN (promote), 2026-09-18 06:4x, window 6
+bin: /home/chris/artifacts_bin/ninfer-serve_a43312bb9634bef9.bin; env = baseline env + NINFER_GGATE_SIMT=1
+serve log: W6_boot_armB_ggate_serve.log; sideband: W6_armB_ggate_clocks.log (mclk 945 pinned, sclk partial droop band — same treatment all legs); resp: W6_armB_ggate_resp.json
+probe: plen-2016 conc=1 first+only after 120 s cool, mt 64 temp 0: finish=stop content='BLUE' completion=41 —
+  greedy text BYTE-IDENTICAL to baseline (parity gate PASS)
+route proof: exactly ONE [GGATE] NINFER_GGATE_SIMT='1' -> route=gdn_gating_proj.bf16.simt.col_tile (cols>=9) — first-seen, before first chunk
+== [PREFILL-BODYSUM] n=16, 4 ranks (baseline -> armB) ==
+rank=0 gate=11.186 (was 84.905)  dn=516.158 (was 536.543)  gqa=57.427 (was 61.989)  body=625.384 (was 706.623)
+rank=1 gate=11.674 (was 77.037)  dn=504.021 (was 502.122)  gqa=55.125 (was 55.166)  body=639.054 (was 721.650)
+rank=2 gate=11.035 (was 77.642)  dn=502.827 (was 501.772)  gqa=55.366 (was 55.096)  body=627.067 (was 711.179)
+rank=3 gate=11.335 (was 81.964)  dn=510.775 (was 509.893)  gqa=57.307 (was 56.742)  body=614.456 (was 700.561)
+4-rank MEANS: gate 80.4 -> 11.31 ms (x7.1, acceptance <12 PASS, RED >25 moot) | dn 512.6 -> 508.4 (unchanged, route
+  untouched) | gqa 57.2 -> 56.3 (unchanged) | body 710.0 -> 626.5 (-83.5 = the gate delta as predicted)
+[PREFILL-SUM] n=16 4-rank wall mean 1674.7 -> 1579.0 ms/chunk (-95.7); client wall 29.34 -> 27.20 s
+VERDICT: ARM-B GREEN — gate fix delivers (SIMT col_tile 384 CTAs vs MmaUnsplit 3 CTAs); PROMOTE.
