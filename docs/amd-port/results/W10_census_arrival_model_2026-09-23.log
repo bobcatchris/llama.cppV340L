@@ -1,0 +1,62 @@
+trace span 59.88 s, decode window last 5.0 s, dispatches in window 339980
+
+per-die NCCL (allreduce) kernel durations in window:
+  die 0: n= 4246 median=192009.0 us avg=237673.9 p90=287718.0
+  die 1: n= 4245 median=211122.0 us avg=259806.7 p90=298533.0
+  die 2: n= 4246 median=152155.0 us avg=197679.0 p90=237936.0
+  die 3: n= 4246 median=128895.0 us avg=157841.2 p90=175861.0
+  W8 of record: die0=191.6 die1=210.8 die2=151.9 die3=128.8 (agent=die+1 by Location_Id)
+
+per-agent clock skew vs cross-die median end (ns): die0=-472, die1=+731468, die2=-10330, die3=+474
+corrected start-spread us: median=126.0 p90=706.1 max=140645.5
+who arrives last per boundary (corrected, wait < 5 us):
+  die 0: 476 of 4245 (11%)  median wait   74.0 us
+  die 1: 878 of 4245 (21%)  median wait   90.8 us
+  die 2: 890 of 4245 (21%)  median wait   37.6 us
+  die 3: 2458 of 4245 (58%)  median wait    0.0 us
+NCCL duration vs corrected arrival-wait (pearson r, slope; ideal slope 1.0 + ring):
+  die 0: r=+0.56 slope= 0.05  duration median  192.0 vs wait median   74.0 -> ring est  118.0 us
+  die 1: r=-0.04 slope=-0.04  duration median  211.1 vs wait median   90.8 -> ring est  120.3 us
+  die 2: r=+0.57 slope= 0.05  duration median  152.2 vs wait median   37.6 -> ring est  114.5 us
+  die 3: r=+0.59 slope= 0.04  duration median  128.9 vs wait median    0.0 -> ring est  128.9 us
+RAW (uncorrected) start-spread us: median=712.9 - clock-skew driven, see calibration above
+
+rate stability (non-NCCL busy ratio vs die3, first half / second half):
+  half 0: die0=0.9344, die1=0.9062, die2=0.9654, die3=1.0000
+  half 1: die0=0.9187, die1=0.8832, die2=0.9685, die3=1.0000
+
+identical-kernel duration medians per die (top 12 classes by total device time, us):
+  kernel                                             die0     die1     die2     die3  ratio d1/d3  n/die
+  void mul_mat_vec_q<(ggml_type)21, 4, false, fa    151.7    148.6    171.9    177.0     0.839  3813 (2147.8 ms tot)
+  void mul_mat_vec_q<(ggml_type)18, 4, false, fa    164.6    159.1    181.6    190.5     0.835  2604 (1690.2 ms tot)
+  void flash_attn_tile<256, 256, 16, 2, false>(c  82228.9  81935.1  82087.5  84100.9     0.974  5 (1650.4 ms tot)
+  void flash_attn_tile<256, 256, 4, 2, false>(ch    722.4    714.9    716.5    724.6     0.987  527 (1530.5 ms tot)
+  void mul_mat_vec_q<(ggml_type)23, 4, false, fa     94.4     90.5    100.3    106.5     0.850  2883 (1280.9 ms tot)
+  void mul_mat_vec_q<(ggml_type)12, 4, false, fa    108.3    106.7    112.5    113.3     0.941  2728 (1034.8 ms tot)
+  Cijk_Alik_Bljk_HB_MT32x32x32_SN_1LDSB0_APM1_AB   5082.5   4894.8   4932.5   5152.7     0.950  42 (830.6 ms tot)
+  void quantize_q8_1<false>(float const*, void*,      4.6      4.4      4.4      4.6     0.968  16375 (293.4 ms tot)
+  void mul_mat_vec_q<(ggml_type)11, 4, false, fa    170.1    168.3    183.3    198.8     0.847  465 (257.4 ms tot)
+  void mul_mat_vec_q<(ggml_type)14, 1, false, fa    635.1    629.2    711.1    758.0     0.830  91 (253.1 ms tot)
+  Cijk_Alik_Bljk_HB_MT128x64x16_SN_1LDSB0_APM1_A   2000.4   1865.4   2246.8   1615.3     1.155  35 (215.8 ms tot)
+  void mul_mat_vec_q<(ggml_type)13, 4, false, fa     26.5     25.8     26.2     27.1     0.951  1426 (213.9 ms tot)
+
+non-NCCL device-busy per die (sum of kernel durations, window):
+  die 0:   3397.6 ms  ratio vs die3: 0.9266
+  die 1:   3280.9 ms  ratio vs die3: 0.8948
+  die 2:   3545.4 ms  ratio vs die3: 0.9669
+  die 3:   3666.7 ms  ratio vs die3: 1.0000
+
+per-boundary inter-NCCL device-busy per die (us):
+  die 0: median   517.5 us  avg   810.5 us  ratio vs die3 0.893
+  die 1: median   490.2 us  avg   779.8 us  ratio vs die3 0.846
+  die 2: median   558.7 us  avg   845.9 us  ratio vs die3 0.964
+  die 3: median   579.4 us  avg   874.6 us  ratio vs die3 1.000
+
+A2 model (per-boundary, verify):
+  W (total compute) = 2145.8 us; today max = 579.4 us (die 3); ring floor = med NCCL on last arriver = 128.9 us
+  per-byte time t_d (die3=1): die0=0.893, die1=0.846, die2=0.964, die3=1.000
+  balancing shares (% of sharded bytes): die0=25.81, die1=27.24, die2=23.90, die3=23.05
+  --tensor-split ratios (die3=1): 1.120, 1.182, 1.037, 1.000
+  equalized per-die compute = 534.2 us; wall/boundary today = 708.3 us -> balanced = 663.1 us (ring unchanged)
+  verify saving/boundary = 45.3 us; x128 = 5.79 ms/round; draft+catchup 8 boundaries ~0.36 ms
+  stacked with ch4 ring (-11%, W9): ring 128.9 -> ~114.7; total saving ~59.5 us/boundary = ~8.09 ms/round

@@ -1,0 +1,102 @@
+W7 REPACK ROW — the M2+M3 desk (mx-llama weight repack + iacopPBK v_perm decode) on the shipped
+NVFP4 prefill GEMM, 2026-09-18, window 7, lane amd/wo-w7-body
+bin: /tmp/w7_repack_bench (hipcc -O3 -DNDEBUG -std=gnu++20 gfx900; production law line; source
+  tools/v340l/w7_repack_bench.cu; shipped kernel TU included UNTOUCHED). raw: W7_repack_run3.log.
+method: w7_pk16_bench.cu methodology verbatim (5 s mclk hammer, 256 MiB copy ceiling, hipEvent
+  3 warmup + 20 iters, rel-L2 vs REF, M=128, four full geometries). BAND: die 2 (NINFER_W7_GPU),
+  clocks AUTO (thermal A/B law), mad-mix desk active on die 0 — absolute GF/s band-contaminated
+  by design; ALL VERDICTS are same-band ratios vs the in-process V0 anchor.
+PRE-REGISTERED (dispatch): each arm mean xV0 >= 1.15 PASS | 1.05-1.15 AMBER | < 1.05 KILL.
+  Correctness: rel-L2 vs REF < 1e-2 for the declared association-change arms (V, PV); P
+  expected bit-identical to V0. Kill-switch FIRST: w3_census.py on the -S compile.
+
+CENSUS (kill-switch, final kernels — ALL GREEN):
+  P  <96,128>:  126 VGPR,  80 B scratch (= V0's own known scratch), 2994 instr,
+                1024 v_fma_f32 + 128 v_mul (V0's product-hoisted form; first compile was
+                256 VGPR/1536 B until coeff dataflow mirrored V0's coeff[r][4]-per-k-tile
+                shape — the compiler's product hoisting is dataflow-SHAPE sensitive).
+  V  <80,64,32>: 113 VGPR,   0 B scratch, 1359 instr, 128 v_pk_fma_f16/body, 32 s_waitcnt
+                (V0: 212). v_perm_b32 = 16/body = 0.25/value (the iacopPBK shape: 2 perms
+                per u32 word = 8 nibbles; verified 64 across the 4 instantiations).
+  PV <96,64,32>: 117 VGPR,   0 B scratch, 1059 instr (leanest body: no v_mul, no scale path).
+  First V/PV compile was the HFMA2-PK resourcing death (256 VGPR + 840 B scratch) at kS=8;
+  the pk16-proven fixes recovered it: TN=64 (kS=4) + rolled group loop (pk16 v2 lesson:
+  the unrolled body's cross-group live ranges) + coeff as per-group half2 (no [4]-deep
+  fp32 arrays). Census-first law fired and was answered BEFORE any bench second.
+
+DECODE PARITY (RED/GREEN cell for the decode swap): tools/v340l/w7_vperm_probe.cu (banked in
+  lane 9670115f9): the v_perm fp16-pair form vs the shipped LDS pair table — BIT-EXACT for
+  ALL 256 code bytes on this device => V decodes the SAME e2m1 nibbles; NO requantization.
+  gfx900 perm convention (empirical, one-kernel atomic probe): perm(first,second,sel) nibble
+  n: n[2]==0 -> second[n[1:0]], n[2]==1 -> first[n[1:0]]; sel bytes 0x08-0x0C -> 0x00,
+  0x0D-0x0F -> 0xFF. Pool: fp16 HIGH bytes of e2m1 mags, first=0x46444240 (mags 4-7),
+  second=0x3E3C3800 (mags 0-3; byte0 = 0x00 doubles as the zero byte / mag 0).
+  Their magnitude table {0,1,2,3,4,6,8,12} = mags x2 for dp4a int8; our e2m1 order matches
+  their nibble semantics (bit3 sign, bits[2:0] = {0,.5,1,1.5,2,3,4,6}) — adapted the pool to
+  fp16 hi-bytes and the output to fp16 PAIRS (their int8-per-byte output is dp4a-shaped).
+
+MEASURED (M=128, GF/s | xV0 | relL2 vs REF | bitdiff vs V0):
+  AttnInput    14336x5120: V0 3303.8 | P 3217.7 0.97x 0.0e0 0 | V 3551.4 1.07x 0.0e0 0 | PV 3276.2 0.99x 0.0e0 0
+  GdnInput     16384x5120: V0 2893.2 | P 2845.4 0.98x 0.0e0 0 | V 3304.1 1.14x 0.0e0 0 | PV 3067.8 1.06x 0.0e0 0
+  MlpGateUp    34816x5120: V0 3264.2 | P 3225.7 0.99x 0.0e0 0 | V 3546.9 1.09x 0.0e0 0 | PV 3262.0 1.00x 0.0e0 0
+  Residual6144  5120x6144: V0 2456.3 | P 2425.5 0.99x 0.0e0 0 | V 3046.4 1.24x 0.0e0 0 | PV 2868.4 1.17x 0.0e0 0
+  MEAN xV0: P 0.983x (KILL) | V 1.136x (AMBER) | PV 1.055x (AMBER, dominated by V alone)
+
+VERDICTS (pre-registered bars):
+  P  — KILL: the mx-llama layout lever (de-aliased rows +16 B pad when stride%128==0 — OUR
+       2560/3072 B rows both alias — plus per-row-group PRE-FOLDED f32 coeff plane replacing
+       the m128x4 gather + scale LUT) is a measured WASH on the tiled GEMM (-1..-3%). V0's
+       scale path was already the iter8-quad trick; the gather mx-llama deleted was never our
+       shape. P's planes cost slightly more than the deleted scale path at TN=128. NOTE: P is
+       BIT-IDENTICAL to V0 everywhere (0/1835008 etc.) — the negative deltas are real, not
+       numerics; do not re-derive this lever for the tiled GEMM.
+  V  — AMBER (1.136x vs the 1.15x PASS bar; per-geometry 1.07/1.14/1.09/1.24): the v_perm
+       register-LUT decode + fp16-pair consumer is CORRECT (relL2 0.0e0 vs REF, bit-identical
+       to V0 on this data), census-GREEN (113 VGPR / 0 scratch / 32 waits vs V0's 212), and
+       wins most where V0 is weakest (Residual6144 +24%). It misses the pre-registered PASS
+       bar by 0.014x mean. Record per the AMBER rule; integration-cost decision is the
+       coordinator's — the arm is a drop-in variant launcher away (kernels are bench-local).
+  PV — AMBER and DOMINATED: folding P's planes into V LOSES 0.08x mean vs V alone (coeff-plane
+       loads + padded strides cost more than the deleted scale quad path at the TN=64 point).
+       If V integrates, it integrates on V0's canonical planes.
+
+CROSS-LINE CROSS-VALIDATION (coordinator notice, cited): Team Green's PRMT decode atom
+  (NVIDIA side) measured +8.2% kernel / +3.2% serve with the explicit law "a shared-memory
+  LUT losing does NOT condemn table lookup — PRMT is a table without memory". Same mechanism
+  class as this desk's v_perm register-LUT (V arm = PRMT-shaped decode on GCN5): both lines
+  confirm the register-resident LUT wins while a memory-backed LUT path loses (their
+  shared-LUT NO-GO -7..-14%; our V0 baseline carries exactly such an LDS LUT, and the V arm
+  deletes it).
+
+WHY the win is bounded (mechanism, for the next desk): V deletes the 128-body LDS table reads
+  and most waitcnts (212 -> 32) but at TN=64 the grid doubles in y and the tile is smaller;
+  the mad-mix insight (decode stream = the scheduler's latency-hiding material) still prices
+  the floor: V keeps MAC density (pk16-class) and buys ~1.14x, not the 1.5x+ the op-count
+  delta alone would suggest. The GEMM-front ledger context stands: this is an AMBER lever on
+  a front the pk16 row already closed at the 2.0x bar.
+
+DEBUG RECEIPTS (the bench caught 3 RED kernels before any GREEN number was believed —
+  relL2 1.46e+02 class would have been the pk16 failure repeated):
+  run1: V relL2 3.54e-01, exactly-half bitdiff -> --debug mode (per-group coeff values 1..4)
+    named the loss arithmetically (V = V0 x 0.25 then 0.75 then 1.0 as bugs closed):
+    1. word-split masks were swapped: (pE<<8)&0x00FF00FF zeroes 3 of 4 lanes (pE<<8 puts
+       h2 at byte2, not byte3) -> exactly 1/4 of products; correct = (pE&0x00FF00FF)<<8.
+    2. x restage q1/q3 put BOTH lanes in the high half ((p0&0xFFFF0000)|((p2&0xFFFF)<<16)
+       = [0, k1|k4]) -> 0.75; correct = (p0>>16)|(p2&0xFFFF0000).
+    3. token domain: reader indexed s_x by GLOBAL token (tok0+t) while the stage writes
+       BLOCK-LOCAL 0..TN-1 — at grid.y=1 that is out-of-bounds LDS (the zero half). V0 never
+       hits this (TN=128 covers all M so local==global); any TN<M port must re-derive it.
+  Uniform-data trap: memset patterns (0x11 codes / 0x3C x) make every permutation
+  value-preserving, which HID bugs 2-3 partially — the per-group-coeff --debug mode and the
+  rel-L2 gate are what exposed them. Keep both in any future decode-swap desk.
+
+VRAM note: repack planes are bench-local allocs, freed per geometry (codes_p row+padded =
+  +16 B/row; coeff plane +50% of code bytes at f32 — P-only; V needs none of it). VRAM law:
+  nothing refused, nothing estimated; largest transient ~135 MB on MlpGateUp at TN=64.
+
+REOPEN/REUSE notes: (a) V's kernels live bench-local (tools/v340l/w7_repack_bench.cu); a
+  production route would port w7_v_tiled_kernel + a 4-line perm-pool constant set behind a
+  NINFER_TILED_V gate, byte-identical off; (b) the perm convention + pool constants + parity
+  cell are the reusable seam for ANY 4-bit code on gfx900 (q4, IQ4_NL, e2m1 alike); (c) the
+  W=16/64 points and 512-thread shapes are UNMEASURED — if anyone reopens, census first
+  (the kS=8 point is already measured DEAD: 256 VGPR + 840 B).

@@ -1,0 +1,328 @@
+Reading symbols from /home/chris/artifacts_bin/ninfer-serve_c618d356f0cdc401.bin...
+(No debugging symbols found in /home/chris/artifacts_bin/ninfer-serve_c618d356f0cdc401.bin)
+Breakpoint 1 at 0x8229820
+Starting program: /home/chris/artifacts_bin/ninfer-serve_c618d356f0cdc401.bin /home/chris/models/qwen3_8_27b_nvfp4.ninfer --port 8100 --devices 0,1,2,3 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16 --spec mtp --draft-tokens 2 --allow-nvfp4-weights > /home/chris/worktrees/amd-wo-w7-body/results/amd/coherence/w7_oneshot_rootlook/R7_LKG_final_serve.log 2>&1 < /dev/null
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+[New Thread 0x7fffa9dff6c0 (LWP 273579)]
+[New Thread 0x7fffa95fe6c0 (LWP 273580)]
+[Thread 0x7fffa95fe6c0 (LWP 273580) exited]
+[New Thread 0x7ff7491bf6c0 (LWP 273602)]
+[New Thread 0x7ff7489be6c0 (LWP 273603)]
+[New Thread 0x7ff7437ff6c0 (LWP 273604)]
+[New Thread 0x7ff73bdff6c0 (LWP 273605)]
+[New Thread 0x7ff733fff6c0 (LWP 273606)]
+[New Thread 0x7ff730bff6c0 (LWP 273607)]
+[Thread 0x7ff7489be6c0 (LWP 273603) exited]
+[New Thread 0x7ff7489be6c0 (LWP 273626)]
+[New Thread 0x7ff6ff9fd6c0 (LWP 273627)]
+[New Thread 0x7ff7001fe6c0 (LWP 273629)]
+[New Thread 0x7ff7009ff6c0 (LWP 273628)]
+[New Thread 0x7ff6fe9fb6c0 (LWP 273631)]
+[New Thread 0x7ff6ff1fc6c0 (LWP 273630)]
+[New Thread 0x7ff6fe1fa6c0 (LWP 273632)]
+[New Thread 0x7ff6fd9f96c0 (LWP 273633)]
+[New Thread 0x7ff6d2d716c0 (LWP 273640)]
+[New Thread 0x7ff6d35726c0 (LWP 273639)]
+[New Thread 0x7ff6d3d736c0 (LWP 273638)]
+[New Thread 0x7ff6d1e3e6c0 (LWP 273641)]
+[New Thread 0x7ffb9bf3f6c0 (LWP 274061)]
+[New Thread 0x7ffb9b73e6c0 (LWP 274062)]
+[New Thread 0x7ffb9af3d6c0 (LWP 274063)]
+[Switching to Thread 0x7ff7491bf6c0 (LWP 273602)]
+
+Thread 4 "ninfer-serve_c6" hit Breakpoint 1.1, __GI__exit (status=72)
+    at ../sysdeps/unix/sysv/linux/_exit.c:27
+warning: 27	../sysdeps/unix/sysv/linux/_exit.c: No such file or directory
+
+ ===== WEDGE-STATE STACK DUMP =====
+  Id   Target Id                                            Frame 
+  1    Thread 0x7fffaa052ac0 (LWP 273572) "ninfer-serve_c6" 0x00007fffad86e503 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+  2    Thread 0x7fffa9dff6c0 (LWP 273579) "ninfer-serve_c6" __GI___ioctl (
+    fd=4, request=3222817548) at ../sysdeps/unix/sysv/linux/ioctl.c:36
+* 4    Thread 0x7ff7491bf6c0 (LWP 273602) "ninfer-serve_c6" __GI__exit (
+    status=72) at ../sysdeps/unix/sysv/linux/_exit.c:27
+  6    Thread 0x7ff7437ff6c0 (LWP 273604) "ninfer-serve_c6" 0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, 
+    expected=0, futex_word=0x8fc7d18) at ./nptl/futex-internal.c:57
+  7    Thread 0x7ff73bdff6c0 (LWP 273605) "ninfer-serve_c6" 0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, 
+    expected=0, futex_word=0x8fc9c78) at ./nptl/futex-internal.c:57
+  8    Thread 0x7ff733fff6c0 (LWP 273606) "ninfer-serve_c6" 0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, 
+    expected=0, futex_word=0x90dbdc8) at ./nptl/futex-internal.c:57
+  9    Thread 0x7ff730bff6c0 (LWP 273607) "ninfer-serve_c6" 0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, 
+    expected=0, futex_word=0x96c41dc) at ./nptl/futex-internal.c:57
+  10   Thread 0x7ff7489be6c0 (LWP 273626) "ninfer-serve_c6" 0x00007fffbbb1b79d in __GI___poll (fds=0x7ff7489afd00, nfds=65, timeout=500)
+    at ../sysdeps/unix/sysv/linux/poll.c:29
+  11   Thread 0x7ff6ff9fd6c0 (LWP 273627) "ninfer-serve_c6" 0x00007fffbbb1b79d in __GI___poll (fds=0x7ff6ff9eed00, nfds=65, timeout=500)
+    at ../sysdeps/unix/sysv/linux/poll.c:29
+  12   Thread 0x7ff7001fe6c0 (LWP 273629) "ninfer-serve_c6" 0x00007fffbbb1b79d in __GI___poll (fds=0x7ff7001efd00, nfds=65, timeout=500)
+    at ../sysdeps/unix/sysv/linux/poll.c:29
+  13   Thread 0x7ff7009ff6c0 (LWP 273628) "ninfer-serve_c6" 0x00007fffbbb1b79d in __GI___poll (fds=0x7ff7009f0d00, nfds=65, timeout=500)
+    at ../sysdeps/unix/sysv/linux/poll.c:29
+  14   Thread 0x7ff6fe9fb6c0 (LWP 273631) "ninfer-serve_c6" 0x00007fffbbb1b79d in __GI___poll (fds=0x7ff6fe9eea78, nfds=1, timeout=500)
+    at ../sysdeps/unix/sysv/linux/poll.c:29
+  15   Thread 0x7ff6ff1fc6c0 (LWP 273630) "ninfer-serve_c6" 0x00007fffbbb1b79d in __GI___poll (fds=0x7ff6ff1efa78, nfds=1, timeout=500)
+    at ../sysdeps/unix/sysv/linux/poll.c:29
+  16   Thread 0x7ff6fe1fa6c0 (LWP 273632) "ninfer-serve_c6" 0x00007fffbbb1b79d in __GI___poll (fds=0x7ff6fe1eda78, nfds=1, timeout=500)
+    at ../sysdeps/unix/sysv/linux/poll.c:29
+  17   Thread 0x7ff6fd9f96c0 (LWP 273633) "ninfer-serve_c6" 0x00007fffbbb1b79d in __GI___poll (fds=0x7ff6fd9eca78, nfds=1, timeout=500)
+    at ../sysdeps/unix/sysv/linux/poll.c:29
+  18   Thread 0x7ff6d2d716c0 (LWP 273640) "ninfer-serve_c6" 0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=265, 
+    expected=0, futex_word=0x7ff6d42f5158) at ./nptl/futex-internal.c:57
+  19   Thread 0x7ff6d35726c0 (LWP 273639) "ninfer-serve_c6" 0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=265, 
+    expected=0, futex_word=0x7ff6dc2f5158) at ./nptl/futex-internal.c:57
+  20   Thread 0x7ff6d3d736c0 (LWP 273638) "ninfer-serve_c6" 0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=265, 
+    expected=0, futex_word=0x7ff6fc49b158) at ./nptl/futex-internal.c:57
+  21   Thread 0x7ff6d1e3e6c0 (LWP 273641) "ninfer-serve_c6" 0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=265, 
+    expected=0, futex_word=0x7ff6d4034158) at ./nptl/futex-internal.c:57
+  22   Thread 0x7ffb9bf3f6c0 (LWP 274061) "ninfer-serve_c6" 0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=<optimized out>, cancel=true, 
+    abstime=0x0, op=393, expected=0, futex_word=0x7ffb94000c48)
+    at ./nptl/futex-internal.c:57
+  23   Thread 0x7ffb9b73e6c0 (LWP 274062) "ninfer-serve_c6" 0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=<optimized out>, cancel=true, 
+    abstime=0x0, op=393, expected=0, futex_word=0x7ffb8c000c48)
+    at ./nptl/futex-internal.c:57
+  24   Thread 0x7ffb9af3d6c0 (LWP 274063) "ninfer-serve_c6" 0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=<optimized out>, cancel=true, 
+    abstime=0x0, op=393, expected=0, futex_word=0x7ffb90000c48)
+    at ./nptl/futex-internal.c:57
+
+Thread 24 (Thread 0x7ffb9af3d6c0 (LWP 274063) "ninfer-serve_c6"):
+#0  0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=<optimized out>, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7ffb90000c48) at ./nptl/futex-internal.c:57
+#1  __futex_abstimed_wait_common (cancel=true, private=<optimized out>, abstime=0x0, clockid=0, expected=0, futex_word=0x7ffb90000c48) at ./nptl/futex-internal.c:87
+#2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x7ffb90000c48, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=<optimized out>) at ./nptl/futex-internal.c:139
+#3  0x00007fffbbaa4fff in do_futex_wait (sem=sem@entry=0x7ffb90000c48, abstime=0x0, clockid=0) at ./nptl/sem_waitcommon.c:111
+#4  0x00007fffbbaa5098 in __new_sem_wait_slow64 (sem=0x7ffb90000c48, abstime=0x0, clockid=0) at ./nptl/sem_waitcommon.c:183
+#5  0x00007fffbc5a6ad8 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#6  0x00007fffbc5a668a in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#7  0x00007fffbc2c8b84 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#8  0x00007fffbc4a3e7e in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#9  0x00007fffbc47467d in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#10 0x00007fffbc47f916 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#11 0x0000000008166689 in ninfer::multi_gpu::tp_unpack_gbeta_strided(ninfer::Tensor const&, ninfer::Tensor const&, ninfer::Tensor&, ninfer::Tensor&, int, int, int, int, ihipStream_t*) ()
+#12 0x0000000007ec8656 in ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::gdn_mix_tp(ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::GdnLayerW const&, ninfer::Tensor&, int, ninfer::targets::qwen3_6::TextPhase) ()
+#13 0x0000000007ed90bf in void ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::run_layers<ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::NullTap>(ninfer::Tensor&, ninfer::targets::qwen3_6::TextPhase, ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::NullTap&) [clone .constprop.0] ()
+#14 0x0000000007f4ab6c in ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::PrefillChunkResult ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::prefill_impl<ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::NullTap>(std::span<int const, 18446744073709551615ul>, ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::TextPrefill const*, ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::MultimodalPrefill const*, ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::NullTap&, bool) ()
+#15 0x0000000007ef4222 in ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::prefill_chunk(std::span<int const, 18446744073709551615ul>, unsigned int, unsigned int, bool) ()
+#16 0x0000000007f12141 in ninfer::runtime::tp2::run_tp2_request(ninfer::runtime::tp2::TpBackend&, ninfer::runtime::tp2::TpRequestConfig const&, std::function<void (int const*, int)>, ninfer::CancellationView const&, bool)::{lambda(int, ninfer::runtime::tp2::TpRankState&, ihipStream_t*)#1}::operator()(int, ninfer::runtime::tp2::TpRankState&, ihipStream_t*) const ()
+#17 0x0000000007f151e6 in std::thread::_State_impl<std::thread::_Invoker<std::tuple<ninfer::runtime::tp2::run_tp2_request(ninfer::runtime::tp2::TpBackend&, ninfer::runtime::tp2::TpRequestConfig const&, std::function<void (int const*, int)>, ninfer::CancellationView const&, bool)::{lambda()#2}> > >::_M_run() ()
+#18 0x00007fffbbeecdb4 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#19 0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+(More stack frames follow...)
+
+Thread 23 (Thread 0x7ffb9b73e6c0 (LWP 274062) "ninfer-serve_c6"):
+#0  0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=<optimized out>, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7ffb8c000c48) at ./nptl/futex-internal.c:57
+#1  __futex_abstimed_wait_common (cancel=true, private=<optimized out>, abstime=0x0, clockid=0, expected=0, futex_word=0x7ffb8c000c48) at ./nptl/futex-internal.c:87
+#2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x7ffb8c000c48, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=<optimized out>) at ./nptl/futex-internal.c:139
+#3  0x00007fffbbaa4fff in do_futex_wait (sem=sem@entry=0x7ffb8c000c48, abstime=0x0, clockid=0) at ./nptl/sem_waitcommon.c:111
+#4  0x00007fffbbaa5098 in __new_sem_wait_slow64 (sem=0x7ffb8c000c48, abstime=0x0, clockid=0) at ./nptl/sem_waitcommon.c:183
+#5  0x00007fffbc5a6ad8 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#6  0x00007fffbc5a668a in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#7  0x00007fffbc2c8b84 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#8  0x00007fffbc4a3e7e in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#9  0x00007fffbc47467d in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#10 0x00007fffbc47f916 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#11 0x000000000811c9f9 in ninfer::ops::detail::launch_nvfp4_small_t(ninfer::Tensor const&, ninfer::Weight const&, ninfer::Tensor&, ihipStream_t*) ()
+#12 0x0000000007fb3a06 in ninfer::ops::detail::(anonymous namespace)::launch_a16(ninfer::Tensor const&, ninfer::Weight const&, ninfer::Tensor&, ihipStream_t*) ()
+#13 0x000000000816570f in ninfer::multi_gpu::tp_gemv(ninfer::Tensor const&, ninfer::Weight const&, ninfer::Tensor&, ihipStream_t*, ninfer::DeviceArena*) ()
+#14 0x0000000007ec6c66 in ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::gdn_mix_tp(ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::GdnLayerW const&, ninfer::Tensor&, int, ninfer::targets::qwen3_6::TextPhase) ()
+#15 0x0000000007ed90bf in void ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::run_layers<ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::NullTap>(ninfer::Tensor&, ninfer::targets::qwen3_6::TextPhase, ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::NullTap&) [clone .constprop.0] ()
+#16 0x0000000007f4ab6c in ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::PrefillChunkResult ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::prefill_impl<ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::NullTap>(std::span<int const, 18446744073709551615ul>, ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::TextPrefill const*, ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::MultimodalPrefill const*, ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::NullTap&, bool) ()
+#17 0x0000000007ef4222 in ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::prefill_chunk(std::span<int const, 18446744073709551615ul>, unsigned int, unsigned int, bool) ()
+#18 0x0000000007f12141 in ninfer::runtime::tp2::run_tp2_request(ninfer::runtime::tp2::TpBackend&, ninfer::runtime::tp2::TpRequestConfig const&, std::function<void (int const*, int)>, ninfer::CancellationView const&, bool)::{lambda(int, ninfer::runtime::tp2::TpRankState&, ihipStream_t*)#1}::operator()(int, ninfer::runtime::tp2::TpRankState&, ihipStream_t*) const ()
+#19 0x0000000007f151e6 in std::thread::_State_impl<std::thread::_Invoker<std::tuple<ninfer::runtime::tp2::run_tp2_request(ninfer::runtime::tp2::TpBackend&, ninfer::runtime::tp2::TpRequestConfig const&, std::function<void (int const*, int)>, ninfer::CancellationView const&, bool)::{lambda()#2}> > >::_M_run() ()
+(More stack frames follow...)
+
+Thread 22 (Thread 0x7ffb9bf3f6c0 (LWP 274061) "ninfer-serve_c6"):
+#0  0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=<optimized out>, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7ffb94000c48) at ./nptl/futex-internal.c:57
+#1  __futex_abstimed_wait_common (cancel=true, private=<optimized out>, abstime=0x0, clockid=0, expected=0, futex_word=0x7ffb94000c48) at ./nptl/futex-internal.c:87
+#2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x7ffb94000c48, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=<optimized out>) at ./nptl/futex-internal.c:139
+#3  0x00007fffbbaa4fff in do_futex_wait (sem=sem@entry=0x7ffb94000c48, abstime=0x0, clockid=0) at ./nptl/sem_waitcommon.c:111
+#4  0x00007fffbbaa5098 in __new_sem_wait_slow64 (sem=0x7ffb94000c48, abstime=0x0, clockid=0) at ./nptl/sem_waitcommon.c:183
+#5  0x00007fffbc5a6ad8 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#6  0x00007fffbc5a668a in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#7  0x00007fffbc2c8b84 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#8  0x00007fffbc4a3e7e in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#9  0x00007fffbc482002 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#10 0x00007ffff7e0da82 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#11 0x00007ffff7e1355b in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#12 0x00007ffff7e12a02 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#13 0x00007ffff7e0ebe5 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#14 0x00007ffff7e03aae in ncclAllReduce () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#15 0x0000000007f73e59 in ninfer::multi_gpu::TpGroup::allreduce_local_bf16(int, void*, unsigned long, void*) ()
+#16 0x0000000007ec70a9 in ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::gdn_mix_tp(ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::GdnLayerW const&, ninfer::Tensor&, int, ninfer::targets::qwen3_6::TextPhase) ()
+#17 0x0000000007ed90bf in void ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::run_layers<ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::NullTap>(ninfer::Tensor&, ninfer::targets::qwen3_6::TextPhase, ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::NullTap&) [clone .constprop.0] ()
+#18 0x0000000007f4ab6c in ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::PrefillChunkResult ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::prefill_impl<ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::NullTap>(std::span<int const, 18446744073709551615ul>, ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::TextPrefill const*, ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::MultimodalPrefill const*, ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::NullTap&, bool) ()
+#19 0x0000000007ef4222 in ninfer::targets::qwen3_6::detail::qwen3_6_27b_runtime::schedule::TextContext::prefill_chunk(std::span<int const, 18446744073709551615ul>, unsigned int, unsigned int, bool) ()
+(More stack frames follow...)
+
+Thread 21 (Thread 0x7ff6d1e3e6c0 (LWP 273641) "ninfer-serve_c6"):
+#0  0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=265, expected=0, futex_word=0x7ff6d4034158) at ./nptl/futex-internal.c:57
+#1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x7ff6d4034158) at ./nptl/futex-internal.c:87
+#2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x7ff6d4034158, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=128) at ./nptl/futex-internal.c:139
+#3  0x00007fffbba9b8cd in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x7ff6d4034108, cond=0x7ff6d4034130) at ./nptl/pthread_cond_wait.c:503
+#4  ___pthread_cond_wait (cond=0x7ff6d4034130, mutex=0x7ff6d4034108) at ./nptl/pthread_cond_wait.c:627
+#5  0x00007ffff7e2844f in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#6  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#7  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 20 (Thread 0x7ff6d3d736c0 (LWP 273638) "ninfer-serve_c6"):
+#0  0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=265, expected=0, futex_word=0x7ff6fc49b158) at ./nptl/futex-internal.c:57
+#1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x7ff6fc49b158) at ./nptl/futex-internal.c:87
+#2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x7ff6fc49b158, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=128) at ./nptl/futex-internal.c:139
+#3  0x00007fffbba9b8cd in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x7ff6fc49b108, cond=0x7ff6fc49b130) at ./nptl/pthread_cond_wait.c:503
+#4  ___pthread_cond_wait (cond=0x7ff6fc49b130, mutex=0x7ff6fc49b108) at ./nptl/pthread_cond_wait.c:627
+#5  0x00007ffff7e2844f in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#6  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#7  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 19 (Thread 0x7ff6d35726c0 (LWP 273639) "ninfer-serve_c6"):
+#0  0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=265, expected=0, futex_word=0x7ff6dc2f5158) at ./nptl/futex-internal.c:57
+#1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x7ff6dc2f5158) at ./nptl/futex-internal.c:87
+#2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x7ff6dc2f5158, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=128) at ./nptl/futex-internal.c:139
+#3  0x00007fffbba9b8cd in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x7ff6dc2f5108, cond=0x7ff6dc2f5130) at ./nptl/pthread_cond_wait.c:503
+#4  ___pthread_cond_wait (cond=0x7ff6dc2f5130, mutex=0x7ff6dc2f5108) at ./nptl/pthread_cond_wait.c:627
+#5  0x00007ffff7e2844f in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#6  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#7  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 18 (Thread 0x7ff6d2d716c0 (LWP 273640) "ninfer-serve_c6"):
+#0  0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=265, expected=0, futex_word=0x7ff6d42f5158) at ./nptl/futex-internal.c:57
+#1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x7ff6d42f5158) at ./nptl/futex-internal.c:87
+#2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x7ff6d42f5158, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=128) at ./nptl/futex-internal.c:139
+#3  0x00007fffbba9b8cd in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x7ff6d42f5108, cond=0x7ff6d42f5130) at ./nptl/pthread_cond_wait.c:503
+#4  ___pthread_cond_wait (cond=0x7ff6d42f5130, mutex=0x7ff6d42f5108) at ./nptl/pthread_cond_wait.c:627
+#5  0x00007ffff7e2844f in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#6  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#7  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 17 (Thread 0x7ff6fd9f96c0 (LWP 273633) "ninfer-serve_c6"):
+#0  0x00007fffbbb1b79d in __GI___poll (fds=0x7ff6fd9eca78, nfds=1, timeout=500) at ../sysdeps/unix/sysv/linux/poll.c:29
+#1  0x00007ffff7e2c4d2 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#2  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#3  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 16 (Thread 0x7ff6fe1fa6c0 (LWP 273632) "ninfer-serve_c6"):
+#0  0x00007fffbbb1b79d in __GI___poll (fds=0x7ff6fe1eda78, nfds=1, timeout=500) at ../sysdeps/unix/sysv/linux/poll.c:29
+#1  0x00007ffff7e2c4d2 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#2  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#3  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 15 (Thread 0x7ff6ff1fc6c0 (LWP 273630) "ninfer-serve_c6"):
+#0  0x00007fffbbb1b79d in __GI___poll (fds=0x7ff6ff1efa78, nfds=1, timeout=500) at ../sysdeps/unix/sysv/linux/poll.c:29
+#1  0x00007ffff7e2c4d2 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#2  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#3  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 14 (Thread 0x7ff6fe9fb6c0 (LWP 273631) "ninfer-serve_c6"):
+#0  0x00007fffbbb1b79d in __GI___poll (fds=0x7ff6fe9eea78, nfds=1, timeout=500) at ../sysdeps/unix/sysv/linux/poll.c:29
+#1  0x00007ffff7e2c4d2 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#2  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#3  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 13 (Thread 0x7ff7009ff6c0 (LWP 273628) "ninfer-serve_c6"):
+#0  0x00007fffbbb1b79d in __GI___poll (fds=0x7ff7009f0d00, nfds=65, timeout=500) at ../sysdeps/unix/sysv/linux/poll.c:29
+#1  0x00007ffff7e2a440 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#2  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#3  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 12 (Thread 0x7ff7001fe6c0 (LWP 273629) "ninfer-serve_c6"):
+#0  0x00007fffbbb1b79d in __GI___poll (fds=0x7ff7001efd00, nfds=65, timeout=500) at ../sysdeps/unix/sysv/linux/poll.c:29
+#1  0x00007ffff7e2a440 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#2  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#3  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 11 (Thread 0x7ff6ff9fd6c0 (LWP 273627) "ninfer-serve_c6"):
+#0  0x00007fffbbb1b79d in __GI___poll (fds=0x7ff6ff9eed00, nfds=65, timeout=500) at ../sysdeps/unix/sysv/linux/poll.c:29
+#1  0x00007ffff7e2a440 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#2  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#3  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 10 (Thread 0x7ff7489be6c0 (LWP 273626) "ninfer-serve_c6"):
+#0  0x00007fffbbb1b79d in __GI___poll (fds=0x7ff7489afd00, nfds=65, timeout=500) at ../sysdeps/unix/sysv/linux/poll.c:29
+#1  0x00007ffff7e2a440 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/librccl.so.1
+#2  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#3  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 9 (Thread 0x7ff730bff6c0 (LWP 273607) "ninfer-serve_c6"):
+#0  0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x96c41dc) at ./nptl/futex-internal.c:57
+#1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x96c41dc) at ./nptl/futex-internal.c:87
+#2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x96c41dc, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=0) at ./nptl/futex-internal.c:139
+#3  0x00007fffbba9b8cd in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x96c4188, cond=0x96c41b0) at ./nptl/pthread_cond_wait.c:503
+#4  ___pthread_cond_wait (cond=0x96c41b0, mutex=0x96c4188) at ./nptl/pthread_cond_wait.c:627
+#5  0x0000000007f740c0 in std::thread::_State_impl<std::thread::_Invoker<std::tuple<ninfer::multi_gpu::TpGroup::TpGroup(ninfer::multi_gpu::TpGroupOptions)::{lambda()#1}> > >::_M_run() ()
+#6  0x00007fffbbeecdb4 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#7  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#8  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 8 (Thread 0x7ff733fff6c0 (LWP 273606) "ninfer-serve_c6"):
+#0  0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x90dbdc8) at ./nptl/futex-internal.c:57
+#1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x90dbdc8) at ./nptl/futex-internal.c:87
+#2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x90dbdc8, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=0) at ./nptl/futex-internal.c:139
+#3  0x00007fffbba9b8cd in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x90dbd78, cond=0x90dbda0) at ./nptl/pthread_cond_wait.c:503
+#4  ___pthread_cond_wait (cond=0x90dbda0, mutex=0x90dbd78) at ./nptl/pthread_cond_wait.c:627
+#5  0x0000000007f740c0 in std::thread::_State_impl<std::thread::_Invoker<std::tuple<ninfer::multi_gpu::TpGroup::TpGroup(ninfer::multi_gpu::TpGroupOptions)::{lambda()#1}> > >::_M_run() ()
+#6  0x00007fffbbeecdb4 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#7  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#8  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 7 (Thread 0x7ff73bdff6c0 (LWP 273605) "ninfer-serve_c6"):
+#0  0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x8fc9c78) at ./nptl/futex-internal.c:57
+#1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x8fc9c78) at ./nptl/futex-internal.c:87
+#2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x8fc9c78, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=0) at ./nptl/futex-internal.c:139
+#3  0x00007fffbba9b8cd in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x8fc9c28, cond=0x8fc9c50) at ./nptl/pthread_cond_wait.c:503
+#4  ___pthread_cond_wait (cond=0x8fc9c50, mutex=0x8fc9c28) at ./nptl/pthread_cond_wait.c:627
+#5  0x0000000007f740c0 in std::thread::_State_impl<std::thread::_Invoker<std::tuple<ninfer::multi_gpu::TpGroup::TpGroup(ninfer::multi_gpu::TpGroupOptions)::{lambda()#1}> > >::_M_run() ()
+#6  0x00007fffbbeecdb4 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#7  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#8  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 6 (Thread 0x7ff7437ff6c0 (LWP 273604) "ninfer-serve_c6"):
+#0  0x00007fffbba98e51 in __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x8fc7d18) at ./nptl/futex-internal.c:57
+#1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x8fc7d18) at ./nptl/futex-internal.c:87
+#2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x8fc7d18, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=0) at ./nptl/futex-internal.c:139
+#3  0x00007fffbba9b8cd in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x8fc7cc8, cond=0x8fc7cf0) at ./nptl/pthread_cond_wait.c:503
+#4  ___pthread_cond_wait (cond=0x8fc7cf0, mutex=0x8fc7cc8) at ./nptl/pthread_cond_wait.c:627
+#5  0x0000000007f740c0 in std::thread::_State_impl<std::thread::_Invoker<std::tuple<ninfer::multi_gpu::TpGroup::TpGroup(ninfer::multi_gpu::TpGroupOptions)::{lambda()#1}> > >::_M_run() ()
+#6  0x00007fffbbeecdb4 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#7  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#8  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 4 (Thread 0x7ff7491bf6c0 (LWP 273602) "ninfer-serve_c6"):
+#0  __GI__exit (status=72) at ../sysdeps/unix/sysv/linux/_exit.c:27
+#1  0x0000000007f7618a in ninfer::multi_gpu::ar_watchdog_default_death(void*, ninfer::multi_gpu::ArWatchdogView const&, int, int, unsigned long) ()
+#2  0x00007fffbbeecdb4 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+#3  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#4  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 2 (Thread 0x7fffa9dff6c0 (LWP 273579) "ninfer-serve_c6"):
+#0  __GI___ioctl (fd=4, request=3222817548) at ../sysdeps/unix/sysv/linux/ioctl.c:36
+#1  0x00007fffad931250 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#2  0x00007fffad92a088 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#3  0x00007fffad8a6bdc in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#4  0x00007fffad869636 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#5  0x00007fffad88b09a in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#6  0x00007fffad82e80b in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#7  0x00007fffbba9cb84 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:447
+#8  0x00007fffbbb29ecc in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+Thread 1 (Thread 0x7fffaa052ac0 (LWP 273572) "ninfer-serve_c6"):
+#0  0x00007fffad86e503 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#1  0x00007fffad86e35e in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#2  0x00007fffad862c91 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#3  0x00007fffad8358f0 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#4  0x00007fffad855e98 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#5  0x00007fffad8af392 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#6  0x00007fffad8aea2b in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#7  0x00007fffad86546b in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libhsa-runtime64.so.1
+#8  0x00007fffbc5bfbf3 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#9  0x00007fffbc567b7a in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#10 0x00007fffbc567bb3 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#11 0x00007fffbc59d967 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#12 0x00007fffbc317cc8 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#13 0x00007fffbc31df7b in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#14 0x00007fffbc2c8ac7 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#15 0x00007fffbc4a3e7e in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#16 0x00007fffbc47467d in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#17 0x00007fffbc47f916 in ?? () from /opt/rocm-6.2.0/lib/llvm/bin/../../../lib/libamdhip64.so.6
+#18 0x0000000008161f42 in ninfer::multi_gpu::one_shot_axpy_bf16(void*, void const*, unsigned long, ihipStream_t*) ()
+#19 0x0000000007f7401a in ninfer::multi_gpu::TpGroup::allreduce_local_bf16(int, void*, unsigned long, void*) ()
+(More stack frames follow...)
+[Inferior 1 (process 273572) killed]

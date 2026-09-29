@@ -1,0 +1,37 @@
+WO_MADMIX_REATTEMPT ATTEMPT 3 ROW — conversion-stream consolidation, BIT-EXACT fp32 frame:
+FAIL at both bars, ceiling EXPLAINED. 2026-09-19, desk amd/wo-madmix, cell commit 8c9e33bb9,
+run2 log (consol binary) + WO_MADMIX_REATTEMPT_census_rows.txt.
+
+THE ATTEMPT (genuinely distinct: no half-width arithmetic anywhere — V0's arithmetic bit-preserved):
+  (a) pair-index byte extraction via __builtin_amdgcn_ubfe(word, 8*(v&3), 8) — 1 op to replace
+      lshlrev+and; (b) scale-quad extraction likewise; (c) the per-use XOR-swizzle address op
+      deleted by +1-word row padding (33-word rows; bank math conflict-free both directions;
+      LDS 19968 B, 2 blocks/CU kept — headroom check vs the 19456 B budget: +512 B, register-
+      limited occupancy unchanged).
+
+CENSUS (pre-registered bar: conversion-issue count -30%): FAIL —
+  consol <96/80,128>: 4322 instr / 130 VGPR / 0 B scratch / 2048 fma + 272 mul / waits 236 /
+  lshlrev 422 + and 297 + bfe 33 per (unsplit) k-tile body vs V0 2x(232+181+33)=892 => -15.7%.
+  TWO compiler mechanisms defeated the source-level consolidation:
+  1. LLVM canonicalizes constant __builtin_amdgcn_ubfe back to lshlrev+and before ISel (bfe
+     count unchanged at 33) — V0's 2-op extract IS the compiler's own canonical form; the ops
+     the WO wanted to delete do not exist as deletable instructions.
+  2. The addressing change perturbed the scheduler's register-pressure fission: the k-tile body
+     stopped splitting into V0's two 16-(g,v) passes (2048 fma in one body vs 2x1024) — a shape
+     change, not a saving.
+
+MEASURED (M=128, patterned data, 3-run reproduced, same-run V0 anchor):
+  [96,128] Residual6144: V0 3.785-3.800 ms (2120.2 GF/s) | consol 3.774-3.797 ms (2134.1 GF/s)
+    | ratio 1.007x — G-MM-0 FAIL (bar >= 3% at [96,128])
+  [80,128] GdnInput:     V0 8.560-8.594 ms (2504.2 GF/s) | consol 8.298-8.312 ms (2587.2 GF/s)
+    | ratio 1.033x — above 3% ONLY off the named bar geometry, within the V0 cross-binary
+    variance band (V0 itself 2120-2167 across binaries = ~2%)
+NUMERICS: relL2 vs fp64 golden 1.65e-03 PASS; relL2 vs V0 = 0.00e+00 — BIT-EXACT to V0 exactly
+  as designed (addressing-only change; the strongest possible numerics receipt). Falsifier trips.
+VERDICT: attempt 3 FAILS. The bit-exact fp32 frame has NO >=30% conversion-op lever: the x-side
+  unpack (2 ops/use) is irreducible without half-width operands (= attempt-1 land), the pair
+  extract is already compiler-canonical, and the fp64-golden/consol-vs-V0 bit-identity proves
+  the harness while the census + cell prove the ceiling. The -30% class lives only across the
+  fp32/fp16 boundary — which is precisely the attempt-1 mad-mix arm, where the decode stream
+  measured lshlrev 107 + and 57 vs V0's 232+181 (banked in the attempt-1 row). Family
+  consequence per the WO kill-switch: rows banked, no re-evaluation unless the ISA changes.

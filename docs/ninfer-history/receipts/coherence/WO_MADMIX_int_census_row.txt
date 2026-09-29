@@ -1,0 +1,44 @@
+WO_MADMIX_REATTEMPT INTEGRATION CENSUS ROW — serving TU nvfp4_tiled_gemm_hip.cu, branch amd/wo-madmix-int
+2026-09-19, desk amd-wo-madmix-int (agent #2). Census = -S emission of the EXACT build compile line
+(/opt/rocm-6.2.0 clang++ -O3 -DNDEBUG -std=gnu++20 --offload-arch=gfx900 + TU flags
+-fgpu-flush-denormals-to-zero -ffp-contract=off), tool tools/v340l/w3_census.py; artifacts
+/home/chris/worktrees/amd-wo-madmix-int/build-tmp/{mm_flags.s,v0_prod.s} (flags vs production flags).
+BANKED BIN: /home/chris/artifacts_bin/ninfer-serve_cc122cc0ab616e4e.bin (sha256
+cc122cc0ab616e4ec018c2b63378ffd9e29a0e197c91148f32a20de63e35b04d, 139,977,720 B, built
+build-hip-amd/apps/ninfer-serve, NINFER_BUILD_APPS=OFF + NINFER_HIP_BUILD_SERVE=ON).
+
+MM KERNEL (the served route; all 21 STILES x TN instantiations embedded — strings census 21/21):
+  nvfp4_tiled_gemm_hip_kernel_mm<96,128>  n_instr=2859 vgpr=122 privateB=80 groupB(LDS)=18432
+    v_mad_mix_f32=1024  v_cvt_f16_f32=10  v_bfe=33  v_lshlrev=107  v_and_b32=57  v_or_b32=44
+    ds_read_b32=208  s_waitcnt=211
+  nvfp4_tiled_gemm_hip_kernel_mm<80,128>  IDENTICAL to the line above
+  => byte-matches the CELL's banked mm2 census (2859/122/80/1024, lshlrev+and 164 vs V0's 413)
+     exactly — the integration port is census-identical to the benched arm (1.119x / 1.104x,
+     relL2 0.0 vs V0). GATES: v_mad_mix_f32 FORMED (1024); VGPR 122 <= 136 bar; scratch 80 B =
+     V0's own class, NO new spill.
+  mm family across all instantiations: VGPR 122 (TN=128) / 156 (TN=32) / 172 (TN=256) vs V0's
+  128 / 162 / 191 — mm is NARROWER than V0 everywhere; privateB <= 80 everywhere, NONE above
+  V0's class. (Pre-registered bar is the served geometry TN=128 — G-MM-2 boots run
+  --prefill-chunk 128.)
+
+V0 ANCHOR (flag validity — the pre-registered requirement):
+  nvfp4_tiled_gemm_hip_kernel<96,128> under TU FLAGS: 3143 instr / 128 VGPR / 80 B / 19456 LDS
+    / v_fma_f32=1024 + v_mul_f32=144 / v_lshlrev=232 + v_and_b32=181 / s_waitcnt=212
+  = the banked PRODUCTION signature, and = the SAME TU compiled WITHOUT the flags:
+    ALL V0 shipped-kernel bodies byte-IDENTICAL between mm_flags.s and v0_prod.s (0 differ);
+    whole-TU metadata diffs flags-vs-prod = 21, ALL inside the mm family (flags IMPROVE mm VGPR
+    127->122 / 174->156 / 174->172); every non-mm kernel metadata-identical. The 51 non-mm
+    body diffs (vperm 7, pk 42, module ctor/dtor 2) are the GATED-OFF arms
+    (NINFER_VPERM_ARM / NINFER_TILED_PK unset in serving) at UNCHANGED resources — not on the
+    default route.
+  v_mad_mix_f32 total: 25088 in the flags emission, 0 in the production-flags emission —
+  formation is flag-gated exactly as the cell's probe declared.
+
+LINK CENSUS (the shipped binary): nm 42 kernel_mm symbols (21 device + 21 stubs);
+  strings 21 distinct nvfp4_tiled_gemm_hip_kernel_mmILi*ELi*E code-object kernel names;
+  NINFER_MADMIX env literal present (runtime kill-switch compiled in).
+
+VERDICT: INTEGRATION CENSUS GREEN — v_mad_mix_f32 present in the SERVING TU's kernel at the
+cell's count, VGPR <= 136, no spill growth anywhere in the TU, V0 flag-invariance proven in-TU.
+NEXT: G-MM-2 pairs (coordinator word only) — tools/v340l/wo_madmix_gmm2_pairs.sh, V0 arm
+defaults to the canonical serve_10k bin, MM arm defaults to cc122cc0ab616e4e.

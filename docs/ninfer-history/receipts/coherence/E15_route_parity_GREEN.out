@@ -1,0 +1,52 @@
+C=4096 T=65 sequence-vs-pairs                mismatches=      0/ 266240 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=4096 T=65 sequence-vs-scalar-prefill       mismatches=      0/ 266240 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=4096 T=65 sequence-vs-cpu-oracle           mismatches=      0/ 266240 ORACLE-OK
+C=4096 T=96 sequence-vs-pairs                mismatches=      0/ 393216 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=4096 T=96 sequence-vs-scalar-prefill       mismatches=      0/ 393216 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=4096 T=96 sequence-vs-cpu-oracle           mismatches=      0/ 393216 ORACLE-OK
+C=4096 T=257 sequence-vs-pairs               mismatches=      0/1052672 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=4096 T=257 sequence-vs-scalar-prefill      mismatches=      0/1052672 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=4096 T=257 sequence-vs-cpu-oracle          mismatches=      0/1052672 ORACLE-OK
+C=10240 T=65 sequence-vs-pairs               mismatches=      0/ 665600 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=10240 T=65 sequence-vs-scalar-prefill      mismatches=      0/ 665600 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=10240 T=65 sequence-vs-cpu-oracle          mismatches=      0/ 665600 ORACLE-OK
+C=8192 T=130 sequence-vs-pairs               mismatches=      0/1064960 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=8192 T=130 sequence-vs-scalar-prefill      mismatches=      0/1064960 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=8192 T=130 sequence-vs-cpu-oracle          mismatches=      0/1064960 ORACLE-OK
+C=512 T=65 sequence-vs-pairs                 mismatches=      0/  33280 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=512 T=65 sequence-vs-scalar-prefill        mismatches=      0/  33280 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=512 T=65 sequence-vs-cpu-oracle            mismatches=      0/  33280 ORACLE-OK
+C=510 T=65 sequence-vs-pairs                 mismatches=      0/  33150 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=510 T=65 sequence-vs-scalar-prefill        mismatches=      0/  33150 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=510 T=65 sequence-vs-cpu-oracle            mismatches=      0/  33150 ORACLE-OK
+split3 C=2560 {512,512,1536} T=65 q sequence-vs-pairs mismatches=      0/  33280 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=65 k sequence-vs-pairs mismatches=      0/  33280 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=65 v sequence-vs-pairs mismatches=      0/  99840 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=65 q sequence-vs-scalar mismatches=      0/  33280 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=65 k sequence-vs-scalar mismatches=      0/  33280 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=65 v sequence-vs-scalar mismatches=      0/  99840 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=96 q sequence-vs-pairs mismatches=      0/  49152 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=96 k sequence-vs-pairs mismatches=      0/  49152 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=96 v sequence-vs-pairs mismatches=      0/ 147456 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=96 q sequence-vs-scalar mismatches=      0/  49152 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=96 k sequence-vs-scalar mismatches=      0/  49152 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=96 v sequence-vs-scalar mismatches=      0/ 147456 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=257 q sequence-vs-pairs mismatches=      0/ 131584 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=257 k sequence-vs-pairs mismatches=      0/ 131584 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=257 v sequence-vs-pairs mismatches=      0/ 394752 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=257 q sequence-vs-scalar mismatches=      0/ 131584 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=257 k sequence-vs-scalar mismatches=      0/ 131584 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=257 v sequence-vs-scalar mismatches=      0/ 394752 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=1280 {256,256,768} T=65 q sequence-vs-pairs mismatches=      0/  16640 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=1280 {256,256,768} T=65 k sequence-vs-pairs mismatches=      0/  16640 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=1280 {256,256,768} T=65 v sequence-vs-pairs mismatches=      0/  49920 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=1280 {256,256,768} T=65 q sequence-vs-scalar mismatches=      0/  16640 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=1280 {256,256,768} T=65 k sequence-vs-scalar mismatches=      0/  16640 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=1280 {256,256,768} T=65 v sequence-vs-scalar mismatches=      0/  49920 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=70 {13,17,40} T=65 q sequence-vs-pairs mismatches=      0/    845 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=70 {13,17,40} T=65 k sequence-vs-pairs mismatches=      0/   1105 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=70 {13,17,40} T=65 v sequence-vs-pairs mismatches=      0/   2600 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=70 {13,17,40} T=65 q sequence-vs-scalar mismatches=      0/    845 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=70 {13,17,40} T=65 k sequence-vs-scalar mismatches=      0/   1105 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=70 {13,17,40} T=65 v sequence-vs-scalar mismatches=      0/   2600 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+OK e13_conv_route_parity

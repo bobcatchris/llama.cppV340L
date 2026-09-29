@@ -1,0 +1,11 @@
+=== G-Q1 behavioral parity probes (5 diverse) ===
+PROBE essay: finish=stop len=354 head=Harbors were built near deep water so that large ships could
+PROBE story: finish=stop len=543 head=The cat pried open the loose floorboard and found a brass ke
+PROBE count: finish=stop len=277 head=one, two, three, four, five, six, seven, eight We need answe
+PROBE code: finish=stop len=465 head=```python def sum_numbers(numbers):     return sum(numbers) 
+PROBE stop: finish=stop len=236 head=BLUE The user is asking me to reply with exactly the word "B
+=== G-Q2 needle retrieval ===
+NEEDLE needle_3800_d0.25: PASS (ORCHID-TUNNEL)
+NEEDLE needle_3800_d0.5: PASS (MARBLE-COMPASS)
+NEEDLE needle_3800_d0.75: PASS (CINDER-HARBOR)
+=== transcripts: /tmp/k4v4_gates_191422 ===

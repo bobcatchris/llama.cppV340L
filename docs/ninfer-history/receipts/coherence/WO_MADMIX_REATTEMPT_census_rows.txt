@@ -1,0 +1,45 @@
+====================================================================================================
+V0 <96,128> PROD flags (consol binary)
+  void ninfer::ops::detail::tiled_gemm_impl::nvfp4_tiled_gemm_hip_kernel<96, 128>(unsigned short const
+    n_instr=3143 vgpr(next_free)=128 privateB=80 groupB(LDS)=19456
+    v_fma_f32=1024  v_mul_f32=144  v_bfe=33  v_lshlrev=232  v_and_b32=181  v_or_b32=43  v_lshl_or=1  ds_read_b32=144  ds_read_b64=64  s_waitcnt=212
+====================================================================================================
+V0 <80,128> PROD flags (consol binary)
+  void ninfer::ops::detail::tiled_gemm_impl::nvfp4_tiled_gemm_hip_kernel<80, 128>(unsigned short const
+    n_instr=3143 vgpr(next_free)=128 privateB=80 groupB(LDS)=19456
+    v_fma_f32=1024  v_mul_f32=144  v_bfe=33  v_lshlrev=232  v_and_b32=181  v_or_b32=43  v_lshl_or=1  ds_read_b32=144  ds_read_b64=64  s_waitcnt=212
+====================================================================================================
+ATTEMPT 3 consol <96,128>
+  void consol::tiled_consol_kernel<96, 128>(unsigned short const*, unsigned char const*, unsigned char
+    n_instr=4322 vgpr(next_free)=130 privateB=0 groupB(LDS)=19968
+    v_fma_f32=2048  v_mul_f32=272  v_bfe=33  v_lshlrev=422  v_and_b32=297  v_or_b32=43  v_lshl_or=1  ds_read_b32=16  ds_read_b64=128  s_waitcnt=236
+====================================================================================================
+ATTEMPT 3 consol <80,128>
+  void consol::tiled_consol_kernel<80, 128>(unsigned short const*, unsigned char const*, unsigned char
+    n_instr=4322 vgpr(next_free)=130 privateB=0 groupB(LDS)=19968
+    v_fma_f32=2048  v_mul_f32=272  v_bfe=33  v_lshlrev=422  v_and_b32=297  v_or_b32=43  v_lshl_or=1  ds_read_b32=16  ds_read_b64=128  s_waitcnt=236
+====================================================================================================
+V0 <96,128> MM flags (anchor validity)
+  void ninfer::ops::detail::tiled_gemm_impl::nvfp4_tiled_gemm_hip_kernel<96, 128>(unsigned short const
+    n_instr=3143 vgpr(next_free)=128 privateB=80 groupB(LDS)=19456
+    v_fma_f32=1024  v_mul_f32=144  v_bfe=33  v_lshlrev=232  v_and_b32=181  v_or_b32=43  v_lshl_or=1  ds_read_b32=144  ds_read_b64=64  s_waitcnt=212
+====================================================================================================
+V0 <80,128> MM flags (anchor validity)
+  void ninfer::ops::detail::tiled_gemm_impl::nvfp4_tiled_gemm_hip_kernel<80, 128>(unsigned short const
+    n_instr=3143 vgpr(next_free)=128 privateB=80 groupB(LDS)=19456
+    v_fma_f32=1024  v_mul_f32=144  v_bfe=33  v_lshlrev=232  v_and_b32=181  v_or_b32=43  v_lshl_or=1  ds_read_b32=144  ds_read_b64=64  s_waitcnt=212
+====================================================================================================
+ATTEMPT 1 mm2 <96,128>
+  void mm2::tiled_mm2_kernel<96, 128>(unsigned short const*, unsigned char const*, unsigned char const
+    n_instr=2859 vgpr(next_free)=122 privateB=80 groupB(LDS)=18432
+    v_mad_mix_f32=1024  v_bfe=33  v_lshlrev=107  v_and_b32=57  v_or_b32=44  v_lshl_or=1  ds_read_b32=208  s_waitcnt=211  v_cvt_f16_f32=10
+====================================================================================================
+ATTEMPT 1 mm2 <80,128>
+  void mm2::tiled_mm2_kernel<80, 128>(unsigned short const*, unsigned char const*, unsigned char const
+    n_instr=2859 vgpr(next_free)=122 privateB=80 groupB(LDS)=18432
+    v_mad_mix_f32=1024  v_bfe=33  v_lshlrev=107  v_and_b32=57  v_or_b32=44  v_lshl_or=1  ds_read_b32=208  s_waitcnt=211  v_cvt_f16_f32=10
+====================================================================================================
+ATTEMPT 2 kernel_pk <96,128,W32>
+  void ninfer::ops::detail::tiled_gemm_impl::nvfp4_tiled_gemm_hip_kernel_pk<96, 128, 32>(unsigned shor
+    n_instr=4329 vgpr(next_free)=256 privateB=820 groupB(LDS)=18432
+    v_mul_f32=16  v_pk_fma_f16=1024  v_bfe=33  v_lshlrev=173  v_and_b32=69  v_or_b32=52  v_lshl_or=230  ds_read_b32=370  ds_read_b64=2  s_waitcnt=570  v_cvt_f16_f32=26  v_cvt_f32_f16=128

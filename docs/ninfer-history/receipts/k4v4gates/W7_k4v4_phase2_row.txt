@@ -1,0 +1,98 @@
+================================================================================
+W7_k4v4_phase2_row.txt — WO_Q4KV_K4V4 PHASE 2 (correctness gates) + PHASE 3 (perf)
+Desk: k4v4gates (Team Red agent #2) | 2026-09-19 23:15Z-00:1xZ (18:15-19:1x local)
+Bin:  /home/chris/artifacts_bin/ninfer-serve_f3312f25c8201da0.bin (PLOG-074 GREEN)
+Branch: amd/wo-k4v4gates (worktree /home/chris/worktrees/amd-wo-k4v4gates)
+Model: /home/chris/models/qwen3_8_27b_nvfp4.ninfer | canonical serve env (ws=96 MiB)
+Arms: BOOT1 kvarn_k4v4 | BOOT2 kvarn_k4v2 (fresh boots, same bodies, same order)
+================================================================================
+BOOT FACTS (preflight, measured; /health carries NO VRAM field in this bin):
+  k4v4 auto: cap=max_ctx=113472 tok, kv=11152 B/t/rank, req 8159/8160 MiB slack 0
+             (fixed 6947 = w 5131 + dec 1360 + ws 96 + staging 200 + pad 160)
+  k4v2 auto: cap=max_ctx=141056 tok, kv=8976 B/t/rank, req 8159/8160 MiB slack 0
+  (bf16 reference: 36352 auto, 34816 B/t, KV 1207 MiB/rank — PLOG-074/071 anchors)
+  k4v4 ratio vs k4v2: 11152/8976 = 1.2425 (WO cost table 140/108 = 1.296 class)
+--------------------------------------------------------------------------------
+G-Q1 BEHAVIORAL PARITY (5 diverse probes, short ctx) — PASS (both arms)
+  k4v4: essay 670 / story 545 / count 239 / code 157 / stop-BLUE 211 chars,
+        ALL finish=stop, coherent, ZERO mojibake            (GQ1_k4v4_boot1.txt)
+  k4v2: 354 / 543 / 277 / 465 / 236 chars, ALL finish=stop, ZERO mojibake
+                                                            (GQ1_k4v2_boot2.txt)
+  No completion-length collapse either arm; behavioral parity holds.
+  (Port battery context: k4v4 byte-identical to bf16-KV reference 5/5, PLOG-074.)
+--------------------------------------------------------------------------------
+G-Q2 NEEDLE RETRIEVAL (exact passphrase, 25/50/75% depth) — PASS <=9.5k; BLOCKED >~10.1k
+  3k-real (prompt=3041/3056): k4v4 3/3 PASS (ORCHID/MARBLE/CINDER)
+                              k4v2 3/3 PASS                 (needle3k_*_boot*.txt)
+  9473 tok: k4v4 exact retrieval PASS (ORCHID-TUNNEL, finish=stop, prefill 66.9 tok/s)
+  50k/150k: BLOCKER (new class, owner: kvarnport desk) —
+    kvarn long-prefill host std::bad_alloc at ~10.0-10.2k real tokens, 4/4
+    deterministic (49269-tok x3 at ~10.1k; 19709-tok at 9984/19709=51%),
+    ALL 4 ranks, RSS FLAT 2978->2995 MB with 55-56 GB host free (RSS-traced),
+    VRAM pool fine. NOT memory pressure — position-locked allocation failure.
+    Bracket: PASS 9473 / DIE 9984..10240. bf16 prefilled 36352 routinely ->
+    kvarn-route-specific. 50k AND 150k legs + Phase 3b unreachable on this bin.
+    (AMBER residue from port battery: GONE — 3k needles 3/3 finish=stop on GREEN bin;
+     the old finish=length+empty signature reproduced only as a TOOL artifact:
+     reasoning model + max_tokens=24, fixed in tools commit series on this branch.)
+  k4v4 >= k4v2: no cell where k4v4 < k4v2 (3k: both 3/3 exact). STOP-condition NOT fired.
+--------------------------------------------------------------------------------
+G-Q3 MTP ACCEPTANCE @ mt=600 (identical counting prompt, short ctx) — PASS
+  k4v4: acceptance 0.86, tok/round 2.73, rounds 220, 600/600 tok
+  k4v2: acceptance 0.88, tok/round 2.75, rounds 218, 600/600 tok
+  Drop = 2 pp < 4 pp gate. (Port k4v4 battery: 0.99/2.99 on ITS probe — prompt-dependent.)
+--------------------------------------------------------------------------------
+G-Q4 SOAK @ mt=600 (10 legs/arm, 206-round-style full legs) — PASS (both arms stable)
+  k4v4: 10/10 600/600 finish=length, acceptance 0.86 FLAT, tok/round 2.73 FLAT,
+        ZERO mojibake, no drift; decode 31.2->43.4 s (thermal ramp then 43.0+-0.5 plateau),
+        edge 80->84 C
+  k4v2: 10/10 600/600, acceptance 0.88 FLAT, tok/round 2.75 FLAT, ZERO mojibake,
+        decode plateau 42.3-43.4 s, edge 83->84 C                    (soak_*_leg*.json)
+--------------------------------------------------------------------------------
+PHASE 3 PERF (ordinal-paired, PLOG-060; within-ordinal law absorbs thermal drift)
+  PREFILL (3x 10k-gen probes, 7915-7930 real tok, fresh boots, IDENTICAL bodies+order):
+    ordinal |  k4v4 prefill | k4v4 tok/s | k4v2 prefill | k4v2 tok/s | delta(wall)
+      1     |    81.84 s    |   96.9     |   127.58 s   |   62.2     | k4v4 -35.8%
+      2     |   111.04 s    |   71.3     |   166.82 s   |   47.5     | k4v4 -33.4%
+      3     |   157.64 s    |   50.2     |   181.92 s   |   43.6     | k4v4 -13.3%
+    k4v4 is FASTER in every ordinal — the WO ">3% slower" report-trigger never fires.
+    CONFOUND (clocks sideband, banked): k4v4 arm sampled mclk lvl1-500/sclk-991
+    (one lvl3-945/sclk-1269 burst); k4v2 arm ran hotter (84 C) with mclk mostly
+    lvl0-167/sclk-560 — the k4v2 numbers are thermally depressed. DIRECTION of the
+    gate is safe (k4v4 not slower); MAGNITUDE needs a cold cold-pair re-run before
+    being quoted as a kernel-level v4>v2 fact.
+  DECODE (mt=600 legs, short ctx): effective 600/decode_s —
+    k4v4 13.83 tok/s (leg10 43.40 s) vs k4v2 14.00 tok/s (leg10 42.85 s) = -1.2%
+    = within the +-2% noise law. tok/round 2.73 vs 2.75. Phase 3b (100k decode):
+    BLOCKED by the prefill wall.
+  VRAM RECORDS: auto-KV lines above; explicit-capacity refusals (live allocator gate,
+    clean, exactly as law requires):
+    k4v4 @151552: required 8564 / usable 8160 MiB, slack -404 (kv 1611 MiB) -> REFUSED
+    k4v2 @151552: required 8249 / usable 8160 MiB, slack -89  (kv 1297 MiB) -> REFUSED
+    => ws=96 posture maxima: k4v4 ~113472 tok, k4v2 ~141056 tok; 151552 needs a
+    smaller staging/arena/ws posture (staging 200 + pad 160 + ws 96 = 456 MiB of levers).
+--------------------------------------------------------------------------------
+PROMOTION GATE (pre-registered): quality ALL PASS + prefill within 3% + decode in noise
+  => VERDICT: NOT MET — G-Q2's 50k/150k legs are UNRUN (BLOCKER, not a quality FAIL).
+  Default unchanged (production default on THIS line is bf16-KV; k4v2 remains the
+  rollback dial; nothing flipped). All short-ctx evidence is GREEN for k4v4:
+  behavioral parity, 3k+9.5k needle exactness, acceptance -2pp, soak stable,
+  prefill/decode no-regression. After the kvarnport desk kills the ~10.1k wall,
+  G-Q2 long legs + Phase 3b re-run on the same tools (this branch, commit series).
+--------------------------------------------------------------------------------
+TOOL FIXES (this branch, RED->GREEN, needed by any re-runner):
+  T1 bodies need "model" field (RED: 'missing required field: model' on every probe)
+  T2 needle max_tokens 24->512 + probe budgets (reasoning model spends 24 tok in
+     reasoning_content -> empty content finish=length)
+  T3 NEEDLE_CTXS='' skip + curl -d @file (400 KB bodies > MAX_ARG_STRLEN 128K argv cap)
+EVIDENCE: serve_boot{1,2}_*_short.log, serve_boot{3,4}_*_151552.log, GQ1_*, needle3k_*,
+  resp_prefill10k_*.json, soak_*_leg*.json, mt600_req.json, prefill10k_[123].json,
+  clocks_prefill_*.txt, soak_temp_*.txt, rss_trace_20k.txt, resp_needle{20k,9500}.json
+  (needle50k_k4v4_boot1.txt = the 3-death run), all in results/amd/k4v4gates/.
+================================================================================
+
+POST-ROW COORDINATOR ADAPTATION (19ebc646d on this branch): G-Q2 long legs re-targeted
+to 113664-tok needles on BOTH tiers (k4v2 has ~27k headroom at 113664 -> fair paired
+point) + 50k mid anchor; refusal lines above = the ceiling receipt. Budget constant
+kvarn_kv_bytes_per_token(4,4)=11152 VERIFIED 0.16% vs measurement — do not "fix".
+ALL adapted legs queued behind BLOCKER #1 (kvarn long-prefill wall ~10.1k real tok).

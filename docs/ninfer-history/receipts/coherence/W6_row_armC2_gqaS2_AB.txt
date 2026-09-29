@@ -1,0 +1,10 @@
+W6 ARM-C2 row — NINFER_GQA_SPLITK=2 (explicit, pre-registered S=2 A/B) — S=4 WINS THE A/B, 2026-09-18 06:5x
+bin: /home/chris/artifacts_bin/ninfer-serve_a43312bb9634bef9.bin; env = baseline env + NINFER_GQA_SPLITK=2
+serve log: W6_boot_armC2_gqaS2_serve.log; sideband: W6_armC2_gqaS2_clocks.log; resp: W6_armC2_gqaS2_resp.json
+probe: plen-2016 first+only: finish=stop content='BLUE' completion=41 (parity), client wall 29.23 s
+route proof: [GQA] splitk=on splits=2 ctas=4x6x2=48 (base 4x6=24) width=128 geom=q6/kv1 br=32
+gqa n=16 4-rank: 33.567/30.256/30.279/31.283 -> MEAN 31.35 ms (S=4 auto was 29.26 — S=4 wins; fewer CTAs = longer walks)
+wall mean 1660.4 (S=4: 1614.0). VERDICT: the §7.6 pre-registered A/B closes in S=4's favor; the S=4 shortfall vs <20
+  is NOT a split-factor tuning issue — 29.3 is the fix's honest ceiling at this geometry (suspect for the desk: the
+  reduce pass + partial-store traffic eating the walk cut, and/or defect-(c) L2 reuse not materializing).
+  NINFER_GQA_SPLITK stays env-gated (no promotion; acceptance gate not met).

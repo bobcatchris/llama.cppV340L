@@ -1,0 +1,24 @@
+rounds parsed: 37
+capture-mode verify passes: 1 / 37
+
+== per-round host decomposition ==
+  verify issue (whole llama_decode)              n=37   med   11.836 ms  min   11.410  p90   12.054  max  234.859
+  verify meta host (graph_compute)               n=37   med   10.547 ms  min   10.161  p90   10.793  max  233.698
+  verify meta ar (RCCL enqueues)                 n=37   med    5.371 ms  min    5.138  p90    5.428  max    9.916
+  verify capture-mode die-capture host           n=1    med    0.000 ms  min    0.000  p90    0.000  max    0.000
+  verify drain (device wait, from issue end)     n=37   med   97.517 ms  min    1.638  p90   99.302  max  100.686
+  SLICE A: drain-end -> catchup-issue-end        n=37   med    2.052 ms  min    1.783  p90    2.392  max    6.431
+  catchup issue (whole llama_decode)             n=37   med    1.347 ms  min    1.288  p90    1.693  max    5.904
+  catchup meta host (graph_compute)              n=37   med    0.331 ms  min    0.294  p90    0.400  max    0.549
+  catchup meta ar                                n=37   med    0.152 ms  min    0.121  p90    0.197  max    0.236
+  catchup sched residual (issue-meta-b-i)        n=37   med    0.964 ms  min    0.854  p90    1.256  max    5.470
+  process decode_issue (drain incl)              n=37   med   99.736 ms  min    3.443  p90  101.570  max  102.760
+  draft section total                            n=37   med   10.608 ms  min    8.806  p90   11.176  max   14.725
+  draft decode_issue/step                        n=37   med    1.759 ms  min    1.212  p90    1.847  max    3.481
+  draft sample+batch/step                        n=37   med    0.053 ms  min    0.050  p90    0.057  max    0.062
+  gap: draft-end -> next verify issue start      n=36   med    0.142 ms  min    0.133  p90    0.155  max   10.140
+
+  round period (verify issue start -> next)      n=36   med  123.395 ms  min  119.564  p90  126.386  max  282.760
+  round period (replay rounds only)              n=35   med  123.337 ms  min  119.564  p90  126.117  max  282.760
+
+SUM: median slice A 2.052 ms; median gap draft->next 0.142 ms

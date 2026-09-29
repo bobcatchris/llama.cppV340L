@@ -1,0 +1,116 @@
+========================================================================
+PART A — arena allocation tables (epochs = MARK REQ lines)
+
+-- alloc_7dafab600000.log  (OPEN base=0x7dafab600000 cap=1338059008 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=0 vs T67 n=0
+   anomalies (non-proportional / align / equal-size-changed): 0
+
+-- alloc_7db00b800000.log  (OPEN base=0x7db00b800000 cap=5226071552 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=0 vs T67 n=0
+   anomalies (non-proportional / align / equal-size-changed): 0
+
+-- alloc_7db143200000.log  (OPEN base=0x7db143200000 cap=1338059008 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=0 vs T67 n=0
+   anomalies (non-proportional / align / equal-size-changed): 0
+
+-- alloc_7db199200000.log  (OPEN base=0x7db199200000 cap=50331648 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=0 vs T67 n=0
+   anomalies (non-proportional / align / equal-size-changed): 0
+   REUSE events in T=2 epoch#3: 1 (first: alloc off=0x9b200 bytes=264 inside restored [0x9b104,0x9b3d4))
+   REUSE events in T=2 epoch#7: 1 (first: alloc off=0x9b200 bytes=268 inside restored [0x9b104,0x9b508))
+   REUSE events in T=2 epoch#11: 1 (first: alloc off=0x9b200 bytes=392 inside restored [0x9b104,0x9b50c))
+   REUSE events in T=2 epoch#15: 1 (first: alloc off=0x9b200 bytes=264 inside restored [0x9b104,0x9b588))
+
+-- alloc_7db19c400000.log  (OPEN base=0x7db19c400000 cap=100663296 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=0 vs T67 n=0
+   anomalies (non-proportional / align / equal-size-changed): 0
+   REUSE events in T=2 epoch#3: 904 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=2 epoch#7: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=2 epoch#11: 9948 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=2 epoch#15: 4712 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=2 epoch#19: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=53 epoch#3: 174 (first: alloc off=0x7fa00 bytes=522240 inside restored [0x7fa00,0x2dd000))
+   REUSE events in T=66 epoch#3: 222 (first: alloc off=0x2c7a00 bytes=196608 inside restored [0x2c7a00,0x3d8600))
+   REUSE events in T=66 epoch#7: 222 (first: alloc off=0x2c7a00 bytes=196608 inside restored [0x2c7a00,0x3d8600))
+   REUSE events in T=67 epoch#3: 222 (first: alloc off=0x2d3000 bytes=199680 inside restored [0x2d2f30,0x3e4400))
+   REUSE events in T=98 epoch#3: 222 (first: alloc off=0x42b800 bytes=294912 inside restored [0x42b800,0x54c400))
+
+-- alloc_7db1a3400000.log  (OPEN base=0x7db1a3400000 cap=5226071552 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=0 vs T67 n=0
+   anomalies (non-proportional / align / equal-size-changed): 0
+
+-- alloc_7db2dae00000.log  (OPEN base=0x7db2dae00000 cap=1338059008 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=0 vs T67 n=0
+   anomalies (non-proportional / align / equal-size-changed): 0
+
+-- alloc_7db32fe00000.log  (OPEN base=0x7db32fe00000 cap=50331648 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=0 vs T67 n=0
+   anomalies (non-proportional / align / equal-size-changed): 0
+   REUSE events in T=2 epoch#3: 1 (first: alloc off=0x9b200 bytes=264 inside restored [0x9b104,0x9b3d4))
+   REUSE events in T=2 epoch#7: 1 (first: alloc off=0x9b200 bytes=268 inside restored [0x9b104,0x9b508))
+   REUSE events in T=2 epoch#11: 1 (first: alloc off=0x9b200 bytes=392 inside restored [0x9b104,0x9b50c))
+   REUSE events in T=2 epoch#15: 1 (first: alloc off=0x9b200 bytes=264 inside restored [0x9b104,0x9b588))
+
+-- alloc_7db333000000.log  (OPEN base=0x7db333000000 cap=100663296 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=0 vs T67 n=0
+   anomalies (non-proportional / align / equal-size-changed): 0
+   REUSE events in T=2 epoch#3: 904 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=2 epoch#7: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=2 epoch#11: 9948 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=2 epoch#15: 4712 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=2 epoch#19: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=53 epoch#3: 174 (first: alloc off=0x7fa00 bytes=522240 inside restored [0x7fa00,0x2dd000))
+   REUSE events in T=66 epoch#3: 222 (first: alloc off=0x2c7a00 bytes=196608 inside restored [0x2c7a00,0x3d8600))
+   REUSE events in T=66 epoch#7: 222 (first: alloc off=0x2c7a00 bytes=196608 inside restored [0x2c7a00,0x3d8600))
+   REUSE events in T=67 epoch#3: 222 (first: alloc off=0x2d3000 bytes=199680 inside restored [0x2d2f30,0x3e4400))
+   REUSE events in T=98 epoch#3: 222 (first: alloc off=0x42b800 bytes=294912 inside restored [0x42b800,0x54c400))
+
+-- alloc_7db33b000000.log  (OPEN base=0x7db33b000000 cap=5226071552 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=0 vs T67 n=0
+   anomalies (non-proportional / align / equal-size-changed): 0
+
+-- alloc_7db472a00000.log  (OPEN base=0x7db472a00000 cap=1338059008 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=0 vs T67 n=0
+   anomalies (non-proportional / align / equal-size-changed): 0
+
+-- alloc_7db4c2a00000.log  (OPEN base=0x7db4c2a00000 cap=50331648 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=0 vs T67 n=0
+   anomalies (non-proportional / align / equal-size-changed): 0
+   REUSE events in T=2 epoch#3: 1 (first: alloc off=0x9b200 bytes=264 inside restored [0x9b104,0x9b3d4))
+   REUSE events in T=2 epoch#7: 1 (first: alloc off=0x9b200 bytes=268 inside restored [0x9b104,0x9b508))
+   REUSE events in T=2 epoch#11: 1 (first: alloc off=0x9b200 bytes=392 inside restored [0x9b104,0x9b50c))
+   REUSE events in T=2 epoch#15: 1 (first: alloc off=0x9b200 bytes=264 inside restored [0x9b104,0x9b588))
+
+-- alloc_7db4c9c00000.log  (OPEN base=0x7db4c9c00000 cap=50331648 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=0 vs T67 n=0
+   anomalies (non-proportional / align / equal-size-changed): 0
+   REUSE events in T=2 epoch#3: 1 (first: alloc off=0x9b200 bytes=264 inside restored [0x9b104,0x9b3d4))
+   REUSE events in T=2 epoch#7: 1 (first: alloc off=0x9b200 bytes=268 inside restored [0x9b104,0x9b508))
+   REUSE events in T=2 epoch#11: 1 (first: alloc off=0x9b200 bytes=392 inside restored [0x9b104,0x9b50c))
+   REUSE events in T=2 epoch#15: 1 (first: alloc off=0x9b200 bytes=264 inside restored [0x9b104,0x9b588))
+
+-- alloc_7db4cce00000.log  (OPEN base=0x7db4cce00000 cap=100663296 owns=1 pid=2133860)
+   epochs: [(2, 20), (53, 4), (66, 8), (67, 4), (98, 4)]
+   alloc-seq T66 n=1 vs T67 n=0
+   *** SEQUENCE-LENGTH MISMATCH — first structural divergence at idx 0
+     [0] T66=(256, 256)  T67=None
+   REUSE events in T=2 epoch#3: 904 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=2 epoch#7: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=2 epoch#11: 9948 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=2 epoch#15: 4712 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=2 epoch#19: 10186 (first: alloc off=0x5200 bytes=20480 inside restored [0x5200,0x1d000))
+   REUSE events in T=53 epoch#3: 174 (first: alloc off=0x7fa00 bytes=522240 inside restored [0x7fa00,0x2dd000))
+   REUSE events in T=66 epoch#3: 222 (first: alloc off=0x2c7a00 bytes=

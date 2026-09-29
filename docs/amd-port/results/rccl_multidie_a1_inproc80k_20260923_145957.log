@@ -1,0 +1,15 @@
+inproc: visible devices = 4
+correctness PASS (grouped, 4 ranks)
+RANK die0 ne=20480 kb=80 lockstep iters=2000 | wall med 130.96 min 120.40 p90 136.52 avg 131.19 spread 5.00% | dev med 124.45 min 114.52 p90 130.37 avg 124.87 spread 5.19% | pci 0000:05:00.0
+RANK die0 dev histogram (us, 2us buckets): 115-117:7 117-119:73 119-121:179 121-123:318 123-125:429 125-127:399 127-129:246 129-131:162 131-133:101 133-135:49 135-137:23 137-139:14
+RANK die1 ne=20480 kb=80 lockstep iters=2000 | wall med 130.96 min 120.40 p90 136.52 avg 131.19 spread 5.00% | dev med 116.15 min 102.52 p90 122.97 avg 116.68 spread 6.76% | pci 0000:08:00.0
+RANK die1 dev histogram (us, 2us buckets): 103-105:5 105-107:16 107-109:32 109-111:87 111-113:233 113-115:385 115-117:299 117-119:251 119-121:246 121-123:214 123-125:141 125-127:59 127-129:20 129-131:12
+RANK die2 ne=20480 kb=80 lockstep iters=2000 | wall med 130.96 min 120.40 p90 136.52 avg 131.19 spread 5.00% | dev med 117.33 min 105.33 p90 121.93 avg 117.40 spread 4.83% | pci 0000:0d:00.0
+RANK die2 dev histogram (us, 2us buckets): 105-107:3 107-109:12 109-111:53 111-113:146 113-115:346 115-117:437 117-119:450 119-121:295 121-123:167 123-125:57 125-127:34
+RANK die3 ne=20480 kb=80 lockstep iters=2000 | wall med 130.96 min 120.40 p90 136.52 avg 131.19 spread 5.00% | dev med 124.15 min 113.48 p90 129.63 avg 124.42 spread 5.19% | pci 0000:10:00.0
+RANK die3 dev histogram (us, 2us buckets): 113-115:9 115-117:30 117-119:145 119-121:302 121-123:380 123-125:366 125-127:353 127-129:201 129-131:123 131-133:54 133-135:25 135-137:12
+BURST ne=20480 n=256 wall per-op 103.25 us | die0 dev 103.20 die1 dev 103.18 die2 dev 103.20 die3 dev 103.22
+
+SUMMARY ne=20480 lockstep per-rank dev med (us): die0=124.4 die1=116.1 die2=117.3 die3=124.2 | dev spread x1.07
+SPREAD-LAW worst halves spread: 6.76% (FAIL)
+DONE

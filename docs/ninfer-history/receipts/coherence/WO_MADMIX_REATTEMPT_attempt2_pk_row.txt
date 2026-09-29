@@ -1,0 +1,31 @@
+WO_MADMIX_REATTEMPT ATTEMPT 2 ROW — pk16 numerics-correct at the FULL prefill geometries:
+numerics PASS / perf DEAD (0.24-0.26x vs the >= 1.15x bar). 2026-09-19, desk amd/wo-madmix,
+cell commit 8c9e33bb9, log results/amd/coherence/WO_MADMIX_REATTEMPT_cell_run3_pk.log.
+
+WHAT WAS MEASURED AND WHY IT IS THE MISSING RECEIPT: the W7_pk16_bench_row killed the W3 sketch
+at 1.34x WITH relL2 ~146 and recorded "numerics fix never attempted, UNDEBUGGED BY DESIGN".
+The numerics-correct form already exists IN THE SHIPPED TU (nvfp4_tiled_gemm_hip_kernel_pk:
+fp16 window with fp32 flush, fp32 contract acc, W in {16,32,64}) but had only ever been benched
+on the W4 SHARD geometries (V0PK_dead_row: 0.21-0.36x). Attempt 2's open question was the full
+prefill points [96,128]/[80,128]. This row closes it: same cell, same patterned data + fp64
+golden + falsifier, production flags, launch_nvfp4_tiled_gemm_pk.
+
+MEASURED (M=128, 3-run x (3 warmup + 20 iters), production flags):
+  [96,128] Residual6144: V0 3.716-3.727 ms (2167.3 GF/s)
+    pk-W16 15.018-15.029 ms (536.2 GF/s) 0.247x | W32 15.502-15.532 (518.5) 0.239x |
+    W64 15.671-15.703 (513.7) 0.237x
+  [80,128] GdnInput:     V0 8.551-8.565 ms (2507.2 GF/s)
+    pk-W16 32.749-32.783 (655.7) 0.262x | W32 0.253x | W64 0.251x
+NUMERICS (the fix VERIFIED): relL2 vs fp64 golden 1.69-1.83e-03 PASS (bar 1e-2); relL2 vs V0
+  1.1-1.7e-03 — the fp16-window association noise the design DECLARED, 2 orders under the gate.
+  The ~146 numerics class of the sketch is gone; the fix is real and costs exactly the perf:
+  census kernel_pk <96,128,W32>: 256 VGPR (FULL CAP) + 820 B scratch + 570 waits + 1024
+  v_pk_fma_f16 — the pk resourcing death class (s2 window file on kS=8), same as V0PK_dead_row.
+FALSIFIER: corrupt-row7 relL2 9.6e-2 / 4.6e-2 — trips (W32 arm).
+VERDICT: attempt 2 FAILS its perf bar with numerics GREEN — the pk16 family is now closed on
+  ALL THREE legs: HFMA2-PK (resourcing 1.07x), W7 sketch bench (1.34x at relL2 146, VOID bar),
+  and the numerics-correct form (correct, 0.24-0.26x at full geometries, shard-geometry row
+  corroborated). The 1.34x sketch number is explained: it skipped the scale fold entirely
+  (broken numerics = missing work); no numerics-correct pk16 reaches 1.15x. NO further
+  re-evaluation of pk16 unless the ISA changes. The mad-mix transparent arm (attempt 1 row)
+  dominates it on every axis anyway.

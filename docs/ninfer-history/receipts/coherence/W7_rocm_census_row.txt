@@ -1,0 +1,91 @@
+W7 ROCM COMPILER-ROAD CENSUS ROW — the ledger's named GEMM reopener ("a compiler that batches
+memory waits at <=112 VGPR") TESTED AND DEAD, 2026-09-18, window 7, amd/wo-w7-body compiler-road desk.
+Method: same kernels, NEWER toolchains, the pre-registered W3 census + the REV2 §3 census-first
+kill-switch (proceed to bench only if waits <=30/body OR V0's own VGPR/wait profile improves).
+
+ACQUISITION (TWO new toolchains WORKING; zero host mutation; /opt/rocm-6.2.0 never written)
+- No docker/podman on this host. manylinux/ carries only python wheels (no toolchain tarballs).
+  Working road: repo.radeon.com/rocm/apt/{6.4.4,7.2.4}/dists/noble (host = Ubuntu 24.04), 10 debs
+  each (rocm-llvm, rocm-device-libs, hipcc, hip-dev, hip-runtime-amd, hsa-rocr, hsa-rocr-dev,
+  comgr, rocm-core, rocminfo; ~0.9 GB downloaded), extracted with `dpkg-deb -x` into userspace
+  prefixes /media/chris/EMTEC256/rocm-new/root-{6.4.4,7.2.4} (3.5 GB; cleaned after banking).
+  Nothing apt-installed, nothing outside the external disk and /tmp staging.
+- Toolchains: 6.4.4 = "AMD clang version 19.0.0git (roc-6.4.4 25224 d366fa84f3fd)";
+  7.2.4 = "AMD clang version 22.0.0git (roc-7.2.4 26084 f58b06dce1f9)". Baseline = host
+  /opt/rocm-6.2.0 (ROCm 6.2.0, LLVM 17-class). hipcc driven with ROCM_PATH/HIP_PATH/HIP_CLANG_PATH
+  pointed at each prefix; census compiles call clang++ directly (LEANMAC §1 method).
+- gfx900 CODEGEN: PRESENT and clean in both (tiny + full TUs compile; offload bundle
+  hip-amdgcn-amd-amdhsa--gfx900). gfx900 has NOT been dropped from the compiler. Support status
+  finding: MI25/Vega10 left the officially-supported list at ROCm 5.0 (Arch Wiki / ServeTheHome;
+  ROCm 5.7 = last fully-supported gfx906 release), so 6.2.0 itself is already an
+  beyond-EOL-but-working deployment; 6.4.1 release notes still carried an MI25/MI50/MI100 SDMA
+  fix. MOOT either way: the census below kills the road.
+
+CENSUS (law flags verbatim: -O3 -DNDEBUG -std=gnu++20 --offload-arch=gfx900 -x hip -S +
+LEANMAC §1's -D/-I set for the V0 TU; counters = tools/v340l/w3_census.py; staged
+/tmp/rocm_census/{sketch_620,sketch_644,sketch_724,v0_620,v0_644,v0_724}.s)
+- R7 ANCHOR: the 6.2.0 rebuild reproduces the banked receipts EXACTLY — sketch A16 = 102 VGPR /
+  0 B / 44 waits (35 lgkm + 9 vm) / 128 pk; A32 = 128 VGPR / 136+140 B spill; V0 <80,128> =
+  128 VGPR / 80 B. Numbers below are therefore same-method, apples-to-apples.
+
+TABLE 1 — w3_pk16_sketch A16 point <80,64,4,16> (the only register-fundable pk16 point; the
+one the W7 bench measured at 1.34x V0):
+  toolchain  LLVM  next_free_vgpr  scratch B  s_waitcnt/body  lgkmcnt  vmcnt  v_pk_fma_f16
+  6.2.0       17        102             0          44            35       9      128
+  6.4.4       19        102             0          44            35       9      128
+  7.2.4       22        104             0          44            35       9      128
+  => WAIT STRUCTURE IDENTICAL TO THE INSTRUCTION ACROSS FIVE COMPILER RELEASES. The
+  pre-registered bar (<=30 waits/body) FAILS at 44 on ALL THREE. pk count stays 128 (no
+  scalarization — and no batching either). A32 points stay register-dead on every toolchain
+  (scratch: 6.2.0 136/140 B; 6.4.4 84/88 B; 7.2.4 88/88 B — small improvement, still spill;
+  waits 78-94/body, all worse than A16).
+
+TABLE 2 — shipped V0 <80,128> (production kernel; the "any V0-only improvement counts" clause):
+  toolchain  next_free_vgpr  scratch B  static v_fma_f32  s_waitcnt (lgkm)
+  6.2.0          128             80          1024             198 (129/body-16blk)
+  6.4.4          256            472          2048             364
+  7.2.4          256            388          2048             236
+  => V0 REGRESSES under both new compilers: LLVM 19/22 statically duplicate the k-body
+  (1024 -> 2048 v_fma_f32) and blow the file to 256 VGPR + 388-472 B scratch (metadata
+  .amdhsa_next_free_vgpr/.amdhsa_private_segment_fixed_size — measured, not a census-label
+  artifact). NOT an improvement; the bench clause does not fire. WARNING side-finding for any
+  future rebuild: do NOT compile production at the 6.2.0 flag set under 6.4.x/7.x — the shipped
+  kernel comes out spill-heavy there.
+
+7.2.4 COMPAT NOTE: the production TU needed a 2-guard shim patch on a /tmp COPY of
+src/common/hip_shim (shared source untouched): LLVM 22's HIP headers now ship
+__hsub2_rn (amd_hip_bf16.h:971) and __half_as_ushort/__ushort_as_half (amd_hip_fp16.h:462)
+natively, colliding with the shim's forwarders; guarded behind NINFER_HSUB2_RN_NATIVE in
+/tmp/rocm_census/hip_shim_724/{cuda_bf16.h,cuda_fp16.h}. ISA-inert; owner may land the same
+guards as a 7.x-compat receipt if 7.x is ever adopted (it is not, per this row).
+
+BENCH PHASE: NOT REACHED — the pre-registered census kill-switch fired (44 > 30 on every
+toolchain; V0 profile worse, not better). Zero GPU seconds this desk; server :8100 untouched;
+no pkill; no process outside this desk started.
+
+VERDICT: **ROAD DEAD (measured, zero GPU).** The named reopener — "a toolchain that emits <=20
+(or meaningfully fewer) waits per body at <=112 VGPR" (W3_SKETCH_CENSUS_step0 reopen condition
+1; REV2 §2 reopen row) — does not exist in LLVM 17 -> 19 -> 22 / ROCm 6.2.0 -> 6.4.4 -> 7.2.4:
+the 44-wait structure (35 partial lgkmcnt drains + 9 vmcnt per rolled group body) is emitted
+unchanged by three scheduler generations, and V0's own codegen actively REGRESSES. Combined
+with W7_pk16_bench_row.txt (structure ceiling 1.34x, waits do not hide), the GEMM front's
+compiler branch is CLOSED BY MEASUREMENT. The family's only remaining reopener is hardware
+class: gfx906+ dot10 (v_dot2_f32_f16 deletes the flush + window). REV2's honest end state
+stands: additive path => ~140-180 tok/s class.
+
+REGEN (exact):
+  # 6.2.0 anchors (sketch; V0 uses LEANMAC §1 line verbatim incl. -DNINFER_HIP_ROSTER=1
+  # -DNINFER_NVFP4_SIMT_LANE=1 -DUSE_PROF_API=1 -D__HIP_PLATFORM_AMD__=1 -D__HIP_ROCclr__=1
+  # -I src/common/hip_shim -I include -I src):
+  /opt/rocm-6.2.0/lib/llvm/bin/clang++ -O3 -DNDEBUG -std=gnu++20 --offload-arch=gfx900 \
+    -isystem /opt/rocm-6.2.0/include -x hip -S tools/v340l/w3_pk16_sketch.cu -o /tmp/rocm_census/sketch_620.s
+  # 6.4.4 / 7.2.4 (P=<prefix>/opt/rocm-6.4.4 or rocm-7.2.4):
+  $P/llvm/bin/clang++ -O3 -DNDEBUG -std=gnu++20 --offload-arch=gfx900 --rocm-path=$P \
+    -isystem $P/include -x hip -S tools/v340l/w3_pk16_sketch.cu -o /tmp/rocm_census/sketch_<tc>.s
+  # 7.2.4 V0 adds: -I /tmp/rocm_census/hip_shim_724 FIRST in include order + -DNINFER_HSUB2_RN_NATIVE
+  python3 tools/v340l/w3_census.py <file>.s <kernel-substring>
+PROVENANCE: debs = rocm-llvm_19.0.0.25224.60404-129~24.04 / rocm-llvm_22.0.0.26084.70204-93~24.04
+(+ device-libs/hipcc/hip-dev/hip-runtime-amd/hsa-rocr{,-dev}/comgr/rocm-core/rocminfo same tags,
+repo.radeon.com/rocm/apt/{6.4.4,7.2.4}); host ROCm 6.2.0 untouched (read-only use);
+w3_census.py + LEANMAC §1 method; W3_SKETCH_CENSUS_step0.md + W7_pk16_bench_row.txt baselines;
+gfx900 support status: rocm.docs.amd.com system requirements (supported GPUs), Arch Wiki MI25.

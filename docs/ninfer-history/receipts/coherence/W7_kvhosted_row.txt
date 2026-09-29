@@ -1,0 +1,44 @@
+W7_kvhosted_row — hosted-KV mechanism cell: parity GREEN + mapped-pinned zero-copy 6.5 GB/s -> GO, 2026-09-19
+Cell: results/amd/coherence/W7_kvhosted_cell.cu (== tools/v340l/w7_kvhosted_cell.cu, standalone hipcc
+  /opt/rocm/lib/llvm/bin/clang++ -x hip --offload-arch=gfx900 -O3 -std=gnu++20, RC=0; NO tree build).
+  Log: W7_kvhosted_cell_run1.log (raw stdout + rocm-smi clocks before/mid/after). GPU die 2,
+  HIP_VISIBLE_DEVICES=2 (microbench law). gfx900:xnack-.
+Clocks note: mclk level 3 (945 MHz) throughout; sclk sampled at level 7 (1500 MHz TOP) mid-run,
+  level 0 only at idle sample points; die 40-47 C — numbers are boost-clock, no parking/throttle.
+Slab model = qwen3_6_27b KVarN k4v2 pool EXACTLY: tile (layer,head,page) = K 8,192 B U8 + V 4,096 B U8
+  + scales 1,152 fp32 = 16,896 B; per-rank 4,224 B/token @TP4 (16 full-attn layers, 1 kv head/rank).
+
+== PARITY (pre-registered bar: bit-exact, MANDATORY) ==
+Same kernel over device slab vs mapped-pinned HOST slab (hipHostMallocMapped, unified pointer),
+deterministic LCG pattern; kernel outputs word-identical AND raw slab hipMemcpy-memcmp equal
+at ALL sizes {10,50,100,200} MiB, BOTH kernel shapes (byte-load and vector-load): parity=1 memcmp=1.
+-> GREEN. Hosted KV reads are bit-faithful on this hardware/stack.
+
+== PERF (full sweep = one decode token's KV read = last prefill chunk's cold read) ==
+size     dev_GB/s  host_GB/s  vdev_GB/s  vhost_GB/s   tok-equiv(rank)
+10 MiB    134.38      6.38      306.44      6.44          2,480
+50 MiB    178.77      6.34      300.35      6.48         12,412
+100 MiB   190.98      6.33      342.88      6.49         24,824
+200 MiB   199.01      6.33      340.82      6.50         49,648
+(host=byte-load kernel, v=vector-load kernel; hosted BW is load-width-INSENSITIVE -> link-bound,
+ not compute/clock-bound; vdev 341 GB/s matches the box's known read ceiling 368.3 GB/s, PK_row.)
+
+== BAR VERDICT (pre-registered in WO_KV_HOSTED_desk.md §3 BEFORE first run) ==
+1. parity bit-exact everywhere: PASS.  2. host BW @200 MiB 6.50 >= 6.0 GB/s: PASS.
+3. prefill tax: 2k-chunk cold read 8.45 MB/rank at 6.5 GB/s = 1.30 ms vs ~1.5-2 s chunk wall
+   = ~0.07-0.09% (bar was <=5%: clears ~60x). FULL 100k cold sweep 422 MB = 65 ms = 3-4% of ONE
+   chunk wall unhid. -> VERDICT: GO (cell exit 0).
+
+== DECODE TAX (measured unit, per rank @TP4 k4v2) ==
+Full cold sweep 200 MiB/rank (49.6k tok) = 32.25 ms per generated token (scales linearly:
+  ~0.65 ms per 1k hosted tokens). C=100k hosted -> ~65 ms/token added decode latency;
+  C=200k -> ~130 ms/token. Device-resident same read = ~1.3 ms. Tax ~25-50x device.
+Overlap probe (mechanism (b) premise): pinned H2D async copy 1.9 ms + 30x multi-block compute
+  20.4 ms -> both concurrent 21.8 ms vs sum 22.3 ms = NO CLEAR OVERLAP on this stack —
+  copy/compute concurrency CANNOT be assumed on Vega 10 HIP; one more point against (b).
+
+== DECISION (per WO_KV_HOSTED_desk.md §2) ==
+Mechanism (a) mapped-pinned zero-copy cold-KV tail CLEARS ITS BAR. Decode tax is the documented
+price (measured above); prefill tax is negligible; (b) is dominated (same tax + machinery whose
+premise just measured FALSE); (c) adopted only as sizing policy. Phase 2 may start when the
+V-arm desk lands its build + window frees (integration gate pre-registered, WO_KV_HOSTED_desk.md §4).

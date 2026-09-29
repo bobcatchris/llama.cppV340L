@@ -1,0 +1,158 @@
+inproc: visible devices = 4
+chris-MS-7D28:387125:387125 [3] NCCL INFO ROCr version 1.14
+chris-MS-7D28:387125:387125 [3] NCCL INFO Dmabuf feature disabled without NCCL_DMABUF_ENABLE=1
+chris-MS-7D28:387125:387125 [3] NCCL INFO Bootstrap : Using wlo1:10.0.0.216<0>
+chris-MS-7D28:387125:387125 [3] NCCL INFO NET/Plugin : dlerror=librccl-net.so: cannot open shared object file: No such file or directory No plugin found (librccl-net.so), using internal implementation
+chris-MS-7D28:387125:387125 [3] NCCL INFO Kernel version: 7.0.0-31-generic
+RCCL version 2.20.5+hip6.2 HEAD:45b618a+
+chris-MS-7D28:387125:387141 [0] NCCL INFO NET/IB : No device found.
+chris-MS-7D28:387125:387141 [0] NCCL INFO NET/Socket : Using [0]wlo1:10.0.0.216<0> [1]tailscale0:100.90.97.20<0>
+chris-MS-7D28:387125:387141 [0] NCCL INFO Using non-device net plugin version 0
+chris-MS-7D28:387125:387141 [0] NCCL INFO Using network Socket
+chris-MS-7D28:387125:387144 [3] NCCL INFO Using non-device net plugin version 0
+chris-MS-7D28:387125:387144 [3] NCCL INFO Using network Socket
+chris-MS-7D28:387125:387143 [2] NCCL INFO Using non-device net plugin version 0
+chris-MS-7D28:387125:387143 [2] NCCL INFO Using network Socket
+chris-MS-7D28:387125:387142 [1] NCCL INFO Using non-device net plugin version 0
+chris-MS-7D28:387125:387142 [1] NCCL INFO Using network Socket
+chris-MS-7D28:387125:387144 [3] NCCL INFO comm 0x4b0c710 rank 3 nranks 4 cudaDev 3 busId 10000 commId 0x278ac18661a08d1e - Init START
+chris-MS-7D28:387125:387141 [0] NCCL INFO comm 0x4a95fa0 rank 0 nranks 4 cudaDev 0 busId 5000 commId 0x278ac18661a08d1e - Init START
+chris-MS-7D28:387125:387142 [1] NCCL INFO comm 0x3ec3ee0 rank 1 nranks 4 cudaDev 1 busId 8000 commId 0x278ac18661a08d1e - Init START
+chris-MS-7D28:387125:387143 [2] NCCL INFO comm 0x44ae5b0 rank 2 nranks 4 cudaDev 2 busId d000 commId 0x278ac18661a08d1e - Init START
+chris-MS-7D28:387125:387143 [2] NCCL INFO [node_id = 2; gpu_id = 43906; unique_id = 150116135807889828; location_id = 2048; bdf = 2048; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387143 [2] NCCL INFO [node_id = 1; gpu_id = 15942; unique_id = 150116135808414020; location_id = 1280; bdf = 1280; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387143 [2] NCCL INFO [node_id = 3; gpu_id = 63553; unique_id = 150127372904180164; location_id = 3328; bdf = 3328; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387143 [2] NCCL INFO [node_id = 4; gpu_id = 41352; unique_id = 150127372904962276; location_id = 4096; bdf = 4096; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387142 [1] NCCL INFO [node_id = 2; gpu_id = 43906; unique_id = 150116135807889828; location_id = 2048; bdf = 2048; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387142 [1] NCCL INFO [node_id = 1; gpu_id = 15942; unique_id = 150116135808414020; location_id = 1280; bdf = 1280; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387142 [1] NCCL INFO [node_id = 3; gpu_id = 63553; unique_id = 150127372904180164; location_id = 3328; bdf = 3328; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387142 [1] NCCL INFO [node_id = 4; gpu_id = 41352; unique_id = 150127372904962276; location_id = 4096; bdf = 4096; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387143 [2] NCCL INFO initialized internal alternative rsmi functionality
+chris-MS-7D28:387125:387142 [1] NCCL INFO initialized internal alternative rsmi functionality
+chris-MS-7D28:387125:387144 [3] NCCL INFO [node_id = 2; gpu_id = 43906; unique_id = 150116135807889828; location_id = 2048; bdf = 2048; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387144 [3] NCCL INFO [node_id = 1; gpu_id = 15942; unique_id = 150116135808414020; location_id = 1280; bdf = 1280; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387144 [3] NCCL INFO [node_id = 3; gpu_id = 63553; unique_id = 150127372904180164; location_id = 3328; bdf = 3328; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387144 [3] NCCL INFO [node_id = 4; gpu_id = 41352; unique_id = 150127372904962276; location_id = 4096; bdf = 4096; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387141 [0] NCCL INFO [node_id = 2; gpu_id = 43906; unique_id = 150116135807889828; location_id = 2048; bdf = 2048; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387141 [0] NCCL INFO [node_id = 1; gpu_id = 15942; unique_id = 150116135808414020; location_id = 1280; bdf = 1280; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387141 [0] NCCL INFO [node_id = 3; gpu_id = 63553; unique_id = 150127372904180164; location_id = 3328; bdf = 3328; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387141 [0] NCCL INFO [node_id = 4; gpu_id = 41352; unique_id = 150127372904962276; location_id = 4096; bdf = 4096; domain = 0; partition = 0], 
+chris-MS-7D28:387125:387144 [3] NCCL INFO initialized internal alternative rsmi functionality
+chris-MS-7D28:387125:387143 [2] NCCL INFO Could not enable P2P between dev 1(=8000) and dev 0(=5000)
+chris-MS-7D28:387125:387143 [2] NCCL INFO Could not enable P2P between dev 0(=5000) and dev 1(=8000)
+chris-MS-7D28:387125:387142 [1] NCCL INFO Could not enable P2P between dev 1(=8000) and dev 0(=5000)
+chris-MS-7D28:387125:387143 [2] NCCL INFO Could not enable P2P between dev 3(=10000) and dev 2(=d000)
+chris-MS-7D28:387125:387142 [1] NCCL INFO Could not enable P2P between dev 0(=5000) and dev 1(=8000)
+chris-MS-7D28:387125:387143 [2] NCCL INFO Could not enable P2P between dev 2(=d000) and dev 3(=10000)
+chris-MS-7D28:387125:387142 [1] NCCL INFO Could not enable P2P between dev 3(=10000) and dev 2(=d000)
+chris-MS-7D28:387125:387142 [1] NCCL INFO Could not enable P2P between dev 2(=d000) and dev 3(=10000)
+chris-MS-7D28:387125:387143 [2] NCCL INFO Could not enable P2P between dev 1(=8000) and dev 0(=5000)
+chris-MS-7D28:387125:387143 [2] NCCL INFO Could not enable P2P between dev 0(=5000) and dev 1(=8000)
+chris-MS-7D28:387125:387142 [1] NCCL INFO Could not enable P2P between dev 1(=8000) and dev 0(=5000)
+chris-MS-7D28:387125:387142 [1] NCCL INFO Could not enable P2P between dev 0(=5000) and dev 1(=8000)
+chris-MS-7D28:387125:387143 [2] NCCL INFO Could not enable P2P between dev 3(=10000) and dev 2(=d000)
+chris-MS-7D28:387125:387142 [1] NCCL INFO Could not enable P2P between dev 3(=10000) and dev 2(=d000)
+chris-MS-7D28:387125:387143 [2] NCCL INFO Could not enable P2P between dev 2(=d000) and dev 3(=10000)
+chris-MS-7D28:387125:387142 [1] NCCL INFO Could not enable P2P between dev 2(=d000) and dev 3(=10000)
+chris-MS-7D28:387125:387143 [2] NCCL INFO Setting affinity for GPU 2 to 0fffff
+chris-MS-7D28:387125:387142 [1] NCCL INFO Setting affinity for GPU 1 to 0fffff
+chris-MS-7D28:387125:387144 [3] NCCL INFO Could not enable P2P between dev 1(=8000) and dev 0(=5000)
+chris-MS-7D28:387125:387144 [3] NCCL INFO Could not enable P2P between dev 0(=5000) and dev 1(=8000)
+chris-MS-7D28:387125:387144 [3] NCCL INFO Could not enable P2P between dev 3(=10000) and dev 2(=d000)
+chris-MS-7D28:387125:387144 [3] NCCL INFO Could not enable P2P between dev 2(=d000) and dev 3(=10000)
+chris-MS-7D28:387125:387144 [3] NCCL INFO Could not enable P2P between dev 1(=8000) and dev 0(=5000)
+chris-MS-7D28:387125:387144 [3] NCCL INFO Could not enable P2P between dev 0(=5000) and dev 1(=8000)
+chris-MS-7D28:387125:387144 [3] NCCL INFO Could not enable P2P between dev 3(=10000) and dev 2(=d000)
+chris-MS-7D28:387125:387144 [3] NCCL INFO Could not enable P2P between dev 2(=d000) and dev 3(=10000)
+chris-MS-7D28:387125:387144 [3] NCCL INFO Setting affinity for GPU 3 to 0fffff
+chris-MS-7D28:387125:387141 [0] NCCL INFO Could not enable P2P between dev 1(=8000) and dev 0(=5000)
+chris-MS-7D28:387125:387141 [0] NCCL INFO Could not enable P2P between dev 0(=5000) and dev 1(=8000)
+chris-MS-7D28:387125:387141 [0] NCCL INFO Could not enable P2P between dev 3(=10000) and dev 2(=d000)
+chris-MS-7D28:387125:387141 [0] NCCL INFO Could not enable P2P between dev 2(=d000) and dev 3(=10000)
+chris-MS-7D28:387125:387141 [0] NCCL INFO Could not enable P2P between dev 1(=8000) and dev 0(=5000)
+chris-MS-7D28:387125:387141 [0] NCCL INFO Could not enable P2P between dev 0(=5000) and dev 1(=8000)
+chris-MS-7D28:387125:387141 [0] NCCL INFO Could not enable P2P between dev 3(=10000) and dev 2(=d000)
+chris-MS-7D28:387125:387141 [0] NCCL INFO Could not enable P2P between dev 2(=d000) and dev 3(=10000)
+chris-MS-7D28:387125:387141 [0] NCCL INFO Setting affinity for GPU 0 to 0fffff
+chris-MS-7D28:387125:387144 [3] NCCL INFO comm 0x4b0c710 rank 3 nRanks 4 nNodes 1 localRanks 4 localRank 3 MNNVL 0
+chris-MS-7D28:387125:387141 [0] NCCL INFO comm 0x4a95fa0 rank 0 nRanks 4 nNodes 1 localRanks 4 localRank 0 MNNVL 0
+chris-MS-7D28:387125:387144 [3] NCCL INFO Trees [0] -1/-1/-1->3->2 [1] -1/-1/-1->3->2 comm 0x4b0c710 nRanks 04 busId 10000
+chris-MS-7D28:387125:387144 [3] NCCL INFO P2P Chunksize set to 131072
+chris-MS-7D28:387125:387142 [1] NCCL INFO comm 0x3ec3ee0 rank 1 nRanks 4 nNodes 1 localRanks 4 localRank 1 MNNVL 0
+chris-MS-7D28:387125:387141 [0] NCCL INFO Channel 00/02 :    0   1   2   3
+chris-MS-7D28:387125:387141 [0] NCCL INFO Channel 01/02 :    0   1   2   3
+chris-MS-7D28:387125:387141 [0] NCCL INFO Trees [0] 1/-1/-1->0->-1 [1] 1/-1/-1->0->-1 comm 0x4a95fa0 nRanks 04 busId 5000
+chris-MS-7D28:387125:387141 [0] NCCL INFO P2P Chunksize set to 131072
+chris-MS-7D28:387125:387142 [1] NCCL INFO Trees [0] 2/-1/-1->1->0 [1] 2/-1/-1->1->0 comm 0x3ec3ee0 nRanks 04 busId 8000
+chris-MS-7D28:387125:387142 [1] NCCL INFO P2P Chunksize set to 131072
+chris-MS-7D28:387125:387143 [2] NCCL INFO comm 0x44ae5b0 rank 2 nRanks 4 nNodes 1 localRanks 4 localRank 2 MNNVL 0
+chris-MS-7D28:387125:387143 [2] NCCL INFO Trees [0] 3/-1/-1->2->1 [1] 3/-1/-1->2->1 comm 0x44ae5b0 nRanks 04 busId d000
+chris-MS-7D28:387125:387143 [2] NCCL INFO P2P Chunksize set to 131072
+chris-MS-7D28:387125:387144 [3] NCCL INFO Could not enable P2P between dev 3(=10000) and dev 2(=d000)
+chris-MS-7D28:387125:387142 [1] NCCL INFO Could not enable P2P between dev 1(=8000) and dev 0(=5000)
+chris-MS-7D28:387125:387144 [3] NCCL INFO Could not enable P2P between dev 3(=10000) and dev 2(=d000)
+chris-MS-7D28:387125:387142 [1] NCCL INFO Could not enable P2P between dev 1(=8000) and dev 0(=5000)
+chris-MS-7D28:387125:387143 [2] NCCL INFO Could not enable P2P between dev 2(=d000) and dev 3(=10000)
+chris-MS-7D28:387125:387143 [2] NCCL INFO Channel 00 : 2[d000] -> 3[10000] via SHM/direct/direct comm 0x44ae5b0 nRanks 04
+chris-MS-7D28:387125:387143 [2] NCCL INFO Could not enable P2P between dev 2(=d000) and dev 3(=10000)
+chris-MS-7D28:387125:387141 [0] NCCL INFO Could not enable P2P between dev 0(=5000) and dev 1(=8000)
+chris-MS-7D28:387125:387144 [3] NCCL INFO Channel 00 : 3[10000] -> 0[5000] via SHM/direct/direct comm 0x4b0c710 nRanks 04
+chris-MS-7D28:387125:387142 [1] NCCL INFO Channel 00 : 1[8000] -> 2[d000] via SHM/direct/direct comm 0x3ec3ee0 nRanks 04
+chris-MS-7D28:387125:387143 [2] NCCL INFO Channel 01 : 2[d000] -> 3[10000] via SHM/direct/direct comm 0x44ae5b0 nRanks 04
+chris-MS-7D28:387125:387144 [3] NCCL INFO Channel 01 : 3[10000] -> 0[5000] via SHM/direct/direct comm 0x4b0c710 nRanks 04
+chris-MS-7D28:387125:387141 [0] NCCL INFO Channel 00 : 0[5000] -> 1[8000] via SHM/direct/direct comm 0x4a95fa0 nRanks 04
+chris-MS-7D28:387125:387141 [0] NCCL INFO Could not enable P2P between dev 0(=5000) and dev 1(=8000)
+chris-MS-7D28:387125:387142 [1] NCCL INFO Channel 01 : 1[8000] -> 2[d000] via SHM/direct/direct comm 0x3ec3ee0 nRanks 04
+chris-MS-7D28:387125:387141 [0] NCCL INFO Channel 01 : 0[5000] -> 1[8000] via SHM/direct/direct comm 0x4a95fa0 nRanks 04
+chris-MS-7D28:387125:387143 [2] NCCL INFO Connected all rings comm 0x44ae5b0 nRanks 04 busId d000
+chris-MS-7D28:387125:387143 [2] NCCL INFO Could not enable P2P between dev 2(=d000) and dev 3(=10000)
+chris-MS-7D28:387125:387142 [1] NCCL INFO Connected all rings comm 0x3ec3ee0 nRanks 04 busId 8000
+chris-MS-7D28:387125:387144 [3] NCCL INFO Connected all rings comm 0x4b0c710 nRanks 04 busId 10000
+chris-MS-7D28:387125:387144 [3] NCCL INFO Could not enable P2P between dev 3(=10000) and dev 2(=d000)
+chris-MS-7D28:387125:387141 [0] NCCL INFO Connected all rings comm 0x4a95fa0 nRanks 04 busId 5000
+chris-MS-7D28:387125:387141 [0] NCCL INFO Could not enable P2P between dev 0(=5000) and dev 1(=8000)
+chris-MS-7D28:387125:387144 [3] NCCL INFO Channel 00 : 3[10000] -> 2[d000] via SHM/direct/direct comm 0x4b0c710 nRanks 04
+chris-MS-7D28:387125:387144 [3] NCCL INFO Could not enable P2P between dev 3(=10000) and dev 2(=d000)
+chris-MS-7D28:387125:387144 [3] NCCL INFO Channel 01 : 3[10000] -> 2[d000] via SHM/direct/direct comm 0x4b0c710 nRanks 04
+chris-MS-7D28:387125:387143 [2] NCCL INFO Could not enable P2P between dev 2(=d000) and dev 3(=10000)
+chris-MS-7D28:387125:387141 [0] NCCL INFO Could not enable P2P between dev 0(=5000) and dev 1(=8000)
+chris-MS-7D28:387125:387142 [1] NCCL INFO Could not enable P2P between dev 1(=8000) and dev 0(=5000)
+chris-MS-7D28:387125:387143 [2] NCCL INFO Channel 00 : 2[d000] -> 1[8000] via SHM/direct/direct comm 0x44ae5b0 nRanks 04
+chris-MS-7D28:387125:387142 [1] NCCL INFO Channel 00 : 1[8000] -> 0[5000] via SHM/direct/direct comm 0x3ec3ee0 nRanks 04
+chris-MS-7D28:387125:387142 [1] NCCL INFO Could not enable P2P between dev 1(=8000) and dev 0(=5000)
+chris-MS-7D28:387125:387143 [2] NCCL INFO Channel 01 : 2[d000] -> 1[8000] via SHM/direct/direct comm 0x44ae5b0 nRanks 04
+chris-MS-7D28:387125:387142 [1] NCCL INFO Channel 01 : 1[8000] -> 0[5000] via SHM/direct/direct comm 0x3ec3ee0 nRanks 04
+chris-MS-7D28:387125:387144 [3] NCCL INFO Connected all trees
+chris-MS-7D28:387125:387144 [3] NCCL INFO threadThresholds 8/8/64 | 32/8/64 | 256 | 256
+chris-MS-7D28:387125:387144 [3] NCCL INFO 2 coll channels, 0 collnet channels, 0 nvls channels, 2 p2p channels, 1 p2p channels per peer
+chris-MS-7D28:387125:387141 [0] NCCL INFO Connected all trees
+chris-MS-7D28:387125:387141 [0] NCCL INFO threadThresholds 8/8/64 | 32/8/64 | 256 | 256
+chris-MS-7D28:387125:387141 [0] NCCL INFO 2 coll channels, 0 collnet channels, 0 nvls channels, 2 p2p channels, 1 p2p channels per peer
+chris-MS-7D28:387125:387143 [2] NCCL INFO Connected all trees
+chris-MS-7D28:387125:387143 [2] NCCL INFO threadThresholds 8/8/64 | 32/8/64 | 256 | 256
+chris-MS-7D28:387125:387143 [2] NCCL INFO 2 coll channels, 0 collnet channels, 0 nvls channels, 2 p2p channels, 1 p2p channels per peer
+chris-MS-7D28:387125:387142 [1] NCCL INFO Connected all trees
+chris-MS-7D28:387125:387142 [1] NCCL INFO threadThresholds 8/8/64 | 32/8/64 | 256 | 256
+chris-MS-7D28:387125:387142 [1] NCCL INFO 2 coll channels, 0 collnet channels, 0 nvls channels, 2 p2p channels, 1 p2p channels per peer
+chris-MS-7D28:387125:387143 [2] NCCL INFO comm 0x44ae5b0 rank 2 nranks 4 cudaDev 2 busId d000 commId 0x278ac18661a08d1e localSize 416 used 4239120 bytes - Init COMPLETE
+chris-MS-7D28:387125:387141 [0] NCCL INFO comm 0x4a95fa0 rank 0 nranks 4 cudaDev 0 busId 5000 commId 0x278ac18661a08d1e localSize 416 used 4239120 bytes - Init COMPLETE
+chris-MS-7D28:387125:387144 [3] NCCL INFO comm 0x4b0c710 rank 3 nranks 4 cudaDev 3 busId 10000 commId 0x278ac18661a08d1e localSize 416 used 4239120 bytes - Init COMPLETE
+chris-MS-7D28:387125:387142 [1] NCCL INFO comm 0x3ec3ee0 rank 1 nranks 4 cudaDev 1 busId 8000 commId 0x278ac18661a08d1e localSize 416 used 4239120 bytes - Init COMPLETE
+correctness PASS (grouped, 4 ranks)
+RANK die0 ne=20480 kb=80 lockstep iters=100 | wall med 134.53 min 126.83 p90 141.31 avg 135.46 halves 5.10% eo 0.20% | dev med 128.59 min 118.96 p90 134.96 avg 129.31 halves 5.33% eo 0.23% | pci 0000:05:00.0
+RANK die0 dev histogram (us, 2us buckets): 119-121:1 121-123:3 123-125:9 125-127:20 127-129:21 129-131:17 131-133:10 133-135:10 135-137:2 137-139:2 139-141:4 141-143:1
+RANK die1 ne=20480 kb=80 lockstep iters=100 | wall med 134.53 min 126.83 p90 141.31 avg 135.46 halves 5.10% eo 0.20% | dev med 120.30 min 108.59 p90 128.15 avg 121.21 halves 6.74% eo 0.18% | pci 0000:08:00.0
+RANK die1 dev histogram (us, 2us buckets): 109-111:2 111-113:2 113-115:4 115-117:5 117-119:20 119-121:21 121-123:13 123-125:5 125-127:12 127-129:8 129-131:4 131-133:2 135-137:1 137-139:1
+RANK die2 ne=20480 kb=80 lockstep iters=100 | wall med 134.53 min 126.83 p90 141.31 avg 135.46 halves 5.10% eo 0.20% | dev med 120.30 min 112.15 p90 125.78 avg 120.64 halves 4.55% eo 0.11% | pci 0000:0d:00.0
+RANK die2 dev histogram (us, 2us buckets): 112-114:2 114-116:5 116-118:17 118-120:26 120-122:19 122-124:17 124-126:6 126-128:6 128-130:2
+RANK die3 ne=20480 kb=80 lockstep iters=100 | wall med 134.53 min 126.83 p90 141.31 avg 135.46 halves 5.10% eo 0.20% | dev med 127.41 min 120.15 p90 133.63 avg 128.19 halves 5.24% eo 0.20% | pci 0000:10:00.0
+RANK die3 dev histogram (us, 2us buckets): 120-122:4 122-124:12 124-126:18 126-128:21 128-130:15 130-132:11 132-134:11 134-136:4 136-138:3 142-144:1
+BURST ne=20480 n=32 wall per-op 107.12 us | die0 dev 106.79 die1 dev 106.32 die2 dev 106.56 die3 dev 106.89
+
+SUMMARY ne=20480 lockstep per-rank dev med (us): die0=128.6 die1=120.3 die2=120.3 die3=127.4 | dev spread x1.07
+SPREAD-LAW worst halves spread: 0.23% (PASS)
+DONE
+chris-MS-7D28:387125:387125 [3] NCCL INFO comm 0x4a95fa0 rank 0 nranks 4 cudaDev 0 busId 5000 - Destroy COMPLETE
+chris-MS-7D28:387125:387125 [3] NCCL INFO comm 0x3ec3ee0 rank 1 nranks 4 cudaDev 1 busId 8000 - Destroy COMPLETE
+chris-MS-7D28:387125:387125 [3] NCCL INFO comm 0x44ae5b0 rank 2 nranks 4 cudaDev 2 busId d000 - Destroy COMPLETE
+chris-MS-7D28:387125:387125 [3] NCCL INFO comm 0x4b0c710 rank 3 nranks 4 cudaDev 3 busId 10000 - Destroy COMPLETE

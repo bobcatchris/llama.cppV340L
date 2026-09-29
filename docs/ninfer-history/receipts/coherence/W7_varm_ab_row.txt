@@ -1,0 +1,89 @@
+=== W7 V-ARM INTEGRATION — PAIRED SERVE-LEG A/B ROW (REV2 §8 SCHEDULED; BACKLOG A1) ===
+desk: V-arm integration, lane amd/wo-w7-body | closed 2026-09-19 ~08:1x CDT (serving window
+05:26 claimed by ROUNDWALL 05:26->stale->taken 06:00 per deconfliction notes in both desk files)
+
+VERDICT: PROMOTE GATES FAIL — the v_perm register-LUT decode (V arm) is NOT promoted.
+  The kernel-level AMBER 1.136x (W7_repack_row) does NOT convert to a serving prefill win
+  at TP4/cure-config on this box today: paired 2k prefill walls read the V arm SLOWER
+  (+5.7%/+6.6% within-pair vs a control band that is epoch-stable), and the 10k pair is a
+  wash. The arm stays in-tree behind NINFER_VPERM_ARM (unset = byte-identical; value-parsed
+  N7; mutual-exclusion throw with NINFER_TILED_PK) for a coordinator decision. Runbook
+  UNCHANGED (canonical bin 2c8901d3d18adef1 + canonical env). No PLOG-066 (owed only on
+  promotion); this row + the desk file are the banked verdict.
+
+CARRIAGE (PLOG-056, both fixes verified IN the production kernel at the fix sites):
+  stage reads x at blockIdx.y*TN + t; restage meets the declared (0,4),(2,6),(1,5),(3,7)
+  consumption. Code-identity with the sha'd bench RED->GREEN chain
+  (a4de0b567/76a98ca6f3838f06 -> 67eb41674/ba364d711a04f023 -> e7985fadf/70b89f70587f38eb).
+
+PATTERNED PARITY (pre-window, die 3, PRODUCTION launchers, --v3parity-class data):
+  relL2(V_arm, V0) = 1.285e-03 (Attn 14336x5120 M128), 1.285e-03 (Gdn 16384x5120),
+  1.285e-03 (MlpGateUp 34816x5120), 1.101e-03 (Residual 5120x6144), 1.348e-03 (M=256) —
+  all << 1e-2 gate (fp16-window rounding class; bitdiff 3.1-8.2% = declared association).
+  BOTH-DIRECTIONS FALSIFIER (fixes-reverted clone): relL2 4.681e-01, bitdiff 100% — RED as
+  required; the cell is not blind. V0 deterministic. Log: W7_varm_parity_GREEN.log.
+
+SERVE-LEG PAIRS (PLOG-060 design: same NEW bin c618d356f0cdc401 both arms, fresh boots,
+3 position-matched plen-2075 mt64 temp0 probes per arm + one 10k; parity BLUE/stop per probe):
+
+  LEG B  (control, 06:27, boot edge 42/32/38/28C): 2k = 19.04 / 19.27 / 19.50 s (flat +-1.2%)
+         10k = 131.47 s (edge-before 85C)                       BLUEPASS 4/4, finish stop x4
+  LEG A  (VPERM=1, 06:44, boot edge 43/31/41/28C — thermally matched to B):
+         2k = 20.30 / [32.90 OUTLIER] / 20.61 s; siblings flat (+1.5%)
+         10k = 129.62 s (edge-before 84C)                       BLUEPASS 4/4, finish stop x4
+  LEG A' (VPERM=1 + TILED_TRACE, 06:51): ROUTE PROVEN in-serve —
+         "[TILED] arm=vperm window=32 n=4096 k=5120 M=128" (+ n=5120 k=1536 shard);
+         2k = 115.36 / 29.61 / 31.10 s; 10k = 163.44 s          BLUEPASS 4/4 (completion
+         drifted 44 -> 41 = DECLARED association change shifting greedy sampling; the V-arm
+         parity bar is BLUE/stop/no-mojibake, never bit-equality/FNV)
+  LEG B2 (control, 07:10, after boot-fault phase + 20s settle): 2k = 18.96 / 19.18 / 19.38
+         — control band reproduced within +-1.5% across a 43-min gap containing the A epochs.
+
+  PAIRED READING (the promote gate needs >=2% FASTER within-pair):
+    2k: A-arm flat siblings 20.30/20.61 vs the stable control band 18.96-19.50 = +5.7%/+6.6%
+        SLOWER. Control epoch-stability (B and B2 bracket the A epochs) makes box drift an
+        unlikely explanation for the +6%. 10k: 131.47 vs 129.62 = -1.4% wash (within +-2%).
+    => GATE FAIL on the 2k class; no gain on the 10k class. NOT PROMOTED.
+
+  EXCLUDED FROM NUMERICS (banked for the A7 gap-bimodality class): A's 32.90s outlier
+  (+73% = ~+815 ms/chunk equivalent) and A's entire collapsed epoch (29.6-115.4s). The +6%
+  clean-delta itself equals ~+70 ms/chunk — the SAME amplitude as A7's unattributed
+  15-vs-69 ms/chunk gap bimodality. HYPOTHESIS ONLY (not proven): the V kernel's 2-D grid
+  (448 blocks vs V0's 224 at the served shapes) may interact with whatever fires the bad-gap
+  mode; a future leg with a working PREFILL-SUM instrument would read gap directly.
+
+INSTRUMENT + PLATFORM FINDINGS this window (receipts: W7_varm_instrument_faults.log):
+  1. [PREFILL-SUM] (NINFER_PREFILL_OPTRACE, any depth) was UNAVAILABLE: warmup-phase device
+     fault ("Memory access fault ... Page not present", random victim node, host-VA
+     dereference class) hit BOTH binaries — including the CANONICAL bin 2c8901d3d18adef1
+     under the CANONICAL env (07:58 restore attempt) — and no-instrument boots (06:45
+     correction supersedes the initial OPTRACE attribution). Legs therefore ran WALLS-ONLY,
+     which is PLOG-060's primary metric; PREFILL-SUM columns banked as
+     unavailable-with-receipts.
+  2. Boot-fault PHASE: ~50% of boot attempts faulted at warmup during the faulting epochs
+     (tally at close: control-env boots 4 OK/3 fault, VPERM boots 2 OK/5 fault —
+     not significantly separable, n=14; the gate is mechanically uninvolved at warmup,
+     tok=2 never reaches launch_a16). Rate scaled with cumulative SIGKILL boot/kill cycles
+     (~20 this window); 10-min full idle did NOT drain it at 08:05; the phase DID clear
+     spontaneously twice earlier (06:12, 06:44, 07:10 all landed after prior faults).
+     OPEN ITEM for the coordinator: box-level, predates and outlives this desk's arm;
+     canonical restore was still being retried at desk close (see desk file tail).
+
+BANKED ARTIFACTS:
+  bin   /home/chris/artifacts_bin/ninfer-serve_c618d356f0cdc401.bin (BANK-BEFORE-RELINK)
+  code  src/ops/linear/nvfp4/nvfp4_tiled_gemm_hip.{cu,h} + nvfp4_dispatch.cpp (this branch)
+  cells tools/v340l/w7_varm_parity.cu (+ falsifier) | W7_varm_parity_GREEN.log
+  rows  this file | W7_varm_instrument_faults.log | docs/amd/W7_VARM_INTEGRATION_desk.md
+  logs  /tmp/w7_varm_{B,B2,A2,A2b}*_measure.log + /tmp/w7_varm_resp_* (B/A/A' jsons)
+  probe /tmp/w7_varm_leg.sh (leg driver), /tmp/w7_varm_analyze.py (pair parser)
+
+RE-ENTRY CONDITIONS for any future V-arm serve-leg (all five required):
+  1. box boots clean (no fault phase; >=2 consecutive healthy boots first),
+  2. PREFILL-SUM instrument healthy (its warmup-fault interaction resolved by the trace
+     owner — today it was unreadable at ANY depth on BOTH bins),
+  3. per-probe clocks sideband (M0 law — this desk's legs carried boot-time edge temps
+     only; per-probe sclk was missed and would discipline the thermal reading),
+  4. >=3 adjacent-boot interleaved B/A pairs (never sequential single boots per arm),
+  5. an A7 gap-bimodality attribution first (the +70 ms/chunk mode is the exact size of
+     the observed delta; without naming it, a 2k serve-leg cannot separate the arm from
+     the mode).

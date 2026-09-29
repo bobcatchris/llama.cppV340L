@@ -1,0 +1,4 @@
+W4AR WEDGE-REPRO ROW (2026-09-18 ~01:42, coordinator-run, bin aec8ac56765458af, NINFER_TP_ONESHOT_AR=1, bounded 100s)
+OUTCOME: LOUD DEATH @ ~20s warmup — SIGABRT/core dump, 'Memory access fault by GPU node-3 ... Page not present' — NOT a wedge (old failure: 17-min silent spin 2/2), NOT a designed [AR-*] diag (no DEADLINE/WATCHDOG/DESYNC lines fired)
+CLASSIFICATION: cure moved the failure mode unbounded-hang -> bounded-crash (class guarded: silent failure impossible); one-shot world=4 still NON-FUNCTIONAL — underlying fault now an illegal access at warmup (~130-collect window), suspect one-shot kernel/buffer world=4 access or cure diag-cell mapping; GREEN leg NOT achieved
+provenance: /tmp/w4ar_repro.log (banked beside row); next desk: fault-find one-shot world=4 access (compute-sanitizer class) before any re-adoption attempt

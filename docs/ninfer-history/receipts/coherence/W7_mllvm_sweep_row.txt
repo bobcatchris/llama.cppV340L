@@ -1,0 +1,14 @@
+W7 MLLVM SWEEP ROW — compiler-tunable rung of the compiler road: no lever in LLVM 6.2's existing flags, 2026-09-18
+method: hipcc -S with -mllvm flags x w3_census.py on the A16 census point <80,64,4,16> (baseline = banked 44/35+9)
+  base:                       44 waits (35 lgkmcnt + 9 vmcnt), 102 VGPR, 0 B
+  --amdgpu-disable-unclustered-high-rp-reschedule:      41 (32+9)   — noise-class
+  --amdgpu-disable-clustered-low-occupancy-reschedule:  41 (32+9)   — noise-class
+  --misched-cluster=false:                              60 (55+5)   — REGRESSION
+  --force-fast-cluster / --enable-post-misched:         44 (35+9)   — no change
+  --pre-ra-sched=list-ilp|bottomup:                     compile-fail (flag not in this build)
+VERDICT: rung 1 of the compiler road (existing tunables) DEAD — no flag reaches <=30 waits.
+Combined with W7_rocm_census_row.txt (LLVM 17/19/22 all produce the identical 44-wait body),
+the 44-wait structure is backend-architectural, not a tunable or a missed upstream fix.
+Rung 2 (patching SIInsertWaitcnts/SI scheduler ourselves) remains available but is a
+correctness-critical compiler research project (weeks-months, memory-hazard risk) — shelved
+unless the program's economics change. Receipt: this file; census files /tmp/mllvm_sweep (ephemeral).

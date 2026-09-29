@@ -1,0 +1,115 @@
+== MANIFEST 2026-09-17T12:0xZ G-AMD-SMALLT bin be4c9dd763cd649f (sha256 be4c9dd763cd649f..., banked /home/chris/artifacts_bin/ninfer-serve_be4c9dd763cd649f.bin BEFORE any relink) TP4 MTP k=2 GRAPHS-ON port=8100
+grant: coordinator work order "GPU-owner agent — Phase 1 kernel identity + Phase 2 small_t tuning" (this session's tasking; instrumented boots authorized per phase)
+purpose: SMALLT — prove from the SERVING SIDE which kernel executes the verify layer projections at T=3 (HOLE1 prime suspect: verify widths T=2..4 route to the untuned small_t arm, not launch_nvfp4_decode)
+code pass (committed evidence, amd/tp4-cure @ dc5a4bd69 + SMALLT-IDENT edit):
+  - policy: HipSources.cmake:330 defines NINFER_NVFP4_SIMT_LANE=1 -> variant_kernels.cpp text_policy() returns A16Only (the one-time boot row names it); tp_kernel.cu:77 tp_gemv routes NVFP4 -> nvfp4_dispatch(A16Only) at EVERY t
+  - route: nvfp4_dispatch.cpp launch_a16 chunks T<=32 -> T==1 launch_nvfp4_decode (TUNED GEMV), T=2..32 launch_nvfp4_small_t
+  - T=3 therefore hits launch_nvfp4_small_t -> nvfp4_small_t_hip_kernel (nvfp4_small_t_hip.cu:32) at the five TP4 W4 geometries:
+      GdnInputW4 4096x5120 (48 fused GDN qkvz), AttnInputW4 3584x5120 (16 FULL layers), MlpGateUpW4 8704x5120,
+      Residual17408W4 5120x4352 (MLP down), Residual6144W4 5120x1536 (GDN output)
+  - structure (the untuned pattern, same disease GEMV-TUNE cured in the decode arm): 4 warps/block __launch_bounds__(128),
+      ONE warp per (row,token) pair -> weights re-read per token (x3 DRAM demand at T=3); per group: 8 scalar u8 code loads,
+      8 scalar u32 x loads, 16 dynamically-indexed GLOBAL e2m1 table loads (static const kTable[16] in the device fn),
+      branchy closed-form e4m3 per group; single fp32 accumulator; lane-strided groups g=lane,lane+32,...
+instrument: NEW env arm NINFER_SMALLT_TRACE=1 -> "[SMALLT] arm=nvfp4_small_t_hip_kernel problem= n= k= T= (first seen at launch #N)"
+  one line per (problem,T) first-seen + total-launch volume lines every 16384 calls; zero cost when unset (nvfp4_small_t_hip.cu dispatch site)
+config: /media/chris/EMTEC256/qwen3_8_27b_nvfp4.ninfer (stat -c %s == 18324067840 verified) --port 8100 --devices 0,1,2,3 --allow-nvfp4-weights --spec mtp --draft-tokens 2 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16
+env: NINFER_WORKSPACE_MIB=96 NINFER_TP2_TIMING=1 NINFER_SMALLT_TRACE=1 NINFER_DRAFT_VOCAB=/home/chris/dual_5060_ti_ninfer/tests/multi_gpu/data/qwen38_draft_vocab_ids.json (CWD-trap mandate; file exists, 279256 B)
+KFD precondition pre: rocm-smi --showpids = "No KFD PIDs currently running"; GPUs 0-3 0% use; no foreign ninfer-serve pgrep match; df / = 14G avail (>= 12G gate)
+probe: count600 (prompt="Count from 1 to 200, one number per line, no commentary.", max_tokens=600, temp=0, greedy); expect ~290 rounds @ t/r~2.06-2.33, decode ~8.8-11 tok/s per HOLE1/GEMV-TUNE anchors
+serial discipline: sole GPU process; anchored exact-pattern kill (pgrep -f "^/home/chris/artifacts_bin/ninfer-serve") at release; KFD-0 post required
+
+== BOOT 1 (instrumented, NINFER_SMALLT_TRACE=1): 12:03Z bin be4c9dd763cd649f
+health ok ~15 s (warmup probe ran first: [ids] 760 1156 1018 328)
+count600 (70-tok prompt, max=600, temp=0, greedy — COUNTING class, acc 0.99, t/r=2.99, 201 rounds):
+  wall 45.9 s, decode 14.0 tok/s, prefill 22.4 tok/s, ttft 3.12 s
+  B1 (200 rounds): round=212.68 ms — VERIFY 194.01 ms (91.8%), align 9.02, propose 0.28
+  (NOTE: counting class has acc 0.99 vs HOLE1's 0.55 prose class; round wall is the same ~212 —
+   the acceptance-dependent round-count changes, not the per-round cost. THIS is the pre-tune anchor.)
+SMALLT PROOF (the Phase 1 answer, verbatim from SMALLT_serve.log):
+  [SMALLT] arm=nvfp4_small_t_hip_kernel problem=11 n=4096 k=5120 T=3 (first seen at launch #2964)  <- GdnInputW4
+  [SMALLT] arm=nvfp4_small_t_hip_kernel problem=10 n=3584 k=5120 T=3 (first seen at launch #3326)  <- AttnInputW4
+  [SMALLT] arm=nvfp4_small_t_hip_kernel problem=12 n=8704 k=5120 T=3 (first seen at launch #2967)  <- MlpGateUpW4
+  [SMALLT] arm=nvfp4_small_t_hip_kernel problem=13 n=5120 k=1536 T=3 (first seen at launch #2965)  <- Residual6144W4
+  [SMALLT] arm=nvfp4_small_t_hip_kernel problem=14 n=5120 k=4352 T=3 (first seen at launch #2969)  <- Residual17408W4
+  volume: "[SMALLT] total launches #196608" by end of count600 (~5 problems x 64 layers x ~290 rounds + prefill chunks 32/19)
+  prefill chunks ALSO ride this arm (T=32, T=19 lines) — the tune helps prefill too where T<=4 chunks occur.
+== VERDICT (Phase 1): CONFIRMED — every layer projection at verify T=3 executes
+  nvfp4_small_t_hip_kernel (nvfp4_small_t_hip.cu) at the five TP4 W4 geometries, via the
+  A16Only SIMT-lane binding -> tp_gemv -> nvfp4_dispatch -> launch_a16 -> launch_nvfp4_small_t.
+  launch_nvfp4_decode (the TUNED GEMV) never runs at T>=2. The untuned pattern is exactly the
+  GEMV-TUNE BASE disease: per-nibble GLOBAL e2m1 table loads, branchy e4m3 closed form, scalar
+  u8/u32 loads, 4 warps/block, 1 warp per (row,token) = weights re-read per token.
+== RELEASE 12:07Z: anchored kill pid 178477 (sole match ^/home/chris/artifacts_bin/ninfer-serve); no serve remains; KFD=0 ("No KFD PIDs currently running"); GPUs 0-3 0%; mclk idle 167 MHz; disk 14G
+
+== PHASE 2 — SMALLT TUNING (bench: nvfp4_smallt_roofline_bench.cu, cell: nvfp4_smallt_bitcheck.cu)
+== law: -O3 compile line, 5 s mclk hammer in bench, one process at a time, bit-ref BEFORE edits.
+== bit-ref: /tmp/smallt/smallt_bits_ref.bin sha256 b6318b4d2d17ffc8886b2339bfc41d28ef72d80266f6a0b2b3d76daf2d3535f2
+== (two runs BIT-IDENTICAL; cross-arm leg decode(T=1,col0)==small_t(T=3,col0) BIT-EQUAL YES on all 10 problem x pass combos — CT-5 pair property witnessed)
+== BASE (pre-edit nvfp4_small_t_hip_kernel, T=3 primary; read ceiling 379.8, copy 369.6):
+==   T=3: AttnInputW4 56.7 (14.9%) GdnInputW4 55.2 (14.5%) MlpGateUpW4 55.8 (14.7%) Resid6144W4 52.0 (13.7%) Resid17408W4 53.2 (14.0%)
+==   T=2: 81.3/75.7/83.2/75.9/75.2 (20-22%)   T=4: 43.3/43.2/44.0/40.4/41.0 (11-12%)
+==   serving cross-check: linears sum ~0.99 ms/GDN-layer x 48 + ~0.96 ms/FULL x 16 = ~63 ms of the 124 ms non-AR hole
+
+== TUNING TABLE (T=3 primary, GB/s = useful weight+x+out stream, % of that run's read ceiling)
+== iter  technique                                          AttnW4  GdnW4   MlpW4   R6144W4 R17408W4 bit-eq
+BASE    (pre-edit kernel: per-nibble GLOBAL e2m1, closed e4m3,  56.7   55.2    55.8    52.0    53.2   (is ref)
+         scalar u8/u32 loads, 4 warps, 1 warp/(row,token))      14.9%  14.5%   14.7%   13.7%   14.0%
+S1      + e2m1 PAIR table LDS (2KB) + e4m3 table LDS (1KB),      85.7   87.9    88.5    69.8    85.0   YES
+         filled FROM amd::e2m1_bits / amd::e4m3_lut_decode      22.7%  23.3%   23.4%   18.5%   22.5%   +55%
+S2      + codes one u64/group, x 2x uint4/group, scale quad      85.3   88.2    89.8    74.1    84.9   YES  ~FLAT
+S3      + TOKEN-SHARING: 1 warp = 1 row x ALL T (T=2..4          131.9  134.6   138.2   108.7   123.6   YES
+         template kernel; weights stream ONCE not T times)      34.5%  35.2%   36.2%   28.4%   32.4%   +54%
+S4      + 8 warps/block (launch_bounds 256)                      137.0  128.9   141.7   115.4   127.1   YES  net+keep
+S5      + 2 rows/warp (16-row blocks; x regs per-token shared    179.2  167.9   192.4   147.7   171.8   YES  LANDED
+         by both rows, acc 2xT)                                 47.0%  44.1%   50.3%   38.7%   44.2%   3.2x BASE
+S6      + unroll 2 on g-loop: K=5120 flat (+1.8% Mlp), K=1536    —      —       195.8   92.5     —     YES  REVERT
+         COLLAPSED (147.7 -> 92.5) — GEMV iter7 shape inverted
+S7      x words on-the-fly u32 instead of uint4 shelf            157.9  135.9   167.7   141.6   149.6   YES  REVERT
+S8      launch_bounds(256,2) forced 2 blocks/SM                  179.4  164.0   189.1   153.1   173.5   YES  ~wash REVERT
+== S5 CONFIRMATION RUN (45 s idle gap): 179.2 / 168.1 / 192.1 / 147.5 / 168.6 @ read 381.6 — within noise
+== full S5 band: T=2: 204.4/207.7/217.0/191.5/184.6 (48-57%)  T=4: 143.4/141.2/156.8/124.7/138.5 (33-41%)
+== legacy kernel (T=5..32 prefill chunks) keeps S1+S2 (LDS tables + wide loads, bit-equal) — prefill
+==    chunks ride the SAME TU (coordinator prefill audit f6ded308e: small_t IS the whole NVFP4 story)
+== BAR HONESTY: mission bar was >=60% of read ceiling at T=3 (GEMV-class). NOT MET: S5 lands 39-50%.
+==    GEMV's 73-77% at T=1 does not transfer at T=3 because every weight byte carries 3x the
+==    ALU/LDS work (fmafs 3x, x loads 3x) — the kernel leaves the DRAM-wall regime and hits the
+==    issue wall; the remaining proven-menu levers measured REGRESS here (S6/S7/S8 above), and the
+==    two levers that could restructure the work (split-K across warps, extra accumulator chains)
+==    are banned by the nvfp4_amd_codec.h contract without a documented re-scope. Bit-equality held
+==    on EVERY iteration (the contract was never touched). 3.2x kernel at T=3 stands.
+== serving projection (measured kernel times x serving shape): linears/round 62.7 -> 19.4 ms
+==    (48 GDN layers x 0.3065 ms + 16 FULL x 0.2939 ms vs BASE 48 x 0.9874 + 16 x 0.9558)
+== LANDING: serve rebuild banked /home/chris/artifacts_bin/ninfer-serve_1e5745f9f8febcc3.bin
+==    (build-hip-amd relinked after bank; final bitcheck vs pre-edit ref: BIT-EQUAL YES, 5 W4 x 2 passes)
+
+== BOOT 2 (LANDED binary 1e5745f9f8febcc3, NINFER_SMALLT_TRACE=1): 12:33Z
+health ok ~20 s; "loaded 40960 draft vocabulary IDs" PRESENT (CWD trap avoided)
+count600 (SAME prompt/shape as BOOT 1, temp 0 greedy):
+  wall 27.7 s (was 45.9), decode 23.2 tok/s (was 14.0, +66%), prefill 37.3 tok/s (was 22.4, +66%),
+  ttft 1.88 s (was 3.12)
+  B1 (200 rounds): round=128.43 ms (was 212.68, -39.6%) — VERIFY 111.95 ms (was 194.01, -42.3%),
+  align 8.49, AR-draft-chain 7.54
+  [SMALLT] arm=nvfp4_small_t_tuned_kernel ... T=3 lines for ALL FIVE problems (10,11,12,13,14) —
+  the TUNED kernel is proven serving the verify projections.
+E-17 re-scoped byte-identity: count600 completion (551 chars, finish=length) BYTE-EQUAL across
+  be4c9dd763cd649f (pre-tune) and 1e5745f9f8febcc3 (tuned), temp 0, same prompt. Warmup [ids]
+  760 1156 1018 328 identical both boots.
+sky-blue mt300 temp 0 (req after count600): decode 18.0 tok/s, prefill 46.4 tok/s, MTP 2.33
+  tok/round (66.7%) — vs e341 anchors (GEMV_TUNING_row, post-battery hot): 10.1-11.2 decode,
+  25.3-25.9 prefill. Same-anchor delta +61-78% decode (thermal-state caveat: this probe ran in a
+  cooler window than the e341 anchors; same-boot A/B above is the controlled comparison).
+BOOT_BATTERY_20260917_123502: OVERALL GREEN (guard GREEN, route-parity PASS, halves-contract PASS,
+  ladder PASS, 21-sample clocks sideband banked).
+RELEASE 12:36Z: anchored kill pid 223037; no serve remains; KFD=0; GPUs 1-3 0% (dev0 = display card,
+  desktop churn, no KFD processes); disk 14G.
+== PREFILL SIBLING BENCH (coordinator ask, nvfp4_prefill_bench.cu, run 12:38Z, hot machine:
+==    ceilings this run copy 351.7 / read 338.6 — thermal-degraded vs the 369.6/379.8 cool runs,
+==    same-run PROD-vs-REF-vs-TILED comparisons are the valid read):
+==   M=128: TILED 3.5x PROD GF/s (AttnInput 3080 vs 889; 6.1 ms vs 21.1 ms), M=32: 2-3x, all
+==   relL2(vsREF) 0.00e+00 PASS. DECISION RULE MET: the tiled dequant GEMM (TILED-GEMM-1, already
+==   in-tree from f6ded308e) is greenlit as the prefill follow-on build; PROD arm (my tuned
+==   legacy kernel at T=32 chunks) remains the serving arm until that lands behind its own gate.
+== ARTIFACTS: SMALLT_serve.log (boot1) SMALLT2_serve.log (boot2 landed) nvfp4_smallt_roofline_bench.cu
+==    nvfp4_smallt_bitcheck.cu bench_{base,s1,s2,s3,s4,s5,s5_confirm,s6,s7,s8}.log in /tmp/smallt
+==    (benches rerunnable from the committed .cu sources; ref bits sha256 b6318b4d2d17ffc8...)

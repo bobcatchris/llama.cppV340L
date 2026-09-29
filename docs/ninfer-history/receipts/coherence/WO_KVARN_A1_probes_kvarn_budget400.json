@@ -1,0 +1,49 @@
+{
+ "label": "A1_kvarn_k4v4_8192_bin18993c16_budget400",
+ "port": "8100",
+ "verdict": "GREEN",
+ "n_pass": 5,
+ "needle6k": true,
+ "rows": [
+  {
+   "probe": "P1_blue_2k",
+   "pass": true,
+   "finish": "stop",
+   "wall_s": 39.6,
+   "coherent": true,
+   "answer": "BLUE"
+  },
+  {
+   "probe": "P2_word_1k",
+   "pass": true,
+   "finish": "stop",
+   "wall_s": 25.8,
+   "coherent": true,
+   "answer": "ORANGE"
+  },
+  {
+   "probe": "P3_arith",
+   "pass": true,
+   "finish": "stop",
+   "wall_s": 10.4,
+   "coherent": true,
+   "answer": "391"
+  },
+  {
+   "probe": "P4_needle_3k",
+   "pass": true,
+   "finish": "stop",
+   "wall_s": 70.1,
+   "coherent": true,
+   "answer": "ZEBRA-48213"
+  },
+  {
+   "probe": "P5_needle_6k",
+   "pass": true,
+   "finish": "stop",
+   "wall_s": 141.6,
+   "coherent": true,
+   "answer": "ZEBRA-73942"
+  }
+ ]
+}

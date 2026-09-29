@@ -1,0 +1,38 @@
+== MANIFEST 2026-09-17T20:0xZ T2 W4-ONESHOT-AR A/B bin 409450b83ffa4be8 (banked; sha==stamp) TP4 MTP k=2 GRAPHS-ON port=8100
+grant: coordinator work order T2 (this session's tasking) per ONESHOT_W4_notes.md s3(c)+(d): count600 A/B ring vs one-shot, NINFER_TP2_TIMING=1 B1 AR phase, [ids]+completion byte-identity (re-scoped E-17)
+config: artifact qwen3_8_27b_nvfp4.ninfer --port 8100 --devices 0,1,2,3 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16 --spec mtp --draft-tokens 2 --allow-nvfp4-weights
+env common: NINFER_ALLOW_NVFP4_TP2=1 NINFER_DRAFT_VOCAB=/home/chris/dual_5060_ti_ninfer/tests/multi_gpu/data/qwen38_draft_vocab_ids.json NINFER_WORKSPACE_MIB=96 NINFER_TP2_TIMING=1
+arm A (RING): default construction (no NINFER_TP_ONESHOT_AR) -> NCCL-ring collects
+arm B (ONESHOT): NINFER_TP_ONESHOT_AR=1 -> OneShotAllReduce(4) construction; OneShotArgmax stays world==2 per R6
+body: count600 chat mt=600 temp=0 greedy (counting class, acc~0.99 anchor)
+KFD pre: 0; serial discipline: anchored kills, <60s bursts / 150s idles
+
+== BOOT A (RING, default construction): 20:04-20:06Z bin 409450b83ffa4be8
+health ok; warmup [ids] 760 1156 1018 328 MATCH; draft-vocab line PRESENT
+count600 (mt600 temp0 greedy): decode 23.0 tok/s, prefill 36.9, acc 0.99 t/r 2.99, 201 rounds, wall 27.9s
+  lane line: [tp2] single-seq lane 0: acceptance=0.99 tok/round=2.99 rounds=201 gen=600
+  B1 (200 rounds): round=129.38 ms — VERIFY 112.82 (87.2%), align 8.48, AR-draft-chain 7.63 ms (5.9%)
+  [ids] + completion banked (ONESHOT_A_count600.json, 1178 B); no REJECT-candidate, no AR-FAILOUT
+== BOOT B (NINFER_TP_ONESHOT_AR=1): 20:09Z — WEDGE (RED CAPTURE #1)
+model loaded 19.6 s OK -> "warming up..." NEVER completes (17+ min observed vs ~2 s normal).
+  100% CPU single-thread spin (21 thr); GPUs 0,1,2 at 100% use, GPU3 0% (rank 3 stranded);
+  NO AR-FAILOUT, NO REJECT-candidate, no soft-fail declaration — the R2 bounded-wait law
+  (2x(world-1) poll budgets x16 retries ~= 7 s to declared death) NEVER FIRES.
+  KFD context present during wedge: 4 GPUs, 27976613888 B, CU occupancy 1 (spin-wait class).
+== BOOT B2 (identical relaunch, repro leg): 20:31Z — WEDGE REPRODUCED (RED CAPTURE #2)
+no /health past 120 s post-spawn; same signature: 100% CPU spin, GPUs 0,2,3 at 100% / GPU1 0%
+  — stranded rank VARIES (rank3 boot B, rank1 boot B2); the WEDGE itself is deterministic 2/2.
+release: anchored kills 65086 + 89468; KFD=0 after both; evidence ONESHOT_B_wedge_evidence.txt
+  + ONESHOT_B2_wedge_evidence.txt; logs ONESHOT_B_serve.log / ONESHOT_B2_serve.log
+== T2 VERDICT:
+  1. AR ms delta: NOT MEASURABLE — the one-shot arm never reaches a served request at TP4.
+     Ring anchor on this binary: 7.63 ms/round (5.9% of round; tasking's 14.5 anchor was a
+     pre-SMALLT-boot number; the SMALLT landing halved it like every other phase).
+  2. One-shot AR is NOT ADOPTABLE in 409450b83ffa4be8. Default-OFF env-gate discipline
+     VINDICATED: default boots are healthy and bit-identical; only the opt-in env wedges.
+  3. RED capture banked for the owner desk (per coordinator 20:3xZ: design-level repair, not
+     this window): BUG CLASS = world>2 collective lockstep/bounded-wait violation — at world=4
+     the poll either desyncs (R3: rank_step pairing) or spins unbounded (R2 bounded-wait not
+     wired into the world kernel path), and the stranded rank is nondeterministic.
+  4. Identity leg: ring-arm [ids]/completion banked as the reference for any future fix's
+     GREEN leg (byte-compare vs 760 1156 1018 328 warmup + ONESHOT_A_count600.json).

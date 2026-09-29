@@ -1,0 +1,118 @@
+=== BOOT_BATTERY ts=20260917_055635 port=8100 host=chris-MS-7D28 repo=/home/chris/worktrees/amd-tp4-cure
+commit: 2f44a6ef8 GEMV-TUNE: NVFP4 decode GEMV 122.9-156.4 -> 211.8-295.1 GB/s = 1.68-1.88x, bit-equal, contract intact
+step 0c: clocks sideband sampling -> /home/chris/worktrees/amd-tp4-cure/results/amd/coherence/BOOT_BATTERY_20260917_055635_clocks.log (pid 3206574, 5 s interval)
+---- step 0: host CI guard (check_bf16_low_guard.py)
+== ninfer bf16-low guard suite (host CI class, BUGTRACK E-13/E-14/E-15) ==
+[G1] OK  src/common/hip_shim/cuda_bf16.h — shim correction present, ninfer_low2bfloat16 :89, ninfer_low2bfloat162 :93
+[G2] OK  src/ops/kernel/causal_conv1d.cuh — __low2bfloat16{,2} code occurrences: 0 (comment mentions exempt)
+[G3] OK  src/ops/launcher/causal_conv1d.h — kCausalConvSequenceMaxTokens=64, kCausalConvParallelMaxTokens=16
+[G3] OK  src/ops/wrapper/causal_conv1d_silu.cpp — 3/3 dispatch chains compare->sequence->else prefill; no literal 64/16
+[G5] OK  src/runtime/tp2/tp_engine.cpp — draft_vocab site present (env->exe-relative->CWD resolution, tp_engine.cpp:1081)
+[G4] OK  tests/CMakeLists.txt — both device cells registered, sources on disk
+GUARD RESULT: GREEN — all 5 guards clean; exit 0
+step 0: GUARD GREEN
+step 0b: draft-vocab present at CWD (/home/chris/worktrees/amd-tp4-cure) — MTP remap will load
+step 1: ninfer_causal_conv_route_parity_test running (/home/chris/worktrees/amd-tp4-cure/build-hip-amd/tests/ninfer_causal_conv_route_parity_test)
+C=4096 T=65 sequence-vs-pairs                mismatches=      0/ 266240 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=4096 T=65 sequence-vs-scalar-prefill       mismatches=      0/ 266240 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=4096 T=65 sequence-vs-cpu-oracle           mismatches=      0/ 266240 ORACLE-OK
+C=4096 T=96 sequence-vs-pairs                mismatches=      0/ 393216 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=4096 T=96 sequence-vs-scalar-prefill       mismatches=      0/ 393216 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=4096 T=96 sequence-vs-cpu-oracle           mismatches=      0/ 393216 ORACLE-OK
+C=4096 T=257 sequence-vs-pairs               mismatches=      0/1052672 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=4096 T=257 sequence-vs-scalar-prefill      mismatches=      0/1052672 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=4096 T=257 sequence-vs-cpu-oracle          mismatches=      0/1052672 ORACLE-OK
+C=10240 T=65 sequence-vs-pairs               mismatches=      0/ 665600 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=10240 T=65 sequence-vs-scalar-prefill      mismatches=      0/ 665600 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=10240 T=65 sequence-vs-cpu-oracle          mismatches=      0/ 665600 ORACLE-OK
+C=8192 T=130 sequence-vs-pairs               mismatches=      0/1064960 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=8192 T=130 sequence-vs-scalar-prefill      mismatches=      0/1064960 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=8192 T=130 sequence-vs-cpu-oracle          mismatches=      0/1064960 ORACLE-OK
+C=512 T=65 sequence-vs-pairs                 mismatches=      0/  33280 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=512 T=65 sequence-vs-scalar-prefill        mismatches=      0/  33280 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=512 T=65 sequence-vs-cpu-oracle            mismatches=      0/  33280 ORACLE-OK
+C=510 T=65 sequence-vs-pairs                 mismatches=      0/  33150 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=510 T=65 sequence-vs-scalar-prefill        mismatches=      0/  33150 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+C=510 T=65 sequence-vs-cpu-oracle            mismatches=      0/  33150 ORACLE-OK
+split3 C=2560 {512,512,1536} T=65 q sequence-vs-pairs mismatches=      0/  33280 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=65 k sequence-vs-pairs mismatches=      0/  33280 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=65 v sequence-vs-pairs mismatches=      0/  99840 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=65 q sequence-vs-scalar mismatches=      0/  33280 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=65 k sequence-vs-scalar mismatches=      0/  33280 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=65 v sequence-vs-scalar mismatches=      0/  99840 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=96 q sequence-vs-pairs mismatches=      0/  49152 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=96 k sequence-vs-pairs mismatches=      0/  49152 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=96 v sequence-vs-pairs mismatches=      0/ 147456 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=96 q sequence-vs-scalar mismatches=      0/  49152 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=96 k sequence-vs-scalar mismatches=      0/  49152 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=96 v sequence-vs-scalar mismatches=      0/ 147456 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=257 q sequence-vs-pairs mismatches=      0/ 131584 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=257 k sequence-vs-pairs mismatches=      0/ 131584 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=257 v sequence-vs-pairs mismatches=      0/ 394752 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=257 q sequence-vs-scalar mismatches=      0/ 131584 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=257 k sequence-vs-scalar mismatches=      0/ 131584 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=2560 {512,512,1536} T=257 v sequence-vs-scalar mismatches=      0/ 394752 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=1280 {256,256,768} T=65 q sequence-vs-pairs mismatches=      0/  16640 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=1280 {256,256,768} T=65 k sequence-vs-pairs mismatches=      0/  16640 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=1280 {256,256,768} T=65 v sequence-vs-pairs mismatches=      0/  49920 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=1280 {256,256,768} T=65 q sequence-vs-scalar mismatches=      0/  16640 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=1280 {256,256,768} T=65 k sequence-vs-scalar mismatches=      0/  16640 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=1280 {256,256,768} T=65 v sequence-vs-scalar mismatches=      0/  49920 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=70 {13,17,40} T=65 q sequence-vs-pairs mismatches=      0/    845 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=70 {13,17,40} T=65 k sequence-vs-pairs mismatches=      0/   1105 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=70 {13,17,40} T=65 v sequence-vs-pairs mismatches=      0/   2600 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=70 {13,17,40} T=65 q sequence-vs-scalar mismatches=      0/    845 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=70 {13,17,40} T=65 k sequence-vs-scalar mismatches=      0/   1105 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+split3 C=70 {13,17,40} T=65 v sequence-vs-scalar mismatches=      0/   2600 even=0 odd=0 first_t=-1 max_delta=0.0000 PARITY-OK
+OK e13_conv_route_parity
+step 1: ninfer_causal_conv_route_parity_test PASS
+step 1: ninfer_bf16_halves_contract_test running (/home/chris/worktrees/amd-tp4-cure/build-hip-amd/tests/ninfer_bf16_halves_contract_test)
+OK bf16_halves_contract (256 cases x 8 assertions, 0 mismatches)
+step 1: ninfer_bf16_halves_contract_test PASS
+step 2: server up on 8100 — coherence ladder fast arm (--max-tokens 64)
+leg w56: prompt=56 gen=64 fin=length -> PASS
+        content='Water is a chemical compound made of hydrogen and oxygen, with the for'
+        reason ='We need answer user: "What is water?" Simple. Need final answer. Provi'
+leg a60: prompt=60 gen=26 fin=stop -> PASS
+        content='4'
+        reason ='We need answer user\'s simple question "What is 2 plus 2?" Need final a'
+leg b61: prompt=60 gen=50 fin=stop -> PASS
+        content='1 2 3 4 5'
+        reason ='We need answer to user: "Count from 1 to 5." Simple. Need final likely'
+leg c62: prompt=61 gen=57 fin=stop -> PASS
+        content='1\n2\n3\n4\n5\n6\n7\n8\n9\n10'
+        reason ='We need answer to user: "Count from 1 to 10." Simple. Need final answe'
+leg d64: prompt=64 gen=35 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need answer user\'s request: "Reply with exactly the single word BLU'
+leg e66: prompt=66 gen=43 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need to reply with exactly single word BLUE. User says: "Reply with'
+leg f68: prompt=68 gen=38 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need to reply with exactly single word BLUE. User says reply with e'
+leg g72: prompt=72 gen=31 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need to reply with exactly single word BLUE. User says reply with e'
+leg h80: prompt=80 gen=45 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need to reply with exactly single word BLUE. User asks: "Reply with'
+leg i96: prompt=96 gen=31 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need to reply with exactly single word BLUE. User says reply with e'
+leg j128: prompt=128 gen=40 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need reply to user: "Reply with exactly the single word BLUE. Conte'
+leg k160: prompt=160 gen=39 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need reply to user: "Reply with exactly the single word BLUE. Conte'
+leg l224: prompt=224 gen=40 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need reply to user: "Reply with exactly the single word BLUE. Conte'
+leg m288: prompt=288 gen=40 fin=stop -> PASS
+        content='BLUE'
+        reason ='We need reply to user: "Reply with exactly the single word BLUE. Conte'
+== 14/14 legs PASS ==
+step 2: LADDER PASS (exit 0)
+step 0c: clocks sideband banked: /home/chris/worktrees/amd-tp4-cure/results/amd/coherence/BOOT_BATTERY_20260917_055635_clocks.log (27 samples)
+=== BOOT_BATTERY OVERALL: GREEN — row: /home/chris/worktrees/amd-tp4-cure/results/amd/coherence/BOOT_BATTERY_20260917_055635.row

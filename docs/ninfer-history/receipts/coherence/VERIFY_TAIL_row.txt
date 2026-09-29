@@ -1,0 +1,107 @@
+VERIFY_TAIL_row — M2: per-op split of the verify tail ([TAIL], NINFER_VERIFY_TAIL_TRACE=1), 2026-09-17 GPU-OWNER window (amd/tp4-cure)
+Mission: split the M1-named 55.21 ms/round post-layer-64 tail per op (CONCURRENCY-1 scope, no mc>=2 anything).
+Bin: BANKED /home/chris/artifacts_bin/ninfer-serve_248630d1b110c2bf.bin (HEAD 248630d1b110c2bfb368b173a8751d00a4a3f93d,
+  the M2 tracer commit; sha256 0778f80b48b7c49c7d6f848b90bf3cc7e66544fb8d29d762ad8fb61e84de7707); strings-check
+  NINFER_VERIFY_TAIL_TRACE HIT in the banked bin pre-boot. Boot healthy ~10 s; "loaded 40960 draft vocabulary IDs"
+  VERIFIED in log (lm_head slice armed, no B3 full-vocab fallback warning); anchored kill post-leg, KFD=0.
+BOOT_BATTERY: OVERALL GREEN pre-leg — row results/amd/coherence/BOOT_BATTERY_20260917_180806.row (+ clocks log):
+  step0 GUARD GREEN; step1 causal_conv_route_parity PASS + bf16_halves_contract PASS; step2 LADDER PASS on the
+  traced server. Closure proof that default behavior is unchanged on the M2 diff (tp2_backend.cpp +
+  text_context_impl.h + verify_tail_trace.h, 74 insertions 0 deletions, all gated).
+Serve log: M2_serve.log (raw: all [TAIL] per-round lines, 4 ranks; OPTRACE/B1 phases; req traces).
+Clocks sideband (M0 law): M2_clocks_sideband.log, 2 s rocm-smi sampling, continuous through both legs
+  (pre-retire state: GPU0 edge 69C/junction 71C warmest, all sclk level 7).
+
+== BOOT/POSTURE ==
+serve_10k.sh line MINUS the 10k body PLUS traces env: TP4 --devices 0,1,2,3 --spec mtp --draft-tokens 2,
+  --prefill-chunk 128, --no-prefix-reuse, greedy, NINFER_ALLOW_NVFP4_TP2=1, NINFER_WORKSPACE_MIB=96,
+  NINFER_DRAFT_VOCAB=<qwen38_draft_vocab_ids.json>,
+  NINFER_VERIFY_TAIL_TRACE=1 NINFER_TP2_TIMING=1 NINFER_TP2_OPTRACE=1 NINFER_VERIFY_LAYER_TRACE=1.
+
+== WORKLOAD / IN-CLASS CHECK ==
+count600-class conc=1 temp=0 greedy (prompt 67 tok, mt=600), fired twice:
+  leg 1 (18:10, after battery+lad): finish=length 600 gen, 204 rounds, acc 0.97, t/r 2.94, decode 10.7 tok/s.
+  leg 2 (18:22, after 10.5 min idle + warmup): finish=length 600 gen, 204 rounds, acc 0.97, t/r 2.94,
+    decode 16.8 tok/s, prefill 35.3 tok/s.
+  IN CLASS vs the M1 anchor family (201-204 rounds / acc 0.97-0.99 / t/r 2.94-2.99): rounds + acceptance
+  IDENTICAL — the greedy path's determinism fingerprints are unchanged by the instrument.
+
+== !!!! LOUD: THE ROUND TOTAL MOVED — CAUSE: BOX CLOCK DROOP, NOT THE INSTRUMENT !!!! ==
+OPTRACE verify (the 117.41 anchor source): leg2 mean 151.06 / p50 130.29 ms vs M1's 117.41
+  -> mean +28.7%, p50 +9.4% (>2% -> said loud, as ordered).
+  leg 1 was worse (server decode 275.7 ms/round = 2.35x M1).
+Evidence the move is the box, not the tracer:
+  (a) sideband: sclk collapses from level 7 to 2-5 WITHIN 2-6 s of ANY decode burst start TODAY
+      (18:22:36 all-7 -> 18:22:38 levels 2/2/4/4; recovers to all-7 within ~2 s of idle) — GPU0 deepest.
+      M1's identical 2 s sampler showed level 7 THROUGHOUT its active leg last night. New-today behavior:
+      instant-onset, instant-recovery droop under burst; differs from THARM1's 5.5-min trip / 3-min clear
+      integrator (THARM1 follow-up owed: the control variable moved).
+      Prefill unaffected: 35.3 tok/s leg2 vs 34.3 M1 — big-kernel bursts still hold full clocks.
+  (b) clean-band internal anchors: in leg2 rounds with OPTRACE verify <= 125 ms (278 of 727 rank-rounds),
+      the M2 draft-side fields land ON M1's independent B1 anchors: align 8.28 vs 8.03 (+3.1%),
+      chain_fwd 7.90 vs 7.85, chain_head 0.32, propose 0.32 vs 0.31, draft-side sum 16.84 vs ~16.44 (+2.4%).
+      The instrument agrees with M1's timers in clean rounds; only the clock state differs.
+  (c) determinism fingerprints identical (204 rounds / acc 0.97 / t/r 2.94 both legs).
+  (d) BOOT_BATTERY GREEN + the commit's structural byte-identity argument (74 insertions, 0 deletions,
+      every added line gated; OFF = zero stream mutation).
+
+== THE PER-OP SPLIT (the deliverable) ==
+Clean band (OPTRACE verify<=125 ms, 278 rank-rounds, 4-rank mean; medians within 5% of means):
+
+  --- verify-side tail (device event pairs, per round) ---        ms      % of dev-tail
+    lm_head      61.93   (per-rank 66.0 / 59.7 / 60.0 / 61.6)   <- #1 OWNER ~90%
+    lgather       4.92   (rank0 0.83; ranks1-3 5.2-7.1 — gather waits on rank0 root, ~5-6 ms = rank0's lm_head excess)
+    ar_argmax     0.20
+    finalnorm     0.02 | argmax 0.02 | embed 0.01 | prep 0.01
+    SUM_dev_verify = 67.12 mean (67.58 median)
+  --- draft-side (device) ---                                     ms
+    align 8.28 | chain_fwd 7.90 | chain_head 0.32 | propose 0.32 | prepnext 0.02 | select 0.01 | rebase 0.00
+    SUM_draft = 16.84   (M1 B1 anchor 16.44 — MATCH)
+  --- host fields ---
+    sync 117.46 (RANK-UNIFORM 117.36-117.67) — the host drain wall at the round's only hard
+      cudaStreamSynchronize. SEMANTICS RESOLVED BY DATA: clean-band sync mean 117.46 == clean-band OPTRACE
+      verify mean (~117.4) — the host reaches the sync immediately after enqueue and sleeps through the
+      ENTIRE verify device phase (loop + tail); sync OVERLAPS, it is NOT a tail component. "sync big" is
+      expected-by-design; the tail question is answered by the device fields.
+    d2h 0.026 (pinned accept ints, us-class — confirms code-read: no verify-logits D2H exists)
+    book 0.11 | chain_enq 0.06
+
+  Top 5 tail ops (clean band, device ms/round): lm_head 61.9 >> lgather 4.9 > ar_argmax 0.20 >
+  finalnorm 0.02 > argmax/embed/prep 0.01-0.02 each. The tail is lm_head AND THEN NOTHING.
+
+== CROSS-CHECKS ==
+1. M1 join: verify(117.41) - loop(62.20) = 55.21 tail. Clean-band today: verify ~117.4 observed directly;
+   SUM_dev_verify 67.1 vs M1's 55.21 (+11%, bracket edges + today's bouncy clocks; the clock-scaled M1
+   equivalent is 55.21 x 1.094 p50-shift = 60.4 — the 67 sits just above with measurement edges).
+2. lm_head is COMPUTE-BOUND, not bracket-wait: leg1 (deep droop, sclk 775-1269) lm_head rank0 mean 153.8
+   vs leg2 clean-band 66.0 = 2.33x — matches the clock ratio. A wait-class op would NOT scale with clocks.
+   Also the lgather asymmetry tracks it: ranks1-3 wait on rank0 exactly rank0's lm_head excess (+5-6 ms).
+3. Draft-side fields == M1's independent B1 timers within 3% (table above).
+4. Round count/acceptance/t-r identical across legs and to M1's family.
+
+== THE ANSWER (coordinator's question) ==
+#1 tail owner: **lm_head — the verify logits projection** (draft-vocab 40960 slice, T=3): 61.9 ms/round
+   clean-band, ~90% of the device tail. #2 lgather 4.9 (ranks1-3 waiting on rank0's late lm_head finish).
+   Everything else in the tail is <0.5 ms combined. The 55.21 ms tail IS the lm_head op (plus its gather).
+Does the 50-tps path now have a concrete fix target: YES —
+   FIX TARGET: the lm_head GEMV kernel at skinny T (T=3 verify / T=1 chain) on the fp4 weights +
+   bf16-activation path: tiled/split-K lm_head + fold finalnorm in (the M1-named "lm_head fusion/tiled
+   lever" — M2 now supplies the number it was waiting for: ~62 of ~63-67 tail ms). Even a 5x kernel win
+   takes the round from ~117 to ~105 and decode from 2.94 t/r toward ~3.2 effective; combined with the
+   parked W4 one-shot AR (in-loop 9.6 + chain 7.9) the 50-tps path has two named, measured levers.
+   SECONDARY: lgather root asymmetry (gather-batching / root rotation) worth ~5 ms/round.
+   TERTIARY (parked): chain AR 7.9 ms behind the W4 R2/R3 design repair.
+
+== THERMAL/OPS NOTES ==
+- leg 1 contamination is banked as evidence (deep-droop scaling row), not as the split.
+- TODAY'S BOX rejects sustained full-clock decode bursts (instant droop, instant recovery, prefill immune);
+  THARM1's operating rule ("stay under ~60 s or take 2-3 min idle gaps") is INSUFFICIENT tonight — legs trip
+  in seconds. Any absolute-ms row measured today needs the clean-band treatment or a re-run when the box
+  returns to last-night behavior. Ratios/rankings remain thermal-robust (THARM1 doctrine).
+- GPU0 is systematically the droop-deepest and lm_head-slowest rank (also hottest at rest: 69C edge at
+  retire vs 52-56 others). Worth a board-level look someday; does not block the lm_head lever.
+
+Raw: M2_serve.log ([TAIL] per-round all ranks; [TAIL-AVG] n=100 windows; [TAIL-SUM] n=19 ladder + n=204 x2
+legs), M2_clocks_sideband.log (2 s, both legs), BOOT_BATTERY_20260917_180806.row + _clocks.log,
+M2_count600_resp.json (leg1), M2_count600_resp_leg2.json (leg2). Analysis reproduction: parse M2_serve.log
+from line 23938 for leg 2; join [TAIL] rank/round with OPTRACE phase=verify ms.

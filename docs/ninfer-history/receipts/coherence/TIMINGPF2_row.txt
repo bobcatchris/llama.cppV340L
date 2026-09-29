@@ -1,0 +1,15 @@
+== MANIFEST 2026-09-17T01:21:20Z night TIMINGPF2 (thermal naming: during-load clock loop + cool-down re-fire) bin 07ad7eccc0b97cc0
+grant: user order "start on it now, full velocity" (blanket GPU grant 2026-09-16 stands)
+config: TP4 --devices 0,1,2,3 --spec mtp --draft-tokens 2 GRAPHS-ON port=8100 NINFER_TP2_TIMING=1 NINFER_WORKSPACE_MIB=96 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16
+design: background rocm-smi sampler (2 s period, sclk+temp) started BEFORE boot; run C immediate (GPUs ~50C, cooling from PF's 84); idle 60 s; run D same prompt — if D recovers toward 24 vs C degraded, state is RECOVERABLE (thermal class); clocks during knee name the mechanism
+pre-state: edge 49-57C (cooling ~4 min after TIMINGPF release), KFD=0, disk 15G
+== RUN C (start ~50-57C): plen=1279 wall 61.74s, flat 24.2->23.8 through 1152 (last chunk 20.1); clocks during load: levels 3-7 (991-1500 MHz), mean ~4/1138 MHz — no throttle
+== COOL-DOWN: 60 s idle -> edge only 62-68C (from ~77 post-C); NOT cool enough
+== RUN D (62-68C start): plen=1279 wall 89.19s, flat 24.0 to tok 512, knee 640: 20.4 14.3 13.1 12.6 11.2 11.9
+== DURING-LOAD CLOCKS (TIMINGPF2_clocks.log, 2 s sampler):
+   knee onset 20:24:25-27 (chunk rate 20.4->14.3): GPU0 sclk collapses level 7/1500 -> levels 0-2 (300-775 MHz, repeatedly 560) and STAYS collapsed through the slow phase
+   20:24:54-25:01: GPUs 1 and 3 also dip to 560-775 MHz; rate bottoms 11.2-11.9 tok/s
+   run C fast phase by contrast: no GPU below 991 MHz for the whole flat window
+== VERDICT (PLOG-017): the prefill decay mechanism is THERMAL CLOCK THROTTLING — named: GPU0 (hottest board) downclocks 1500->560-775 MHz at knee onset, throttle spreads with heat soak; depth effect is second-order (flat 24 to tok 1152 whenever clocks hold). 60 s idle does NOT recover the fast regime (only cooled to 62-68) — recovery time/hysteresis unmeasured (next: 5-min idle re-fire, forced-clock A/B via ppfeature, or active cooling). All deep-ctx prefill AND decode numbers on this box are thermal-state-dependent; future perf rows MUST log clocks+temps sideband (row-law proposal for the next window).
+== GRADE: TIMINGPF2 PASS — all four runs coherent ('Alpha', stop)
+== RELEASE 2026-09-17T01:27:08Z: logger killed by own PID 2399373; serve killed exact-PID anchored (sole match); no serve remains; KFD=0 verified after

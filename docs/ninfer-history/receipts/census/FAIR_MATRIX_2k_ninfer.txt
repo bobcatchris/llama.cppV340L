@@ -1,0 +1,21 @@
+FAIR MATRIX @2k (plen-2075 mt64, 3 probes/arm, union bin 058a7b85) Sun Sep 20 04:42:07 PM CDT 2026
+=== ARM bf16 draft=2 16:42:10 ===
+[tp2] auto KV: free=8160 MiB (min both ranks), placement=5131 MiB/rank (measured-manifest) -> capacity=23808 tokens, max-context=23808
+prefill=101.0tok/s decode=16.3tok/s wall=23.00s speculative=mtp 2.47tok/round (73.5%)
+prefill=75.8tok/s decode=23.5tok/s wall=29.09s speculative=mtp 2.47tok/round (73.5%)
+prefill=88.4tok/s decode=16.9tok/s wall=25.84s speculative=mtp 2.47tok/round (73.5%)
+=== ARM bf16d3 draft=3 16:44:07 ===
+[tp2] auto KV: free=8160 MiB (min both ranks), placement=5131 MiB/rank (measured-manifest) -> capacity=23808 tokens, max-context=23808
+prefill=69.5tok/s decode=16.6tok/s wall=32.94s speculative=mtp 2.84tok/round (61.4%)
+prefill=67.2tok/s decode=14.8tok/s wall=34.32s speculative=mtp 2.84tok/round (61.4%)
+prefill=64.9tok/s decode=14.2tok/s wall=35.57s speculative=mtp 2.84tok/round (61.4%)
+=== ARM k4v4 draft=2 16:46:32 ===
+prefill=67.5tok/s decode=10.6tok/s wall=34.51s speculative=mtp 2.47tok/round (73.5%)
+prefill=65.7tok/s decode=10.4tok/s wall=35.44s speculative=mtp 2.47tok/round (73.5%)
+prefill=64.3tok/s decode=10.4tok/s wall=36.12s speculative=mtp 2.47tok/round (73.5%)
+=== ARM k4v4d3 draft=3 16:49:06 ===
+prefill=65.6tok/s decode=10.8tok/s wall=36.06s speculative=mtp 2.83tok/round (61.1%)
+prefill=65.2tok/s decode=10.9tok/s wall=36.23s speculative=mtp 2.83tok/round (61.1%)
+prefill=64.5tok/s decode=11.9tok/s wall=36.20s speculative=mtp 2.83tok/round (61.1%)
+RESTORED OK 16:53:03
+MATRIX DONE

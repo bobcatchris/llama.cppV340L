@@ -1,0 +1,35 @@
+PK_row — HFMA2 packed-fp16 (PK) vs production S5, T=3, five W4 geometries, 2026-09-17 GPU-OWNER window
+Bench: /tmp/gpuowner_build/nvfp4_smallt_roofline_bench (results/amd/coherence/nvfp4_smallt_roofline_bench.cu
+  + src/core/device.cu, -O3 LAW line, RC=0). Log: PK_run_20260917.log (raw, includes T=2/3/4 S5 sections).
+Device GPU[0] gfx900. Bench's own 5 s mclk hammer ran before timing; sampler confirmed GPU[0] mclk level 3
+  (945 MHz TOP) — no 167 MHz parking. Ceilings this run: copy 358.8 GB/s, read 368.3 GB/s (achievable anchor).
+
+== SMALLT-PK A/B, T=3, rel-L2 bar 1e-2 (A16-class) ==
+problem        S5 GB/s   PK GB/s   ratio    rel-L2   check
+AttnInputW4     162.7     148.8    1.09x   1.14e-03  PASS
+GdnInputW4      142.9     139.3    1.03x   1.20e-03  PASS
+MlpGateUpW4     150.3     146.7    1.02x   1.26e-03  PASS
+Resid6144W4     145.6     129.6    1.12x   1.22e-03  PASS
+Resid17408W4    151.5     138.1    1.10x   1.24e-03  PASS
+Bench rc=0 (all gates PASS).
+
+VERDICT: NUMERICS GREEN — rel-L2 1.14e-3..1.26e-3, ~8x under the 1e-2 bar on every geometry
+  (PK's fp16 window error exactly in the ~1e-3 class the desk predicted; no NaN-scale deviation).
+PERF RED vs the adoption bar — desk prediction was 1.15x-1.6x IF still issue-bound; measured mean
+  ratio 1.07x, and 1.02x on MlpGateUpW4 (8704x5120, the geometry closest to serving's largest verify
+  linear). Only 2 of 5 touch 1.1x; the cvt-pipe tax ate the packed-FMA win => the arm sits in the
+  notes' own "cvt-bound / ~flat" branch, NOT the issue-bound win branch.
+ADOPTION RULE (HFMA2_notes: ratio >= ~1.1x AND gates PASS): ratio FAILS => NO promotion.
+  Default stays S5 (byte-identical boot). NINFER_SMALLT_PK=1 remains a non-default env arm; the
+  launch_nvfp4_small_t_pk symbol stays parked. NO server rebuild, NO BOOT_BATTERY, NO serving A/B owed
+  (those were gated on promotion). The 128.43 ms count600 anchor is NOT challenged by this arm.
+
+Context (S5 production arm from the same run, decode-relevant widths):
+  T=2: 183.5-215.3 GB/s (fastest width; serving MTP k=2 posture lives here)
+  T=3: 142.9-162.7 GB/s; T=4: 117.8-155.1 GB/s — the width cliff the SMALLT_row noted, unchanged.
+
+50-TPS ARITHMETIC: UNMOVED by this arm (decode stays on S5; 23.2 tok/s decode / 128.43 ms count600
+  anchors stand). The lever is measured DEAD as-is; if revisited, the notes' named follow-up is
+  LDS-activation staging (convert x once per block), a different commit, not a re-run of this one.
+
+Binary sha256: 2a52722227a67128445f2f477ca60312ff1d911dd121096d1c46ced94c8ec1ca (bench)

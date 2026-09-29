@@ -1,0 +1,6 @@
+"Name","Calls","TotalDurationNs","AverageNs","Percentage"
+"void flash_attn_tile<256, 256, 4, 2, false>(char const*, char const*, char const*, char const*, char const*, int const*, float*, HIP_vector_type<float, 2u>*, float, float, float, float, unsigned int, float, int, HIP_vector_type<unsigned int, 3u>, int, int, int, int, int, int, int, int, int, int, int, long, int, int, long, int, int, int, int, int, long) [clone .kd]",100,70565272,705652,46.61488982245143
+"void flash_attn_tile<256, 256, 4, 6, false>(char const*, char const*, char const*, char const*, char const*, int const*, float*, HIP_vector_type<float, 2u>*, float, float, float, float, unsigned int, float, int, HIP_vector_type<unsigned int, 3u>, int, int, int, int, int, int, int, int, int, int, int, long, int, int, long, int, int, int, int, int, long) [clone .kd]",120,64564007,538033,42.65049914072439
+"void dequantize_block_q4_0<__half>(void const*, __half*, int) [clone .kd]",440,10739094,24407,7.094165010842008
+"void flash_attn_combine_results<256>(float const*, HIP_vector_type<float, 2u> const*, float*, int) [clone .kd]",220,5502880,25013,3.6351612859392297
+"__amd_rocclr_fillBufferAligned.kd",1,8000,8000,0.0052847400429436656

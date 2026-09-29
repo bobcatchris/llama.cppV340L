@@ -1,0 +1,14 @@
+=== G-Q1 behavioral parity probes (5 diverse) ===
+PROBE essay: finish=stop len=670 head=Harbors were built near deep water so that larger ships coul
+PROBE story: finish=stop len=545 head=Whisker pried open the loose floorboard and found a brass ke
+PROBE count: finish=stop len=239 head=one, two, three, four, five, six, seven, eight We need answe
+PROBE code: finish=stop len=157 head=```python def sum_list(numbers):     return sum(numbers) ```
+PROBE stop: finish=stop len=211 head=BLUE The user is asking me to reply with exactly the word "B
+=== G-Q2 needle retrieval ===
+tools/v340l/w7_k4v4_gates.sh: line 52: /usr/bin/curl: Argument list too long
+NEEDLE needle_50000_d0.25: FAIL expected=ORCHID-TUNNEL got=
+tools/v340l/w7_k4v4_gates.sh: line 52: /usr/bin/curl: Argument list too long
+NEEDLE needle_50000_d0.5: FAIL expected=MARBLE-COMPASS got=
+tools/v340l/w7_k4v4_gates.sh: line 52: /usr/bin/curl: Argument list too long
+NEEDLE needle_50000_d0.75: FAIL expected=CINDER-HARBOR got=
+=== transcripts: /tmp/k4v4_gates_182554 ===

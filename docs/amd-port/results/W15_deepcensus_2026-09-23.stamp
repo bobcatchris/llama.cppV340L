@@ -1,0 +1,57 @@
+204544 LOCK-HELD pid 73269
+204544 DIES-COOL 
+204544 BOOT-START attempt 1 srvpid 79013
+204604 BOOT-OK after 20 s
+204604 PROBE-A-START
+211104 PROBE-A-END rc=1 t+1520s
+211104 PROBE-B-START
+213240 PROBE-B-END rc=143 t+2816s
+23.36.855.643 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =  46634, progress = 0.73, t = 1396.82 s / 33.39 tokens per second
+24.08.404.733 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =  47146, progress = 0.74, t = 1428.37 s / 33.01 tokens per second
+24.40.049.229 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =  47658, progress = 0.75, t = 1460.01 s / 32.64 tokens per second
+25.11.651.588 I slot print_timing: id  3 | task 0 | prompt processing, n_tokens =  48170, progress = 0.76, t = 1491.61 s / 32.29 tokens per second
+25.44.148.943 I slot      release: id  3 | task 0 | stop processing: n_tokens = 48682, truncated = 0
+25.44.148.978 I slot get_availabl: id  3 | task -1 | selected slot by LCP similarity, sim_best = 0.411 (> 0.100 thold), f_keep = 1.000
+25.44.149.120 I slot launch_slot_: id  3 | task 98 | processing task, is_child = 0
+26.17.088.532 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =    512, progress = 0.42, t =  32.94 s / 15.54 tokens per second
+26.49.349.052 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   1024, progress = 0.42, t =  65.20 s / 15.71 tokens per second
+27.22.162.954 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   1536, progress = 0.42, t =  98.01 s / 15.67 tokens per second
+27.54.772.027 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   2048, progress = 0.43, t = 130.62 s / 15.68 tokens per second
+28.27.634.608 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   2560, progress = 0.43, t = 163.48 s / 15.66 tokens per second
+29.00.883.866 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   3072, progress = 0.44, t = 196.73 s / 15.61 tokens per second
+29.35.092.278 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   3584, progress = 0.44, t = 230.94 s / 15.52 tokens per second
+30.08.671.771 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   4096, progress = 0.45, t = 264.52 s / 15.48 tokens per second
+30.43.105.182 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   4608, progress = 0.45, t = 298.96 s / 15.41 tokens per second
+31.17.608.309 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   5120, progress = 0.45, t = 333.46 s / 15.35 tokens per second
+31.52.881.845 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   5632, progress = 0.46, t = 368.73 s / 15.27 tokens per second
+32.27.208.805 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   6144, progress = 0.46, t = 403.06 s / 15.24 tokens per second
+33.02.162.093 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   6656, progress = 0.47, t = 438.01 s / 15.20 tokens per second
+33.37.856.621 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   7168, progress = 0.47, t = 473.71 s / 15.13 tokens per second
+34.14.177.840 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   7680, progress = 0.48, t = 510.03 s / 15.06 tokens per second
+34.50.638.479 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   8192, progress = 0.48, t = 546.49 s / 14.99 tokens per second
+35.26.581.159 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   8704, progress = 0.48, t = 582.43 s / 14.94 tokens per second
+36.04.158.019 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   9216, progress = 0.49, t = 620.01 s / 14.86 tokens per second
+36.41.297.338 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =   9728, progress = 0.49, t = 657.15 s / 14.80 tokens per second
+37.19.169.038 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  10240, progress = 0.50, t = 695.02 s / 14.73 tokens per second
+37.57.794.731 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  10752, progress = 0.50, t = 733.64 s / 14.66 tokens per second
+38.36.449.825 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  11264, progress = 0.51, t = 772.30 s / 14.59 tokens per second
+39.16.586.432 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  11776, progress = 0.51, t = 812.44 s / 14.49 tokens per second
+39.56.974.883 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  12288, progress = 0.51, t = 852.83 s / 14.41 tokens per second
+40.36.987.449 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  12800, progress = 0.52, t = 892.84 s / 14.34 tokens per second
+41.17.788.518 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  13312, progress = 0.52, t = 933.64 s / 14.26 tokens per second
+41.58.791.263 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  13824, progress = 0.53, t = 974.64 s / 14.18 tokens per second
+42.41.310.464 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  14336, progress = 0.53, t = 1017.16 s / 14.09 tokens per second
+43.22.863.789 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  14848, progress = 0.54, t = 1058.71 s / 14.02 tokens per second
+44.04.296.153 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  15360, progress = 0.54, t = 1100.15 s / 13.96 tokens per second
+44.47.722.876 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  15872, progress = 0.54, t = 1143.57 s / 13.88 tokens per second
+45.30.653.651 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  16384, progress = 0.55, t = 1186.50 s / 13.81 tokens per second
+46.14.159.824 I slot print_timing: id  3 | task 98 | prompt processing, n_tokens =  16896, progress = 0.55, t = 1230.01 s / 13.74 tokens per second
+213243 TEARDOWN-KILL 79013
+213248 TEARDOWN-DONE t+2824s
+213248 LOCK-RELEASED
+-rw-rw-r-- 1 chris chris      2108 Sep 23 21:32 /media/chris/ssd128/llamacpp/wt-deep-census/docs/amd-port/results/W15_deepcensus_2026-09-23_agent_info.csv
+-rw-rw-r-- 1 chris chris 634189775 Sep 23 21:32 /media/chris/ssd128/llamacpp/wt-deep-census/docs/amd-port/results/W15_deepcensus_2026-09-23_kernel_trace.csv
+-rw-rw-r-- 1 chris chris      1723 Sep 23 21:11 /media/chris/ssd128/llamacpp/wt-deep-census/docs/amd-port/results/W15_deepcensus_2026-09-23.probes
+-rw-rw-r-- 1 chris chris     20616 Sep 23 21:32 /media/chris/ssd128/llamacpp/wt-deep-census/docs/amd-port/results/W15_deepcensus_2026-09-23.server
+-rw-rw-r-- 1 chris chris       507 Sep 23 20:45 /media/chris/ssd128/llamacpp/wt-deep-census/docs/amd-port/results/W15_deepcensus_2026-09-23.stalelock.log
+-rw-rw-r-- 1 chris chris      6061 Sep 23 21:32 /media/chris/ssd128/llamacpp/wt-deep-census/docs/amd-port/results/W15_deepcensus_2026-09-23.stamp

@@ -1,0 +1,54 @@
+WO_MADMIX_REATTEMPT ATTEMPT 1 ROW — mad-mix on the dequant-mul stream, TRANSPARENT delivery:
+GREEN at cell level (G-MM-0 + G-MM-1 + census); G-MM-2 (serving pairs) awaits coordinator word.
+2026-09-19, desk amd/wo-madmix, cell commit 8c9e33bb9, run logs
+  results/amd/coherence/WO_MADMIX_REATTEMPT_cell_run2.log (mm binary), census
+  WO_MADMIX_REATTEMPT_census_rows.txt. Driver: serve-guard pgrep clean, rocm-smi sideband in log.
+
+THE RE-ATTEMPT (genuinely distinct from the W7 0.48x kill): the W7_madmix_row death was
+RESOURING, not math — inline-asm MAC chains were opaque to the scheduler => 256 VGPR + spill +
+1 block/CU, at relL2 0.0. The fix attempted here: the SAME surviving arm design (wpair:
+coeff2-in-pair, fp32 acc, no fp16 window, no gacc file) re-expressed so the compiler SEES the
+MAC nest. Probe (banked in the WO progress): clang 18 has no mad_mix builtin; it forms
+v_mad_mix_f32 from a half-operand mul+add ONLY under -fgpu-flush-denormals-to-zero
+-ffp-contract=off (the fmaf spelling never forms it; production flags never form it). mm2 is
+plain C++ (`acc += lo(pw2)*lo(x2)`) compiled with that DECLARED flag pair scoped to the bench
+binary; V0 anchor compiled in the SAME binary is census-identical to production flags (3143
+instr / 128 VGPR / 1024 fma + 144 mul — flag validity proven, its explicit fmaf() calls are
+immune to -ffp-contract=off).
+
+CENSUS (pre-registered kill-switch: VGPR <= 136, no new spill, mad-mix formed):
+  V0 <96/80,128>       3143 instr / 128 VGPR / 80 B scratch / 1024 fma + 144 mul / 212 waits
+  mm2 <96/80,128>      2859 instr / 122 VGPR / 80 B (V0's own class — NO new spill) /
+                       v_mad_mix_f32 1024 (the MAC), 0 fma / lshlrev 107 + and 57 (V0: 232+181)
+                       / ds_read 208 b32 (V0: 272 b32-equiv; halved fp16 pair table, LDS 18432)
+  The scheduler kept the body COMPACT under transparency: 2859 vs the asm arm's 4753 — the
+  register death is gone (122 VGPR, 2 blocks/CU).
+
+MEASURED (M=128, patterned data, hipEvent 3 warmup + 20 iters x 3 runs, 5 s mclk hammer; run2):
+  [96,128] Residual6144 5120x6144: V0 3.716-3.725 ms (2164.1 GF/s) | mm2 3.322-3.349 ms
+    (2422.4 GF/s) | ratio 1.119x — G-MM-0 PASS (bar >= 3%)
+  [80,128] GdnInput 16384x5120:    V0 8.496-8.530 ms (2521.3 GF/s) | mm2 7.712-7.728 ms
+    (2784.7 GF/s) | ratio 1.104x — PASS
+  3-run spread < 1% every row (reproduced pair). rocm-smi sideband in the run log.
+
+NUMERICS (G-MM-1): relL2 vs HOST FP64 GOLDEN (exact codec decode, nvfp4_scale_offset tiled
+  scale plane, k-ascending double accumulation): V0 1.65e-03, mm2 1.65e-03 — PASS (bar 1e-2).
+  mm2 relL2 vs V0 = 0.00e+00 — BIT-IDENTICAL to V0 in the bench (divisor=1: e2m1<=2 sig bits x
+  e4m3<=4 sig bits is fp16-exact; the D3 bf16->fp16 bridge is exact-class C441; mad-mix forms
+  the product in fp32 = V0's single-rounding fmaf — the W7 row's numerics argument, now
+  delivered). Production divisor != 1 is a DECLARED ~2^-11 coeff rounding (same class as pk).
+  Both-directions falsifier: corrupting row 7's codes trips the gate (relL2 9.6e-2 / 4.6e-2 >>
+  1e-2) — gate not vacuous. Data PATTERNED (PLOG-056: uniform data hides pairing bugs).
+  Run1 note (kept in run1 log): a row-major golden (wrong scale plane) read relL2 1.10 on V0
+  ITSELF — twice-red lesson: the golden must read the codec's single-home scale layout.
+
+VERDICT: attempts-1 gate GREEN. The 0.48x mad-mix kill is REVERSED to 1.10-1.12x at bit-identical
+  numerics — the resourcing class was the asm delivery, not the ISA feature. NEXT GATE: G-MM-2
+  (ordinal-paired fresh boots, PLOG-060, 3x plen-2075 mt64 per arm, wall -1.5% to promote) is
+  COORDINATOR WORD ONLY — no boots from this desk. Integration note for that desk: the arm needs
+  -fgpu-flush-denormals-to-zero -ffp-contract=off on its TU (or the W7 asm spelling as fallback);
+  V0-in-TU census identity under the flags is proven above. Harness drift: same-run V0 ran
+  ~-10% vs the banked pk16-row numbers (clock-state class, uniform across arms and binaries;
+  ratios are same-band back-to-back — the w7 row's own same-band discipline).
+FILES: tools/v340l/wo_madmix_reattempt_bench.cu (mm2 namespace = the arm), census + run logs
+  under results/amd/coherence/WO_MADMIX_REATTEMPT_*.

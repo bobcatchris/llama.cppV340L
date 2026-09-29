@@ -1,0 +1,3 @@
+GPU[0]		: mclk clock level: 1: (500Mhz) GPU[0]		: sclk clock level: 3: (991Mhz) 
+GPU[0]		: mclk clock level: 1: (500Mhz) GPU[0]		: sclk clock level: 3: (991Mhz) 
+GPU[0]		: mclk clock level: 1: (500Mhz) GPU[0]		: sclk clock level: 3: (991Mhz) 

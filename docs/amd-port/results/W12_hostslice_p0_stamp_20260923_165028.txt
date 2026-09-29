@@ -1,0 +1,10 @@
+== HOST-SLICE P0 stamp 20260923_165028 ==
+desk=host-slice arm=P0-launch-timeline lane=8083
+bin=/media/chris/ssd128/llamacpp/llama.cpp/build-hip/bin/llama-server
+bin_sha256=938a6999f1d8beb1d87742edb71be5c34816d7d64220839e9109fb8d1d8ae939
+base_commit=0b679b5cc amd-port host-slice: P0 probe script - TP4 launch-timeline boot on lane 8083 (lock-compliant, PID teardown)
+BASEENV: GGML_CUDA_ALLREDUCE=nccl GGML_CUDA_MMVQ_IQ3S_SHARE=1 GGML_CUDA_MMVQ_IQ3XXS_SHARE=1 GGML_CUDA_MMVQ_Q3K_SHARE=1 GGML_CUDA_MMVQ_Q4K_SHARE=1 GGML_CUDA_MMVQ_Q5K_SHARE=1 GGML_CUDA_MMVQ_Q6K_SHARE=1 LLAMA_DRAFT_FAST_TOPK=1 LLAMA_DRAFT_PACKED_GET=1 LLAMA_DRAFT_LIGHT_SYNC=1 LLAMA_VERIFY_ROW_SAMPLING=1 LLAMA_ASYNC_INPUT=1 GGML_PINNED_DEV_COPY=1
+TLENV:   LLAMA_LAUNCH_TIMELINE=1 LLAMA_DECODE_TIMELINE=1 LLAMA_SPEC_TIMELINE=1
+cmdline: llama-server -m /media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf -ngl 999 -sm tensor -c 32768 --batch-size 512 --ubatch-size 512 -ctk q4_0 -ctv q4_0 -fa on --spec-type draft-mtp --device ROCm0,ROCm1,ROCm2,ROCm3 --port 8083 -t 8 -lv 4
+server_log=/media/chris/ssd128/llamacpp/wt-host-slice/docs/amd-port/results/W12_hostslice_p0_server_20260923_165028.log
+pre_temps: max_die=28 C  2026-09-23 16:50:28

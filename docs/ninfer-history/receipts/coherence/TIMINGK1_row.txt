@@ -1,0 +1,20 @@
+== MANIFEST 2026-09-17T01:01:35Z night TIMINGK1 (k-sweep leg k=1) bin 07ad7eccc0b97cc0 (sha256 verified pre-boot in TIMING1 cycle)
+grant: user order "start on it now, full velocity" (blanket GPU grant 2026-09-16 stands)
+config: TP4 --devices 0,1,2,3 --spec mtp --draft-tokens 1 GRAPHS-ON port=8100 NINFER_TP2_TIMING=1 NINFER_WORKSPACE_MIB=96 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16
+purpose: k-sweep leg k=1 at count600 shape — marginal-cost-per-k table (SPEED_PLAN §3.2), PLOG-012
+KFD precondition: 0. serial TP4 boot, sole GPU user.
+== BOOT+HEALTH: healthy after 20s
+== PROBE count600: client wall 54.37s, finish=length, coherent 1..200
+[tp2] single-seq lane 0: acceptance=0.98 tok/round=1.99 rounds=302 gen=600 prefill=3.06s decode=51.30s (TIMINGK1_serve.log:138) -> 11.70 tok/s
+== B1 (Mean over 301 rounds, total = 169.70 ms/round) TIMINGK1_serve.log:123-133:
+  1. Target Verify (T=k+1=2): 160.97 ms (94.9%)  5. Alignment 8.28 (4.9%)  8. AR Draft Chain 0.01 (0.0%)  [2+3+4+6+7 = 0.45 ms]
+first-miss: rk=1 rounds=302 m=0.983 p_full=0.983 | a0=5 a1=297
+== PROBE BLUE (mt=64): finish=stop content='BLUE' no mojibake -> PASS (log:158-171, block total 176.44 ms/round over 23 rounds, acc=0.79 t/r=1.83)
+== K-TABLE READ (all decode, count600 shape):
+  k=1: 169.70 ms/round @ t/r 1.99 = 85.3 ms/tok (11.70 tok/s)
+  k=2: 211.95 ms/round @ t/r 2.94 = 72.1 ms/tok (13.87 tok/s) [TIMING1]
+  marginal T=2->T=3: +42.25 ms/round buys +0.95 tok/round -> marginal rate ~22.5 tok/s, still >2x average -> k=2 justified; k=3 leg fires next
+  verify-forward T-sweep so far: T=2 160.97, T=3 195.34 -> slope ~34.4 ms/position, intercept ~126.5 ms @T=1 (consistent w/ SPEED_PLAN ~125 ms single-step)
+  OPEN ANOMALY (decode axis, for next hunt): non-MTP graphs-ON same shape = 300 ms/step (BASE2) vs MTP verify T=2 = 161 ms — non-MTP step path carries ~2x the bare T=2 verify cost; not explained by phase breakdown (its phases are not instrumented on that path)
+== GRADE: TIMINGK1 PASS
+== RELEASE 2026-09-17T01:04:51Z: exact-PID kill (anchored pattern, sole match), no serve remains, KFD=0 verified after

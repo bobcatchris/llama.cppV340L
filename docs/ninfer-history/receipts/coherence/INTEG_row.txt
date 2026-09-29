@@ -1,0 +1,14 @@
+== MANIFEST 2026-09-17T03:16:28Z night INTEG (C3: integrator-vs-instantaneous, 5x [1279-tok probe -> 60 s idle]) bin 07ad7eccc0b97cc0
+grant: user order continuation (blanket GPU grant 2026-09-16 stands)
+design: fresh boot cool start; cycle i: probe = 1279-tok prefill (per-chunk rates reveal knee onset within the probe), then idle 60 s. Metric per cycle: plateau length (leading chunks >= 20 tok/s) + knee token position. ACCUMULATING integrator => plateau shrinks cycle over cycle (60 s idle never fully drains); INSTANTANEOUS/threshold => plateau identical every cycle (recovery a pure function of the 60 s gap). PF2 anchor: one [52 s load + 60 s idle] cycle already yielded knee at tok ~640 (partial recovery) — C3 maps the trend over 5 cycles
+config: TP4 k=2 graphs-ON port=8100, --prefill-chunk 128, NINFER_TP2_TIMING=1; sysfs sampler 2 s through the whole window
+KFD precondition: 0
+== CYCLES (probe = 1279-tok prefill, then 60 s idle; same prompt every cycle):
+  c1: wall 57.36s  prefill 53.11s  knee@768   plateau 4/10 chunks  mean 18.6 tok/s  decode 4.25s
+  c2: wall 81.46s  prefill 72.34s  knee@640   plateau 3/10         mean 16.0          decode 9.11s
+  c3: wall 96.96s  prefill 86.36s  knee@512   plateau 2/10         mean 14.8          decode 10.59s
+  c4: wall 103.22s prefill 91.65s  knee@512   plateau 2/10         mean 14.8          decode 11.56s
+  c5: wall 103.97s prefill 92.81s  knee@512   plateau 2/10         mean 14.8          decode 11.15s
+== VERDICT (C3): ACCUMULATING INTEGRATOR WITH SATURATION — the deficit grows cycle-over-cycle under a fixed [probe + 60 s idle] duty (knee 768 -> 640 -> 512), then LOCKS at a periodic steady state (c4 == c5: knee@512, prefill ~92 s, ~14.8 tok/s mean vs 24.1 first-chunk). NOT instantaneous (cycle 2 differs from cycle 1 despite the identical 60 s gap), NOT unbounded (saturation by cycle 3-4). Classic first-order thermal RC: the machine's periodic steady state under this duty cycle is a predictable ~1.75x-degraded prefill / ~2.6x-degraded decode. SERVING IMPLICATION: sustained serving stabilizes at a predictable degraded rate rather than sliding — capacity planning can use the steady-state numbers; full-rate bursts require >= 2-3 min idle (THARM1).
+== GRADE: INTEG PASS — 5 cycles, sideband INTEG_clocks.log banked
+== RELEASE $TS: sampler + serve killed (anchored, verified all clear), KFD=0

@@ -1,0 +1,43 @@
+12:01:32 gpu_busy=use,use,use,use, warmup=0
+0 listening=0
+0
+12:01:33 gpu_busy=use,use,use,use, warmup=0
+0 listening=0
+0
+12:01:34 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:35 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:36 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:37 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:38 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:39 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:40 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:41 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:43 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:44 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:45 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:46 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:47 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:48 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:49 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:50 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:51 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:52 gpu_busy=use,use,use,use, warmup=1 listening=0
+0
+12:01:53 gpu_busy=use,use,use,use, warmup=1 listening=1

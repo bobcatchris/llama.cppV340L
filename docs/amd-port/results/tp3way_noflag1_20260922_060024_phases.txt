@@ -1,0 +1,10 @@
+[06:00:24] === tp3way arm=noflag rep=1 stamp=20260922_060024 ctx=10000 port=8083 idle_wait=180 ===
+tree HEAD 355d28c83 2026-09-22 01:31:15 -0500
+[06:00:24] LOCK held by TP3-threeway arm=noflag1 pid=1337895
+[06:00:24] thermal edge card0/1/2 = 46.0/73.0/45.0 C
+[06:00:54] thermal edge card0/1/2 = 37.0/64.0/36.0 C
+[06:01:24] thermal edge card0/1/2 = 32.0/57.0/31.0 C
+[06:01:54] thermal edge card0/1/2 = 29.0/53.0/28.0 C
+[06:02:24] thermal edge card0/1/2 = 27.0/48.0/26.0 C
+[06:02:54] thermal edge card0/1/2 = 25.0/44.0/25.0 C
+[06:03:24] thermal edge card0/1/2 = 24.0/40.0/24.0 C

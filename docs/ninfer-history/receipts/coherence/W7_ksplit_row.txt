@@ -1,0 +1,147 @@
+W7 K-SPLIT ROW — G1 desk: cross-CTA K-split on the V0 nvfp4 tiled GEMM (Team Green KSC4 transfer),
+limiter kit + S-sweep, 2026-09-18, window 7
+bin: bin/w7_ksplit_bench (hipcc -O3 -DNDEBUG -std=gnu++20 --offload-arch=gfx900 -Iinclude -Isrc
+  -Isrc/common/hip_shim; production law line; lane amd/wo-w7-body; source tools/v340l/w7_ksplit_bench.cu).
+logs: W7_ksplit_limkit_run1.log, W7_ksplit_bench_run1.log (raw). Methodology = the pk16/madmix bench
+  verbatim (event timing 3 warmup + 20 iters, 5 s mclk-ramp hammer, ceilings cell, same-window
+  same-binary A/B). Clocks AUTO today (W7_thermal_pin_ab_row: pinned-high REVOKE for sustained) —
+  ratios are same-window; banked-today anchor = W7_padded_swx_row V0(XOR) 3041.4/2238.5/2330.5/2100.8.
+
+PRE-REGISTERED ACCEPTANCE (written + committed BEFORE the bench ran; resume note
+  docs/amd/W7_KSPLIT_RESUME.md milestone 2):
+  PRIMARY (decides): mean over the 4 geometries of (best passing S per geometry) xV0 >= 1.20 => PASS
+    (promote to integration + serve-leg design) | 1.08-1.20 => AMBER (record, decide) | < 1.08 => KILL.
+  SECONDARY (recorded): fixed-S=4 mean; per-geometry pattern (expect Residual6144 — 0.71 waves at S=1,
+    40% of the machine idle — to gain most; MlpGateUp — 4.86 waves — least).
+  CORRECTNESS: relL2(KS, REF) < 1e-2 EVERY row (DECLARED association change: k-ascending fp32 order
+    preserved WITHIN each split; cross-split sum order changes at the reduce — the codec gate's
+    order-change grammar; NO FNV/bit-equality gate).
+  HARNESS (reproduce-first law): V0 same-run must reproduce banked-today within ~5% BEFORE any arm
+    number counts.
+  LIMITER-KIT KILL-AT-STEP-0.5 (brief law): k-scaling ratio t(k)/t(k/2) < 1.15 (flat: halving the
+    serial chain does not move time) AND pure-consume < 0.5x V0 time (access pattern far above V0's
+    rate) => chain NOT binding => report KILL-at-step-0.5, skip the S-sweep honestly.
+
+STEP-0 CENSUS (R3 kill-switch, CPU-only, w3_census.py on the bench TU's hipcc -S; S is a runtime
+  grid.z param so ONE instantiation covers S in {2,4,8} — census is S-invariant by construction):
+                                      V0 <80,128> anchor | ksplit_a <80,128> | ksplit_a <96,128> | ksplit_b <80,128> | consume <80,128> | reduce
+  instructions                        3143               | 3018              | 3018              | 3000               | 2938            | 54
+  VGPR (next_free)                    128                | 125               | 125               | 122                | 128 (pinned)    | 6
+  private (scratch)                   80 B               | 80 B              | 80 B              | 80 B               | 792 B (arm-only)| 0 B
+  v_fma_f32                           1024               | 1024              | 1024              | 1024               | 0 (by design)   | 0
+  occupancy class                     2 blocks/CU        | 2 blocks/CU       | 2 blocks/CU       | 2 blocks/CU        | 2 blocks/CU     | -
+  VERDICT: KILL-SWITCH NOT TRIPPED. The split kernel is V0's body (MAC stream identical, 1024 fma)
+  with the k-loop bounds computed in the prologue — compiler lands it BELOW V0's 128 VGPR at the
+  SAME 80 B scratch, 2 blocks/CU preserved. Benched posture = ksplit_a (V0's own launch bounds).
+  V0 anchor reproduces the banked W7_v0_census/W7_madmix-row numbers exactly (3143/128/80).
+  pureconsume note: the free-scheduling xor body hoarded to 256 VGPR+276 B (no fma chain to serialize
+  => the pipeliner hoards); PINNED to __launch_bounds__(256,2) so the ablation runs at V0's
+  occupancy; its 792 B scratch is the cost of that pin on an ablation arm (madmix row's benched
+  268 B wpair scratch class) — the CONSUME ARM IS NOT A CANDIDATE KERNEL.
+
+COMPATIBILITY CITATIONS (R2 obligation): W7_madmix_row.txt (mad-mix KILL 0.48x) and
+  W7_padded_swx_row.txt (padded-swizzle wash/loss) both prove V0's conversion/address stream is
+  LATENCY-HIDING MATERIAL — deleting it exposed load latency. K-split is the COMPATIBLE lever: it
+  adds independent CTAs (grid.z = S) to hide the same latency while keeping the conversion stream,
+  tile, thread mapping, LDS tables, staging and FMA nest byte-identical.
+
+RESIDENCY MAP (56 SMs x 2 blocks/CU = 112 resident slots; waves = (n/64)*S/112):
+  AttnInput    224 CTAs: S1 2.00 | S2  4.00 | S4  8.00 | S8 16.00
+  GdnInput     256 CTAs: S1 2.29 | S2  4.57 | S4  9.14 | S8 18.29
+  MlpGateUp    544 CTAs: S1 4.86 | S2  9.71 | S4 19.43 | S8 38.86
+  Residual6144  80 CTAs: S1 0.714 (!! 40% of SMs idle at S=1) | S2 1.43 | S4 2.86 | S8 5.71
+  (Team Green "size S per SM count", their 36 -> our 56; Residual S2's 1.43 waves is their named
+  1.33-wave co-residency artifact class — swept anyway per brief.)
+
+-- LIMITER KIT (STEP-0.5; W7_ksplit_limkit_run1.log = defective-consume first pass, named
+   defect below; W7_ksplit_limkit_run2.log = valid pass; mclk ramped to level-3 945 MHz both,
+   CEILING copy 356.8/358.8 GB/s -- clean window) --
+HARNESS (reproduce-first): V0 @M=128 = 3134.8/2763.3/3118.2/2390.8 GF/s =>
+  vs W7_pk16_row/W7_madmix_row bank (3157/2830/3166/2396 and 3123/2773/3094/2384): -0.7/-2.4/-1.5/-0.2 %
+  -- WITHIN 5% ON ALL FOUR. The W7_padded_swx_row band (3041/2238/2330/2100) is +13..+34% off EVERY
+  other bank including this one -- that row's absolute band is the outlier state (its own evidence was
+  same-window RATIOS, which stand); harness verdict: OK against the coherent 3-row bank.
+  (a) PURE-CONSUME (staging+load stream only, xor-consume; census 256 VGPR/124 B, 1 block/CU --
+      HALF V0's occupancy, an UPPER-bound posture for a pattern-cost ceiling):
+      AttnInput  6.557 ms vs V0 5.994  (0.91x V0 time) | ~51 GB/s effective touched-byte rate
+      GdnInput   8.163 ms vs V0 7.771  (0.95x)         | ~47 GB/s
+      MlpGateUp 16.452 ms vs V0 14.635 (0.89x)         | ~49 GB/s
+      Residual   3.981 ms vs V0 3.368  (0.85x)         | ~36 GB/s
+      => V0 sits essentially AT its access-pattern wall: the loads/staging ALONE, with NO decode and
+      NO MACs, cannot beat V0's wall-clock even at half-occupancy free-scheduling hoarding. Same
+      disease class as Team Green's "(a) found an ACCESS-PATTERN ceiling nobody knew" -- OURS is
+      ~50 GB/s-class at this grid, and V0 (22-29% fp32 nominal) is pinned to it.
+  (b) K-SCALING (V0 at k vs k/2, capped k_dim, timing-only):
+      Attn 2.00x | Gdn 1.97x | Mlp 2.00x | Resid 1.99x  => LINEAR: time is proportional to the
+      serial k-work per CTA at fixed grid. Per-tile cost is constant -- the chain/work term binds.
+  (c) T-SCALING (V0 GF/s at M=32/64/128/256):
+      Attn 1834/2538/3135/2230 | Gdn 1687/2345/2763/2054 | Mlp 1797/2481/3118/2173 | Resid 1346/1931/2391/1640
+      => NOT flat: efficiency rises 32->128 (more math per weight byte), falls at 256 (accumulator/
+      LDS pressure class, the sweep's V2 lesson). Not M-issue-bound at the served M=128.
+  (d) CTA-TILING: CITED CLOSED -- TILED_SWEEP_notes.md (V0-V4 swept; V2 lost 25%, LDS occupancy beat
+      every reshape). Not redone.
+  KILL-AT-STEP-0.5 CONDITION CHECK: requires k-scaling FLAT (<1.15x) AND consume far above V0's
+  rate -- k-scaling is LINEAR (2.0x): condition NOT met, conjunction fails on its first leg. The kit
+  instead names the limiter: PER-TILE ACCESS-PATTERN LATENCY at fixed co-residency -- the exact term
+  more-resident-CTAs would hide. Proceed to the sweep as registered.
+
+-- S-SWEEP (STEP-1; W7_ksplit_bench_run1.log; same window/binary as the kit; mclk level-3 945 MHz,
+   CEILING copy 358.1 GB/s; relL2 vs REF gate 1e-2; reduce kernel inside the timed arm) --
+HARNESS: V0 same-run = 3092.0/2773.3/3110.9/2374.0 => vs pk16/madmix bank -2.1/-2.0/-1.7/-0.9 %
+  (all within 5%). NOTE: the run log's %nom column is 1000x (print bug, fixed in source post-run;
+  verdict columns ms/GF/s/relL2/ratios unaffected) -- corrected %nom below (GF/s / 10750 x 100).
+  relL2 0.00e+00 on every arm INCLUDING the splits: this bench's constant-pattern data (codes 0x11,
+  scales 0x38, x 0x3C) makes equal-summand associations round identically; the gate still
+  discriminates indexing/decode bugs on THIS data (the killed pk16 arm printed relL2 1.46e+02 on the
+  same fill) -- production numerics re-proof remains the integration desk's job on any future reopen.
+
+  geometry       | V0 GF/s (%nom)      | KS S=2              | KS S=4              | KS S=8              | best-S/V0
+  AttnInput      | 3092.0 (28.8)       | 2723.0 (25.3) 0.88x | 2283.2 (21.2) 0.74x | 1462.5 (13.6) 0.47x | 0.88x
+  GdnInput       | 2773.3 (25.8)       | 2493.1 (23.2) 0.90x | 1884.1 (17.5) 0.68x | 1211.9 (11.3) 0.44x | 0.90x
+  MlpGateUp      | 3110.9 (28.9)       | 2741.8 (25.5) 0.88x | 2348.6 (21.8) 0.75x | 1479.5 (13.8) 0.48x | 0.88x
+  Residual6144   | 2374.0 (22.1)       | 2323.4 (21.6) 0.98x | 2212.5 (20.6) 0.93x | 1654.4 (15.4) 0.70x | 0.98x
+  MEAN best-S/V0 = 0.91x | MEAN S=4/V0 = 0.78x. Monotone LOSS in S on every geometry. Even the
+  low-CTA geometry (Residual, 0.71 waves at S=1 -- 40% of SMs idle) peaks at 0.98x (a wash) at S=2
+  and degrades from there: its S=2 point is exactly the 1.43-wave co-residency artifact class Team
+  Green themselves named (theirs was 1.33 waves).
+
+-- VERDICT: MEASURED KILL (pre-registered < 1.08x floor; measured 0.91x mean best-S; S=2 everywhere
+   the best split and still a loss; monotone worse in S) --
+
+WHY (mechanism, from the kit + census -- not narrative): Team Green's KSC4 won because THEIR wide
+arm ran ONE CTA/SM (fat 272-tile chains, 80 CTAs on 36 SMs) -- splitting k DOUBLED the resident-CTA
+count, and their consume proved the pattern wall yields to raw concurrency (103.8 -> 137.4 GB/s).
+OUR V0 is the opposite posture: 128-VGPR-class resourcing already holds 2 blocks/CU (224-544 CTAs =
+2.0-4.9 waves on 3 of 4 geometries), so k-split CANNOT raise co-resident concurrency -- the extra
+CTAs queue, and each pays its own LDS-table prologue more often (S x more prologues over shorter
+chains) plus the fp32 partials write+reduce (~0.2-0.4 ms). The limiter kit closes the loop: (a)
+V0 is AT its pattern wall at TODAY's co-residency, (b) time is linear in per-CTA k-work, (c) M is
+not the binding axis -- so the only lever that could pay is more CO-RESIDENT CTAs, and on gfx900 at
+128 VGPR / 2-blocks-per-CU the k-split grid trick does not buy residency (unlike their 1-CTA/SM
+posture). Consistent with the R2 citations: mad-mix and padded-swizzle proved V0's conversion stream
+is the latency-hiding material -- this row proves the SAME stream also fills the co-residency that
+k-split would need to expand. The family is closed for the V0 posture on gfx900/ROCm-6.2.
+
+DEFECT LOG (banked honestly): (1) consume arm shape 1 (32 xor accumulators, (256,2) pin): 792 B
+spill, ran 2.5x OVER V0 -- measured spill traffic, not the pattern; restructured. shape 2 (4 accs,
+same pin): still 620 B spill (the pipeliner hoards independent loads past any 128-VGPR pin).
+shape 3 (single rolling consumer, no pin, 256 VGPR/124 B, 1 block/CU): VALID as an upper-bound
+ceiling arm -- used. (2) T-scaling GF/s print scale bug (first limkit pass): ratios readable,
+absolutes re-printed corrected in run2. (3) sweep %nom column 1000x print bug: fixed in source
+post-run; corrected values in the table above.
+
+-- RE-ENTRY NOTES (REV2 section 8 map) --
+K-split DID NOT LAND (KILL) -- therefore NO re-entries fire:
+  - pk16 re-check ("if K-split lands"): NOT triggered -- the occupancy/chain structure is unchanged;
+    the 1.34x kill stands as recorded.
+  - mad-mix re-census ("if K-split lands"): NOT triggered -- no new latency-hiding capacity exists to
+    absorb the 2048-op asm body.
+  - graph capture ("if GEMM wall shrinks >=1.4x"): NOT triggered -- GEMM wall unchanged.
+  - M=256 ladder ("low odds; only if G1 K-split lands"): NOT triggered.
+  - padded-swizzle re-entry ("if inner-loop access pattern is restructured"): NOT triggered -- the
+    staging/inner loop is byte-identical; only the k-range per CTA moved.
+CONDITIONAL-POSITIVE for the map (recorded, not scheduled): the named limiter -- per-tile
+access-pattern latency at fixed co-residency -- is EXACTLY the term a resourcing change would
+attack: any future kernel holding <=96 VGPR (3 blocks/CU) or a gfx906-class part changes the
+co-residency denominator and re-prices BOTH this lever and the pk16/mad-mix bars. Re-checks stay
+CPU-side censuses until then.

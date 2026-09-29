@@ -1,0 +1,80 @@
+LMHEAD_flip_row — window 3: count600 route-flip legs on bin 6c8ae21399516750 (HEAD 61c1ecc0b), 2026-09-17 GPU-OWNER window (amd/tp4-cure)
+Workload: count600-class, /tmp/req_count600_m2.json (67-tok counting prompt, mt=600, temp=0 greedy, conc=1),
+  warmup leg + 150 s cool gap + one measured leg per boot; 2 s rocm-smi clocks sideband through every leg
+  (W3_<tag>_clocks.log); anchored TERM of only this window's PIDs after each leg, KFD=0 verified.
+
+== LEG B: CONTROL (NINFER_LMHEAD_ARM unset = smallt; M2 trace family NINFER_VERIFY_TAIL_TRACE=1
+   NINFER_TP2_TIMING=1 NINFER_TP2_OPTRACE=1 NINFER_VERIFY_LAYER_TRACE=1) ==
+serve log: W3_bootB_control_serve.log | resp: W3_control_count600_resp.json | pid 565312 anchored-TERM'd
+boot: healthy <15 s, "loaded 40960 draft vocabulary IDs" x1, no gate refusals.
+measured leg: HTTP 200, finish=length, prompt 67, completion 600, client wall 33.51 s (17.9 tok/s, traces ON,
+  droop-band leg — see sideband note).
+
+FINGERPRINT: [TAIL-SUM] rank0 n=202 rounds (warmup leg n=204) -> t/r 600/202 = 2.97,
+  acc = (600-202)/(202*2) = 0.985 — IN the M1/M2 anchor family (201-204 rounds / acc 0.97-0.99 / t-r 2.94-2.99).
+GREEDY TEXT: byte-IDENTICAL to BOTH banked M2 legs (M2_count600_resp{,_leg2}.json) — "1\n2\n3\n...".
+
+[TAIL] means, rank0, measured leg (n=201 parsed rounds; clean-band = sync<=125 ms per PLOG-043 treatment):
+             all-rounds mean   clean-band mean   p50
+  lm_head       78.019            65.776         66.810   (leg ran deep-droop; clean-band rank0 65.8 vs M2's 66.0 = +0 ms class)
+  lgather        0.955             1.041          0.788
+  sync (verify) 133.273           117.703        118.742   (clean-band == M1 B1 anchor 117.4 within 0.3%)
+  align          9.704             8.330          8.422
+  chain_fwd      9.121             7.834          7.950
+  propose        0.356             0.320          0.336
+Clean-band round arithmetic (control): ~117.7 verify + 8.33 align + 7.83 chain_fwd + ~0.7 draft/misc
+  = ~134.5 ms/round — ON the M1 B1 anchor (133.8 with traces).
+Sideband note: measured leg shows the instant-droop signature (sync mean 133 all-rounds vs 117.7 clean;
+  lgather up to 19 on ranks1-2 = rank-wait class during droop) — clean-band fields land ON the M1/M2
+  anchors within 3%, instrument + posture CONFIRMED before the flip leg.
+
+== LEG C: FLIP (NINFER_LMHEAD_ARM=simt NINFER_LMHEAD_TRACE=1 + same M2 trace family) ==
+serve log: W3_bootC_flip_serve.log | resp: W3_flip_count600_resp.json | pid 576190 anchored-TERM'd
+boot: healthy <15 s, "loaded 40960 draft vocabulary IDs" x1, NO refusal lines (N7 gate accepted =simt).
+
+ROUTE PROOF ([LMHEAD] first-seen lines, verbatim from the serve log):
+  [LMHEAD] arm=launch_w8_simt_r8_c4 n=62080 k=5120 T=1 gate=simt (launch #1)
+  [LMHEAD] arm=launch_w8_simt_r8_c4 n=5120 k=10240 T=2 gate=simt (launch #5)
+  [LMHEAD] arm=launch_w8_simt_r8_c4 n=5120 k=10240 T=1 gate=simt (launch #9)
+  [LMHEAD] arm=launch_w8_simt_r8_c4 n=62080 k=5120 T=3 gate=simt (launch #13)
+  [LMHEAD] arm=launch_w8_simt_r8_c4 n=5120 k=10240 T=3 gate=simt (launch #17)
+  -> BOTH application sites (lm_head 62080x5120 AND draft-fc 5120x10240) served by the simt arm.
+
+FINGERPRINT (MERGE GATE): [TAIL-SUM] rank0 n=202 rounds — IDENTICAL round count to the CONTROL leg on the
+  same binary/env-minus-gate; t/r 2.97, acc 0.985; GREEDY TEXT byte-IDENTICAL to CONTROL and to BOTH banked
+  M2 legs. -> MERGE GATE PASS (arms differ in accumulation order; zero drift observed).
+
+PERF GATE ([TAIL] rank0, measured leg; leg ran FULLY CLEAN — n=201/201 rounds under the clean band, sync max 65.3 ms):
+                       control (clean-band) -> flip (all-rounds)      verdict
+  lm_head                65.776            ->  2.526  (p50 2.466, max 3.46)  <=4 ms PASS (RED bar >=10 not approached); 26.0x vs control
+  lgather                1.041             ->  0.673                          <=1 ms PASS
+  sync (verify phase)    117.703           -> 55.713                          -62.0 ms (= lm_head -63.2 + lgather/wait -0.4 class)
+  align                   8.330            ->  2.156                          -6.17 ms ~ the DRAFT-FC bench share (A 6.00 -> B 0.25 = -5.75 predicted)
+  chain_fwd               7.834            ->  1.393                          -6.44 ms ~ the fc share again (one T=1 draft forward per chain step)
+  propose                 0.320            ->  0.337                          unchanged (argmax+remap, not this seam)
+  Seam topology CONFIRMED: align/chain_fwd moved ONLY BY THE FC SHARE (each T=1 draft forward's fc stem
+  was the ONLY small_t linear on this seam; the other four already rode tp_gemv->simt). Residual
+  align 2.16 + chain_fwd 1.39 is the tp_gemv-arm retune follow-up named in LMHEAD_FIX_NOTES.
+
+ROUND ARITHMETIC NOW: verify 55.7 + align 2.16 + chain_fwd 1.39 + propose 0.34 + chain_head 0.33 +
+  prepnext/book/select/rebase ~0.12 = ~60.0 ms/round (vs control 134.5 clean-band, M1 B1 anchor 133.8)
+  = 2.24x round speedup; decode-phase rate 2.97 tok / 60.0 ms = 49.5 tok/s device arithmetic.
+  Client wall 14.63 s for 600 tok = 41.0 tok/s end-to-end (vs control 33.51 s = 17.9) — includes
+  prefill + HTTP + first-token; the 50-TPS class is REACHED in decode-phase arithmetic.
+  vs the spec's conservative prediction (verify 66-70, round 85-90): BEATEN — because M2's clean-band
+  lm_head was 61.9 mean-across-ranks (66 rank0), and removing it also collapsed the lgather rank-wait
+  (ranks1-3 no longer wait on rank0's late lm_head).
+
+CLOCK SIDEBAND: W3_flip_clocks.log — sclk level 7 (1500) in 303/325 samples; levels 2-5 only in the
+  warmup/cool-gap transitions; the measured leg never left the clean band (the ~60 ms rounds are too
+  short to trip the instant droop; no clean-band filtering was needed for this leg's numbers).
+
+BOOT-TIME n=2 [TAIL-SUM] block: present in BOTH boots before any client traffic (posture boot
+  self-probe, default-max-tokens 16 class) — consistent, not leg traffic; excluded from all stats.
+
+== VERDICT ==
+BENCH  : B >= 10x over A at T=3 — PASS (24.4-24.7x, C loses).
+SERVING: MERGE GATE PASS (202/0.985/2.97 + identical text) + PERF GATE PASS (lm_head 2.53 ms <= 4;
+  lgather 0.67 <= 1; fc-share trim visible on align/chain_fwd exactly as priced by the DRAFT-FC leg).
+ROUTE FLIP IS GREEN END-TO-END. Promotion of the default (unset->simt) remains a coordinator order;
+  this window gates nothing on promotion — env-gated boots are the deliverable.

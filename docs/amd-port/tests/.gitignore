@@ -1,0 +1,3 @@
+
+# battery session runtime lock - never track
+.battery.lock

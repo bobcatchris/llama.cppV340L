@@ -1,0 +1,4 @@
+{"tag": "T1", "req": 1, "wall_s": 89.33, "prompt_n": 7857, "predicted_n": 128, "decode_tps": 14.878, "prefill_tps": 97.36, "draft_n": 126, "draft_n_accepted": 84, "accept": 0.66667}
+{"tag": "T1", "req": 2, "wall_s": 89.75, "prompt_n": 7857, "predicted_n": 128, "decode_tps": 14.929, "prefill_tps": 96.8, "draft_n": 126, "draft_n_accepted": 84, "accept": 0.66667}
+{"tag": "T1", "req": 3, "wall_s": 93.2, "prompt_n": 7857, "predicted_n": 128, "decode_tps": 14.472, "prefill_tps": 93.16, "draft_n": 126, "draft_n_accepted": 84, "accept": 0.66667}
+{"tag": "T1", "req": 4, "wall_s": 97.66, "prompt_n": 7857, "predicted_n": 128, "decode_tps": 14.636, "prefill_tps": 88.37, "draft_n": 126, "draft_n_accepted": 84, "accept": 0.66667}

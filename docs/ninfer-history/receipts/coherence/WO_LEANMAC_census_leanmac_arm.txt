@@ -1,0 +1,40 @@
+====================================================================================================
+void leanmac::nvfp4_tiled_gemm_leanmac_kernel<96, 128>(unsigned short const*, unsigned char const*, unsigned char const*, float, unsigned short*, int, int)
+  instructions=5773  vgpr(next_free)=256  privateB=884  groupB(LDS)=19456  sgpr=32  scratchVgprSpill=see_md
+    v_fma_f32              2048
+    v_mul_f32              272
+    v_bfe                  33
+    v_lshlrev              425
+    v_and_b32              321
+    v_or_b32               51
+    v_lshl_or              230
+    ds_read_b32            242
+    ds_read_b64            130
+    ds_write               6
+    buffer_load            224
+    buffer_store           220
+    s_waitcnt              611
+    s_waitcnt_lgkmcnt      378
+    s_waitcnt_vmcnt        234
+    s_barrier              2
+    (other: {'global_load': 15, 'v_mov(b32)_other': 125, 'ds_read_b128': 3})
+====================================================================================================
+void leanmac::nvfp4_tiled_gemm_leanmac_kernel<80, 128>(unsigned short const*, unsigned char const*, unsigned char const*, float, unsigned short*, int, int)
+  instructions=5773  vgpr(next_free)=256  privateB=884  groupB(LDS)=19456  sgpr=32  scratchVgprSpill=see_md
+    v_fma_f32              2048
+    v_mul_f32              272
+    v_bfe                  33
+    v_lshlrev              425
+    v_and_b32              321
+    v_or_b32               51
+    v_lshl_or              230
+    ds_read_b32            242
+    ds_read_b64            130
+    ds_write               6
+    buffer_load            224
+    buffer_store           220
+    s_waitcnt              611
+    s_waitcnt_lgkmcnt      378
+    s_waitcnt_vmcnt        234
+    s_barrier              2
+    (other: {'global_load': 15, 'v_mov(b32)_other': 125, 'ds_read_b128': 3})

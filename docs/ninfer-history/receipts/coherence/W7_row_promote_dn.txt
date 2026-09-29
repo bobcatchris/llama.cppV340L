@@ -1,0 +1,35 @@
+W7 ROW — NINFER_GDN_SIMT PROMOTED default-ON (dn trio: 480 -> ~30 ms/chunk, x16), 2026-09-18, window 7
+bin: /home/chris/artifacts_bin/ninfer-serve_1e03e5af5fb438b9.bin (HEAD: ggate + gqa + dn promotions; banked)
+CHANGE: simt_gate.h — unset now ARMS the SIMT trio; "0"/any non-"1" = rollback to the chunked mma path
+  (same promotion shape as FIX-B/FIX-C). Known cosmetic debt: the dispatch-receipt line still carries the
+  old "env unset keeps the mma path byte-identical" wording in this bin — the promotion trace line above it
+  is authoritative; corrected string rides the next rebuild.
+
+EVIDENCE STACK:
+  1. Root cause + cell (W1 ledger row): three device-addressing defects (h_chunk 64x OOB x2 sides,
+     Phase-G v_row double-offset) fixed -> poison canaries clean, handoff consistent.
+  2. Phase-G residual (W1_PHASEG_DELTA_desk.md, float64 re-simulation reproduced every cell number):
+     DELTA-1 W-product K column (k_smem[s][d2] -> [s][d_off+d2], one line) and DELTA-2 Phase-E block-Schur
+     missing both unit-diagonal block factors (two-pass rewrite + 1 KiB smem). Post-fix cell prediction
+     "~1e-6" — MEASURED: DN-SIMT-CHUNK CELL ALL PASS, W 2.0e-11/7.7e-7, U 3.2e-8/1.3e-6, v_new 3.2e-8/1.3e-6,
+     h_chunk 0.0, state 0.0, attn 0.0/1.9e-6 (T=64 / T=128), both legs + handoff, rc=0.
+  3. Serve leg, env-armed (bin 7a1af98f65fbad8c, NINFER_GDN_SIMT=1): route proof at the EXACT former wedge
+     geometry (T=128/chunks=2, grid=(2,12,4)x256/(12,8)x256/(2,12,4)x256) — COMPLETED, 87 chunk traces,
+     no wedge, no fault. dn column 480 -> 28.9/29.6/30.9/32.1 ms (4-rank, n=17). wall mean 990-1050 ms/chunk
+     => 2075/(17x~1.02) ~ 120 tok/s class. Probe: content 'BLUE', finish=stop.
+  4. Serve leg, DEFAULT (bin 1e03e5af5fb438b9, env UNSET): [GDN] '<unset>' -> SIMT route proof fired from
+     default; n=17 wall 1054-1055 ms/chunk (~116 tok/s class, band-uncontrolled); probe content 'BLUE' /
+     finish=stop / completion=52.
+  5. BOOT_BATTERY_20260918_120531: OVERALL GREEN (host guard + ladder fast arm + sideband; device cells SKIP).
+
+PARITY NOTE (honest): the SIMT trio is a different summation ORDER — cell-gated rel-L2 <= 1.9e-6 vs mma on
+  all six tensors; bit-identity is NOT claimed and does not hold. Observable: MTP decode-trajectory drift
+  (probe completion 41 -> 52; content and finish unchanged). Every boot log carries the numeric-delta class
+  in the promotion trace. Rollback: NINFER_GDN_SIMT=0 (or any non-"1") = chunked mma path, byte-identical
+  to the pre-W7 serving line.
+
+WALL ACCOUNTING (per 128-token chunk, dn-promoted, band-uncontrolled): gemm ~735 (73%) | gap ~92-152 |
+  ar ~49-78 | unbr ~49-67 | gqa ~34 | dn ~30 | gate ~11 | rest ~10  => the remaining software levers are
+  W2 (gap capture) + AR floor; GEMM is the walled window (5 ledger kills + the W7 M=256 measurement).
+SERVING CUTOVER: 1e03e5af5fb438b9 IS the :8100 server (battery-verified in posture); serve_10k.sh flipped.
+  Prefill scoreboard: 76.4-class (W6 close) -> ~116-121-class (W7), +~55%.

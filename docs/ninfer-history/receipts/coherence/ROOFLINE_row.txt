@@ -1,0 +1,22 @@
+== MANIFEST 2026-09-17 ~04:5xZ grant: user order "get to work on number1" (roofline bench #1)
+== bin=/tmp/nvfp4_roofline src=results/amd/coherence/nvfp4_roofline_bench.cu single-die dev0
+== KFD=0 pre/post. VOID ROW (first run): compiled without -O -> clang -O0 default produced
+   garbage (copy 27 GB/s, GEMV 0.1 GB/s) — preserved in git history of this file's first
+   commit? NO (overwritten before commit; noted here per retraction discipline). Harness law
+   added: any perf bench MUST compile with the SAME -O level as the production build (-O3).
+== CLOCKS: mclk idles at level 0 (167 MHz); bench carries a 5 s hammer warm-up; sysfs
+   pp_dpm_mclk sampled DURING load shows level 3 (945 MHz) starred = hot state measured.
+== RESULTS (-O3, hot clocks):
+device AMD Radeon Graphics SMs=56
+CEILING copy      1.45 ms     369.5 GB/s (2x conv)
+CEILING read      0.71 ms     377.9 GB/s (pure read)
+problem           ms/call      GB/s     %read   %copy    rows       K
+AttnInput          0.2718     152.0   40.2%   41.2%   14336    5120
+GdnInput           0.3073     153.7   40.7%   41.6%   16384    5120
+MlpGateUp          0.6417     156.4   41.4%   42.3%   34816    5120
+Residual6144       0.1441     122.9   32.5%   33.3%   5120    6144
+WORST-CASE GEMV BW: 122.9 GB/s (32.5% of read ceiling)
+== READ: die's practical roofline TODAY is ~370-380 GB/s (not nominal 483.8 — doc 01 SS6.4's
+   "units vary, re-measure" confirmed). Production NVFP4 GEMV = 32-42% of achievable read BW
+   vs v100-skinny's 78.5%: the named tuning gap is REAL, ~1.9x headroom on the GEMV itself.
+   Note %read uses the pure-read ceiling (fairer for a read-dominated GEMV than 2x copy).

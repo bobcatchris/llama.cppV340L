@@ -1,0 +1,7 @@
+== MANIFEST 2026-09-17T00:21:44Z G-AMD-MTP3 bin b864220912aec151 MTP k=2 GRAPHS-ON 10k leg mt=192 port=8100 (relaunch after self-kill pgrep mishap)
+== GRADE: plen=10000 MTP k=2 graphs-ON mt=192 finish=stop content='BLUE' usage={prompt:10000,completion:61} mojibake=none -> PASS
+[tp2] single-seq lane 0: acceptance=0.69 tok/round=2.42 rounds=26 gen=63 prefill=939.25s decode=17.88s
+decode=17.88s/63tok=3.52 tok/s @10k ctx (E-16 non-MTP no-graphs: 2.6) = 1.35x; prefill 939.25s/10000=10.65 tok/s (E-16: 9.7) = 1.10x
+== req2 = duplicate fired by dead first shell (zombie) — killed ungraded, deterministic
+KFD=0
+0

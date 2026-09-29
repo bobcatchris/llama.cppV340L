@@ -1,0 +1,9 @@
+== MANIFEST 2026-09-17T15:09:05Z post-reboot recovery: bin e341a2072c6f5078 (tuned, certified), N7 flags, battery+ladder
+== attempt1 15:09:05Z interrupted mid-load (log preserved as RECOVERY_attempt1_serve.log; KFD=0 at 15:19Z re-verify, no serve procs, no fault line in log) — re-booting same bin for the certified window
+== RECOVERY CERTIFIED 2026-09-17 ~10:4xZ (GPU-owner agent rate-limited; fix seat completed):
+   zero faults in boot log, N7 flag boot env-clean (/proc environ verified),
+   BOOT_BATTERY_20260917_103227 OVERALL GREEN (guard 5/5 + both device cells + ladder 14/14),
+   BLUE probe PASS (stop, 'BLUE', no mojibake). KFD=0 after exact-PID release.
+== INCIDENT CLOSED: the 06:10Z driver corruption was cleared by the user's reboot (~09:4xZ).
+KFD=0
+0

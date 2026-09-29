@@ -1,0 +1,52 @@
+VERIFY_DECOMP_row — M1: post-tune LTRACE+OPTRACE decomposition of the verify round, 2026-09-17 GPU-OWNER window (amd/tp4-cure)
+Mission: coordinator add (VERIFY-DECOMP desk 6cfb3cf2, doc s4 M1, ★ decisive cell). Bin: the ALREADY-BANKED
+  409450b83ffa4be8 — ZERO new code; all four arms strings-verified IN the binary before boot
+  (NINFER_TP2_TIMING / NINFER_TP2_OPTRACE / NINFER_VERIFY_LAYER_TRACE / NINFER_SMALLT_TRACE).
+Serve log: M1_serve.log (raw: 820 OPTRACE rounds, 1548 LTRACE lines, B1 blocks) + M1_clocks_sideband.log.
+Boot posture: serve_10k.sh line minus the 10k body — TP4 --devices 0,1,2,3 --spec mtp --draft-tokens 2,
+  --prefill-chunk 128, greedy, NINFER_DRAFT_VOCAB set ("loaded 40960 draft vocabulary IDs" VERIFIED in log,
+  the HOLE1 mandate), NINFER_ALLOW_NVFP4_TP2=1, NINFER_WORKSPACE_MIB=96, conc=1. Anchored kill post-leg,
+  KFD=0 after. Boot healthy ~5 s.
+Workload: count600-class, prompt 105 tok counting instruction, mt=600 temp=0 greedy conc=1:
+  finish=length, 600 completions, 204 rounds, t/r 2.94 (acc 0.98), client wall 30.02 s = 20.0 tok/s with
+  traces ON — IN CLASS vs the 201-204 rounds / acc 0.97-0.99 / t/r 2.94-2.99 anchor family.
+
+== B1 phase split (mean over 204 rounds; TOTAL 133.80 ms/round with traces on; no-trace anchor 128.43) ==
+  Target Verify (T=3):   117.37 ms  (87.7%)
+  MTP Alignment Fwd:       8.03 ms  ( 6.0%)
+  AR Draft Chain:          7.85 ms  ( 5.9%)
+  Prepare Next Round:      0.15 ms   | accept 0.08 | propose 0.31 | rebase/select ~0.02
+OPTRACE (analyzer tools/optrace_analyze.py): per-phase per-rank means verify 117.410 on ALL FOUR ranks
+  (skew mean 0.010 / p95 0.022 ms); between-phase unaccounted 0.028 ms mean (p95 0.99).
+  VERDICT: COMPUTE — no laggard rank, no gap; the time is owned by the phases' kernels.
+
+== THE DECOMPOSITION (LTRACE per-layer cudaEvent ring, 64-layer verify loop, 3 windows x 4 ranks, 191 passes/rank) ==
+  layer-loop BODY:   52.60 ms/pass mean (52.11-52.96 across ranks/windows)
+  in-loop AR:         9.60 ms/pass mean (8.03-11.14; ranks 0/1 ~10.4-11.1, ranks 2/3 ~8.0-8.8)
+  LOOP-RESIDENT:     62.20 ms  (53% of verify)
+  OUTSIDE THE LAYER LOOP (inside verify): 117.41 - 62.20 = **55.21 ms/round**  (47% of verify)
+Per-layer body is rank-UNIFORM and bimodal-by-kind: GDN layers ~758-795 us, FULL-attn layers ~945-956 us,
+  early heavy FULL (layers 3,7) ~1195 us, layers 11-23 FULL ~1038-1041 us (FULL layers +0.12-0.43 ms,
+  consistent with HOLE1's FULL +0.15 sign, larger at T=3 post-tune). Layer table banked in the PLOG and
+  reproducible from M1_serve.log.
+
+== WHAT M1 NAMES (the coordinator's question answered) ==
+>15 ms/round lands OUTSIDE the layer loop: YES — 55.21 ms/round, the single largest owner in the round,
+larger than the entire 64-layer body (52.60). Cross-check vs HOLE1 pre-tune (verify 195.34, loop 141.0,
+outside 54.3): the SMALLT tune shrank the LOOP 141 -> 62 ms (-79) and the outside tail DID NOT MOVE
+(54.3 -> 55.2). The remaining hole is TAIL-RESIDENT, not loop-resident: the post-layer-64 verify tail =
+final norm + lm_head/logits projection (full-vocab target head at T=3) + logits post-processing/sampling
++ D2H sync + tail collectives — exactly M2's named probe list (tpv_probe sites: one GDN + one FULL layer
++ TAIL OPS). Owner desk next lever: M2 per-op arm to split lm_head-GEMV vs sampling vs sync inside the
+55.21; fusion/graph-capture of the tail is the lever class afterwards. H1's "~50-60 ms unattributed" is
+now a NAMED, MEASURED target.
+Also named: in-loop AR is 9.60 ms/round (64 layers x ~150 us) — the W4 one-shot AR upside (~5 ms) lives
+HERE plus the 7.85 ms draft-chain AR (parked behind the R2/R3 design repair, PLOG-035).
+
+Thermal sideband (M0 law): 113 samples @2 s; mclk level 3 (945 MHz TOP) in 113/113, sclk level 7 (1500 MHz)
+throughout — FULL CLOCKS, zero 167 MHz; GPU0 edge 63 -> 82 C, junction to ~77 C across the leg (hot-band;
+the +5.4 ms/round vs the 128.43 cool anchor is trace overhead + THARM1 shift — decomposition RATIOS are
+the deliverable and are thermal-robust; all four legs of the anchor family ran this same band).
+
+Config note: analyzer wall-source printed 293.48 ms (round-start deltas span a client idle gap between
+warmup and the count600 leg) — per-round unaccounted (0.028 ms) is the between-phase number that matters.

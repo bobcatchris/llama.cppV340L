@@ -1,0 +1,81 @@
+== iq3_s 4 base,share,base 30 4
+bench_mmvq_real: iq3_s K=5120 N=17408 T=4 niter=30 reps=4 arms=base,share,base
+base           us: 749.2 778.2 792.6 786.4 | med 786.4 spread 5.52% SPREAD-FAIL
+share          ORACLE BITEXACT
+share          us: 685.9 687.9 691.8 686.6 | med 687.9 spread 0.86%
+base           ORACLE BITEXACT
+base           us: 792.2 788.3 791.6 794.3 | med 792.2 spread 0.76%
+oracle: ALL BITEXACT
+== q4_K 4 base,share,base 30 4
+bench_mmvq_real: q4_K K=5120 N=17408 T=4 niter=30 reps=4 arms=base,share,base
+base           us: 1103.1 1110.3 1110.3 1105.6 | med 1110.3 spread 0.65%
+share          ORACLE BITEXACT
+share          us: 839.8 840.2 843.6 834.5 | med 840.2 spread 1.07% SPREAD-FAIL
+base           ORACLE BITEXACT
+base           us: 1105.3 1106.6 1108.4 1102.2 | med 1106.6 spread 0.56%
+oracle: ALL BITEXACT
+== iq3_xxs 4 base,share,base 30 4
+bench_mmvq_real: iq3_xxs K=5120 N=17408 T=4 niter=30 reps=4 arms=base,share,base
+base           us: 751.2 793.9 799.4 799.8 | med 799.4 spread 6.08% SPREAD-FAIL
+share          ORACLE BITEXACT
+share          us: 782.7 783.8 780.1 780.2 | med 782.7 spread 0.47%
+base           ORACLE BITEXACT
+base           us: 796.1 799.5 799.9 795.0 | med 799.5 spread 0.61%
+oracle: ALL BITEXACT
+== iq4_xs 4 base,share,base 30 4
+bench_mmvq_real: iq4_xs K=5120 N=17408 T=4 niter=30 reps=4 arms=base,share,base
+base           us: 531.6 551.6 555.1 566.4 | med 555.1 spread 6.27% SPREAD-FAIL
+share          ORACLE BITEXACT
+share          us: 809.5 809.3 811.0 810.9 | med 810.9 spread 0.21%
+base           ORACLE BITEXACT
+base           us: 565.7 565.5 565.7 565.6 | med 565.7 spread 0.04%
+oracle: ALL BITEXACT
+== q5_K 4 base,share,base 30 4
+bench_mmvq_real: q5_K K=5120 N=12288 T=4 niter=30 reps=4 arms=base,share,base
+base           us: 789.5 787.5 789.2 794.9 | med 789.5 spread 0.94%
+share          ORACLE BITEXACT
+share          us: 628.3 638.3 637.7 629.6 | med 637.7 spread 1.56% SPREAD-FAIL
+base           ORACLE BITEXACT
+base           us: 800.3 791.2 796.4 788.2 | med 796.4 spread 1.52% SPREAD-FAIL
+oracle: ALL BITEXACT
+== q3_K 4 base,share,base 30 4
+bench_mmvq_real: q3_K K=5120 N=17408 T=4 niter=30 reps=4 arms=base,share,base
+base           us: 752.2 794.4 799.3 791.9 | med 794.4 spread 5.93% SPREAD-FAIL
+share          ORACLE BITEXACT
+share          us: 791.4 794.8 793.4 800.9 | med 794.8 spread 1.20% SPREAD-FAIL
+base           ORACLE BITEXACT
+base           us: 795.1 799.0 799.7 800.2 | med 799.7 spread 0.64%
+oracle: ALL BITEXACT
+== q6_K 4 base,share,base 20 4
+bench_mmvq_real: q6_K K=5120 N=129272 T=4 niter=20 reps=4 arms=base,share,base
+base           us: 6076.9 6167.2 6095.6 6030.6 | med 6095.6 spread 2.24% SPREAD-FAIL
+share          ORACLE BITEXACT
+share          us: 6225.9 6296.5 6296.6 6254.0 | med 6296.5 spread 1.12% SPREAD-FAIL
+base           ORACLE BITEXACT
+base           us: 6110.9 6228.3 6134.5 6126.5 | med 6134.5 spread 1.91% SPREAD-FAIL
+oracle: ALL BITEXACT
+OCC iq3_s/base/T4/run4: numRegs=83 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq3_s/share/T4/run4: numRegs=83 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq3_s/s2r/T4/run4: numRegs=84 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq3_s/ldsy/T4/run4: numRegs=68 shared=8704 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq3_s/ldsys2r/T4/run4: numRegs=68 shared=8704 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC q4_K/base/T4/run4: numRegs=101 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q4_K/share/T4/run4: numRegs=101 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q4_K/s2r/T4/run4: numRegs=101 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q4_K/ldsy/T4/run4: numRegs=101 shared=8704 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q4_K/ldsys2r/T4/run4: numRegs=101 shared=8704 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC iq3_xxs/base/T4/run4: numRegs=64 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=8
+OCC iq3_xxs/share/T4/run4: numRegs=64 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=8
+OCC iq3_xxs/s2r/T4/run4: numRegs=64 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=8
+OCC iq3_xxs/ldsy/T4/run4: numRegs=62 shared=8704 local=48 maxThreadsPerBlock=128 ctas_per_cu=7
+OCC iq3_xxs/ldsys2r/T4/run4: numRegs=62 shared=8704 local=48 maxThreadsPerBlock=128 ctas_per_cu=7
+OCC iq4_xs/base/T4/run4: numRegs=85 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC iq4_xs/share/T4/run4: numRegs=85 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC iq4_xs/s2r/T4/run4: numRegs=84 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=6
+OCC iq4_xs/ldsy/T4/run4: numRegs=62 shared=8704 local=48 maxThreadsPerBlock=128 ctas_per_cu=7
+OCC iq4_xs/ldsys2r/T4/run4: numRegs=62 shared=8704 local=48 maxThreadsPerBlock=128 ctas_per_cu=7
+OCC q5_K/base/T4/run4: numRegs=104 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q5_K/share/T4/run4: numRegs=104 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q5_K/s2r/T4/run4: numRegs=104 shared=2048 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q5_K/ldsy/T4/run4: numRegs=104 shared=8704 local=48 maxThreadsPerBlock=128 ctas_per_cu=4
+OCC q5_K/ldsys2r/T4/run4: numRegs=104 shared=8704 local=48 maxThreadsPerBlock=128 ctas_per_cu=4

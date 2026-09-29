@@ -1,0 +1,12 @@
+=== W7 RCCL ENV MATRIX (WO_RCCL_TUNING_desk executed inline) — NULL RESULT: the class closes ===
+ts: 2026-09-19 01:55-02:5x CDT | bin 2c8901d3d18adef1 all arms | design: WO_RCCL_TUNING_desk.md (ordinal-paired fresh boots, 3x 2k probes each, heat-equalized ~150 s pre-boot cooldowns; NOTE: box entered the matrix HOT after the 104 tok/s cold-start soak — ar absolutes ran warm-era; within-ordinal comparison is the law)
+DATA PLANE (banked from NCCL_DEBUG=INFO, arm 0): P2P "Could not enable" every pair (known) -> collectives ride SHM/direct, 2 channels, bootstrap via wlo1/tailscale0 (normal). The ~99-123 ms/chunk AR is host-SHM-bandwidth-bound at ~1.5 MB bf16 messages
+results (ar column [PREFILL-SUM] rank=0, ordinals 1/2/3 | walls):
+  arm 0 baseline (Ring, default ch): ar 120.9 / 99.1 / 98.9 | 18.7/18.8/19.0 s
+  arm 1 NCCL_MIN_NCHANNELS=16:       ar 140.2 / 117.0 / 109.7 | 18.9/19.4/22.6 s  — WORSE (SHM copy contention)
+  arm 2 NCCL_ALGO=Tree:              ar 157.3 / 110.2 / 141.3 | 19.3/20.4/23.7 s  — WORSE + noisy
+  arm 3 NCCL_PROTO=LL128:            ar 124.8 /  97.1 / 99.0 | 18.9/20.1/23.6 s  — WASH (identical to baseline ordinals 2-3)
+GATE (pre-registered >=10% ar within-ordinal): NOT MET by any arm. Matrix = NULL RESULT -> class closure banked: "RCCL env knobs do not improve 4x-gfx900 SHM-ring allreduce at ~1.5 MB on ROCm 6.2; default Ring/SHM/2ch is at the achievable envelope"
+consequence: the ~99-123 ms/chunk AR is immovable by configuration; the #2 prefill item remains ALGORITHMIC ONLY (fewer collectives: fuse mixer+mlp per-layer ARs = halve AR count; quantized AR messages = halve bytes; both are real engineering desks with PLOG-063 as premise). Thermal note: run-3 walls rose in EVERY arm tonight (box accumulating heat across the matrix) — within-ordinal ar comparison absorbed it as designed
+provenance: /tmp/rccl_arm{0,1,2,3}.log (boot logs; NCCL INFO lines in arm0 bank the transport) + resp_rc_a{0,1,2,3}_*.json + this row; desk doc WO_RCCL_TUNING_desk.md (pre-registered design + gate)
+post-matrix restore soak (5th grade, 02:0x): PASS BLUE/stop/69, prefill=148.67 s => 67.3 tok/s — HOT-start sample (box heat-loaded from the matrix), consistent with the PLOG-064 state function (cold 104 / warm 70.7 / hot 63.1-67.3); acceptance 0.71 tok/round 2.45 identical to every grade

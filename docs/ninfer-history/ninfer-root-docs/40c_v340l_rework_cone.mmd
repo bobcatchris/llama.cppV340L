@@ -1,0 +1,18 @@
+flowchart TB
+    subgraph REWORK["REWORK — CUDA → ROCm gfx900"]
+        K["All .cu kernels → HIP:<br/>Q4 GEMV, GQA attn (BF16+I8), GDN,<br/>speculative_round, sampling<br/>(autovec/SM count/occupancy retune)"]
+        NC["TpGroup: NCCL → RCcl<br/>(API-compatible, driver rebind)"]
+        HW["arena / device.h / tensor /<br/>CUDA_CHECK → HIP runtime"]
+        BL["build: CUDA 13.1 → ROCm CMake<br/>toolchain + gfx900 target"]
+        TP["TP2 → TP4: 4 dies (2× V340L cards,<br/>2 dies each) · 4-way weight shard ·<br/>2-level allreduce (intra-card +<br/>PCIe 3.0 x8 cross-card)"]
+        PF["preflight constants: 16.31 GiB →<br/>8 GiB/die, V340L estimate path"]
+        MT["MTP k retune (k=3–4 sweet spot<br/>for gfx900 acceptance) + HBM 400 GB/s<br/>per-die bandwidth model"]
+    end
+    subgraph KEEP["KEEP AS-IS — HW-agnostic, drops in"]
+        AF[(".ninfer artifact format + reader<br/>(weights travel unchanged)")]
+        SR["serve / HTTP / OpenAI endpoints<br/>/ sampling plumbing"]
+        PL["paged KV logic · GDN slot protocol ·<br/>prefix cache logic (host-side compare)"]
+        TE["TPEngine options/factory structure"]
+        BT["verify battery + multi_gpu tests<br/>(same gates, new expected numbers)"]
+    end
+    REWORK ==> KEEP

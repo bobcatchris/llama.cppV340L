@@ -1,0 +1,31 @@
+W6 BASELINE row (default-off body gates, NINFER_PREFILL_OPTRACE=2) — window 6 BODYFIX, 2026-09-18 06:2x, GPU-OWNER amd/tp4-cure
+bin: /home/chris/artifacts_bin/ninfer-serve_a43312bb9634bef9.bin (HEAD 9fe491f8f; strings 4/4; battery BOOT_BATTERY_20260918_061052 GREEN)
+config: qwen3_8_27b_nvfp4.ninfer --port 8100 --devices 0,1,2,3 --prefill-chunk 128 --no-prefix-reuse
+  --prefix-cache-capacity 256 --greedy --default-max-tokens 16 --spec mtp --draft-tokens 2 --allow-nvfp4-weights
+env: P2 known-good line (NINFER_ALLOW_NVFP4_TP2=1 NINFER_WORKSPACE_MIB=96 NINFER_DRAFT_VOCAB=... VERIFY_LAYER_TRACE
+  TP2_TIMING TP2_OPTRACE LMHEAD_ARM=simt LMHEAD_TRACE TILED_TRACE VERIFY_TAIL_TRACE) + NINFER_PREFILL_OPTRACE=2;
+  NINFER_GDN_SIMT / NINFER_GGATE_SIMT / NINFER_GQA_SPLITK UNSET (route lines in log: 0 — default-off proven)
+serve log: W6_bootB2_baseline_serve.log (boot B2; v1 leg archived as *_v1_* — temps-only sideband sampler defect, its
+  BODYSUM agreed with B2 within 1.5%: dn 510.7/512.6 gate 80.3/80.4 gqa 56.9/57.2)
+probe: ONE plen-2016 conc=1 FIRST+ONLY request on fresh boot after 120 s cool (BLUE-instruction + 1954 ' alpha',
+  mt 64 temp 0): finish=stop content='BLUE' prompt=2016 completion=41, client wall 29.34 s -> prefill-class ~70.6 tok/s
+sideband (W6_baseline_clocks.log, 2 s sysfs sampler): mclk 3 (945) pinned 35/35 samples ALL cards; sclk oscillated
+  levels 3-7 (945-1500) across the burst = PARTIAL droop band (same class as P1 leg; cross-leg absolute deltas carry
+  the band caveat, per-chunk columns same-boot internally consistent); pre-probe sysfs verify: mclk 945 pinned,
+  sclk 1500 idle-spin; edge 71/53/55/55 C at probe start
+== [PREFILL-BODYSUM] n=16 (probe request), verbatim, 4 ranks ==
+rank=0 gate=84.905 dn=536.543 gqa=61.989 unbr=52.852 body=706.623 resid=-40.809
+rank=1 gate=77.037 dn=502.122 gqa=55.166 unbr=114.176 body=721.650 resid=-37.814
+rank=2 gate=77.642 dn=501.772 gqa=55.096 unbr=103.724 body=711.179 resid=-37.763
+rank=3 gate=81.964 dn=509.893 gqa=56.742 unbr=79.936 body=700.561 resid=-38.931
+4-rank MEANS: dn 512.6 | gate 80.4 | gqa 57.2 | body 710.0 (resid -37..-41 systematic, noted; column grammar is
+  the leg-to-leg comparator, identical treatment every leg)
+== [PREFILL-SUM] n=16 (P1 layer), verbatim ==
+rank=0 wall=1676.202 gemm=827.270 ar=64.186 body=659.289 gap=125.457
+rank=1 wall=1674.019 gemm=787.736 ar=85.476 body=677.481 gap=123.327
+rank=2 wall=1674.049 gemm=820.299 ar=67.442 body=662.983 gap=123.325
+rank=3 wall=1674.499 gemm=847.118 ar=51.233 body=652.392 gap=123.756
+4-rank MEANS: wall 1674.7 = gemm 820.6 + ar 67.1 + body 663.0 + gap 124.0
+VERDICT: PLOG-048 baseline REPRODUCED on the FIX-build binary with gates off (dn 512.6 vs 501.6-513.7 band,
+  gate 80.4 vs 78.1-82.1, gqa 57.2 vs 54.7-57.4; body 710 vs 677-698) — the three fix gates cost NOTHING
+  when unset and the reference for arm parity is set (greedy text='BLUE' completion=41).

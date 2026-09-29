@@ -1,0 +1,14 @@
+tile-resident bench: M=128 reps=3 x 20 iters | TILE_FP16=1 RESIDENT=1 CAP_MIB=default | free 8160.0 MiB
+shape              K   N_d    n      qMiB    f16MiB      ms/iter       TF/s    freeMiB
+ffn_gate        5120  5760   64     12.08     56.25      1.38755       5.44     7914.0
+ffn_up          5120  5760   64     12.08     56.25      1.40045       5.39     7838.0
+ffn_down       17408  1664   64     11.87     55.25      1.28820       5.76     7752.0
+gdn_qkv         5120  3328   48      6.98     32.50      0.83755       5.21     7692.0
+ssm_out         6144  1664   48      4.19     19.50      0.50150       5.22     7662.0
+gdn_gate        5120  2048   48      4.30     20.00      0.49870       5.38     7634.0
+attn_q+gate     5120  4096   16      8.59     40.00      0.99775       5.38     7580.0
+attn_out        6144  1664   16      4.19     19.50      0.50310       5.20     7550.0
+attn_k          5120   256   16      0.54      2.50      0.14065       2.39     7540.0
+attn_v          5120   256   16      0.54      2.50      0.14325       2.34     7532.0
+call-weighted die agg: 2043.3 GF/ubatch, 377.64 ms/ubatch -> 5.41 TF/s/die wall
+bench-set f16 residency footprint: 304.25 MiB (304.25 MiB/shape-set)

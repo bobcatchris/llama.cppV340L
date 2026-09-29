@@ -1,0 +1,55 @@
+{
+  "description": "TP2-feasibility desk anchors (Qwen3.8-27B-ASCII-P1M at TP2/200k). No TP2-200k served numbers exist (historical refusal, PLOG-098/099), so prefill/decode cells are ANCHORS for provenance, not gates; measured values are the deliverable. The mtp_canary gate (>=0.63) stays a hard gate.",
+  "source": "PLOG-098 TP2/none 2k pp 96.3; PLOG-099 TP2 bs256+MTP 2k decode 16.7 accept 0.646; PLOG-101 no-spec reference 12.24",
+  "ratchets": 0,
+  "config": {
+    "server_script": "docs/amd-port/tests/run_tp2_feasibility.sh",
+    "model": "/media/chris/ssd128/gguf/Qwen3.8-27B-ASCII-P1M.gguf",
+    "ctx_max": 200000,
+    "tp": 2,
+    "spec": "draft-mtp (flag arm only)",
+    "kv_dtype": "q4_0",
+    "fa": "on",
+    "batch_size": 512,
+    "ubatch_size": 512,
+    "temperature": 0.0,
+    "untraced_no_spec_reference_tps": 12.24
+  },
+  "thresholds": {
+    "decode_tps_warn_pct": 50.0,
+    "decode_tps_fail_pct": 90.0,
+    "prefill_tps_warn_pct": 50.0,
+    "prefill_tps_fail_pct": 90.0,
+    "mtp_accept_fail_threshold": 0.63,
+    "mtp_accept_warn_threshold": 0.65
+  },
+  "cells": {
+    "prefill_2k": {
+      "prompt_tokens_target": 2075,
+      "prompt_per_second": 96.3,
+      "description": "Anchor: PLOG-098 TP2/none 2k prefill (informational only at 200k)"
+    },
+    "decode_8k_10k": {
+      "ctx_target": 7857,
+      "completion_tokens": 128,
+      "decode_per_second": 16.7,
+      "mtp_accept_ratio": 0.646,
+      "mtp_mean_len": 2.94,
+      "description": "Anchor: PLOG-099 TP2 bs256+MTP at 2k (banked ceiling; 8-10k@200k measurement is informational)"
+    },
+    "mtp_canary": {
+      "min_acceptance_ratio": 0.63,
+      "expected_acceptance_ratio": 0.667,
+      "description": "MTP speculative draft acceptance canary gate (fail < 0.63) - hard gate for the flag arm"
+    },
+    "determinism_greedy": {
+      "completion_tokens": 64,
+      "description": "Within-world bit-identical determinism test across two consecutive greedy runs at temp 0"
+    },
+    "needle_recall_8k": {
+      "depths": [0.25, 0.5, 0.75],
+      "target_tokens": 8000,
+      "description": "Long-context needle retrieval at 25%, 50%, and 75% depth (exact 5-digit match)"
+    }
+  }
+}

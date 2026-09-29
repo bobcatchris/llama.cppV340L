@@ -1,0 +1,8 @@
+====================================== Temperature =======================================
+GPU[0]		: Temperature (Sensor edge) (C): 50.0
+GPU[0]		: Temperature (Sensor junction) (C): 52.0
+GPU[0]		: Temperature (Sensor memory) (C): 52.0
+GPU[1]		: Temperature (Sensor edge) (C): 40.0
+GPU[1]		: Temperature (Sensor junction) (C): 42.0
+GPU[1]		: Temperature (Sensor memory) (C): 44.0
+GPU[2]		: Temperature (Sensor edge) (C): 49.0

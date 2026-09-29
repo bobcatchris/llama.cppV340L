@@ -1,0 +1,107 @@
+=== WO_COPYADD runner start 2026-09-19T12:28:59-05:00 host=chris-MS-7D28 ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda2       116G   99G   11G  91% /
+--- build ---
+-rwxrwxr-x 1 chris chris 84120 Sep 19 12:29 /tmp/w7_copyadd_bin
+BUILD OK c3478fc7710febdb
+--- rocm-smi snapshot: pre 2026-09-19T12:29:00-05:00 ---
+===================================================== Concise Info =====================================================
+Device  Node  IDs              Temp    Power     Partitions          SCLK    MCLK    Fan    Perf  PwrCap  VRAM%  GPU%  
+[3m              (DID,     GUID)  (Edge)  (Socket)  (Mem, Compute, ID)                                                    [0m
+========================================================================================================================
+0       1     0x6864,   15942  42.0°C  21.0W     N/A, N/A, 0         300Mhz  945Mhz  9.41%  auto  110.0W  84%    0%    
+1       2     0x6864,   43906  29.0°C  14.0W     N/A, N/A, 0         300Mhz  945Mhz  9.41%  auto  110.0W  84%    0%    
+2       3     0x6864,   63553  40.0°C  12.0W     N/A, N/A, 0         300Mhz  945Mhz  9.41%  auto  110.0W  84%    0%    
+3       4     0x6864,   41352  34.0°C  11.0W     N/A, N/A, 0         300Mhz  945Mhz  9.41%  auto  110.0W  84%    0%    
+========================================================================================================================
+================================================= End of ROCm SMI Log ==================================================
+GPU[2]		: mclk clock level: 3: (945Mhz)
+GPU[2]		: sclk clock level: 0: (300Mhz)
+GPU[2]		: socclk clock level: 3: (960Mhz)
+GPU[3]		: mclk clock level: 3: (945Mhz)
+GPU[3]		: sclk clock level: 0: (300Mhz)
+GPU[3]		: socclk clock level: 3: (960Mhz)
+GPU[3]		: pcie clock level: 0 (8.0GT/s x8)
+=== RUN size=1.31MB (655360 bf16) ===
+HEADER world=4 vrankmap=0:visdev0,1:visdev1,2:visdev0,3:visdev1 vis_env=2,3 ndev_visible=2 dies_law=2,3
+ROW kind=verify arm=R bytes=1310720 t1call_us=4421.87 maxabs=0.03906 maxrel=7.812e+06 big=0 crossrank=0 verdict=PASS
+ROW kind=verify arm=C bytes=1310720 maxabs_vs_truth=0.01562 maxabs_vs_R=0.03125 big=0 crossrank=0 verdict=PASS
+ROW kind=verify arm=C3 bytes=1310720 maxabs_vs_truth=0.0293 maxabs_vs_R=0.0625 big=0 crossrank=0 verdict=PASS
+ROW kind=qerr bytes=1310720 t1call_us=3328.55 maxabs_vs_R=0.2812 maxabs_vs_truth=0.2812 gate=Q1 verdict=FAIL
+MARK size=655360 run=1 begin
+ROW kind=ar arm=R bytes=1310720 run=1 mean_us=2453.12 med_us=2452.02 p5_us=2446.10 p95_us=2462.33 wire_gbs=6.415 busbw_gbs=0.802
+ROW kind=ar arm=C bytes=1310720 run=1 mean_us=2404.26 med_us=2399.30 p5_us=2391.58 p95_us=2422.67 wire_gbs=6.556 busbw_gbs=0.819
+ROW kind=ar arm=C3 bytes=1310720 run=1 mean_us=2421.31 med_us=2414.98 p5_us=2409.96 p95_us=2457.44 wire_gbs=4.342 busbw_gbs=0.814
+ROW kind=ar arm=C2 bytes=1310720 run=1 mean_us=2410.65 med_us=2408.27 p5_us=2401.84 p95_us=2427.48 wire_gbs=6.531 busbw_gbs=0.816
+ROW kind=ar arm=Q bytes=1310720 run=1 mean_us=2852.40 med_us=2852.33 p5_us=2825.45 p95_us=2885.27 wire_gbs=3.676 busbw_gbs=0.689
+MARK size=655360 run=2 begin
+ROW kind=ar arm=R bytes=1310720 run=2 mean_us=2467.25 med_us=2462.54 p5_us=2445.60 p95_us=2500.41 wire_gbs=6.387 busbw_gbs=0.798
+ROW kind=ar arm=C bytes=1310720 run=2 mean_us=2399.89 med_us=2396.94 p5_us=2391.26 p95_us=2417.27 wire_gbs=6.562 busbw_gbs=0.820
+ROW kind=ar arm=C3 bytes=1310720 run=2 mean_us=2422.29 med_us=2415.64 p5_us=2411.05 p95_us=2442.86 wire_gbs=4.341 busbw_gbs=0.814
+ROW kind=ar arm=C2 bytes=1310720 run=2 mean_us=2417.64 med_us=2411.41 p5_us=2402.51 p95_us=2459.81 wire_gbs=6.523 busbw_gbs=0.815
+ROW kind=ar arm=Q bytes=1310720 run=2 mean_us=2856.21 med_us=2859.55 p5_us=2825.77 p95_us=2891.23 wire_gbs=3.667 busbw_gbs=0.688
+ROW kind=hostadd bytes=1310720 us=882.13 note=single_thread_4way_fp32acc
+ROW kind=anchor status=skipped reason=rccl_init_failed rank=3 rc=5 note=duplicate_gpu_refusal_expected
+ROW kind=anchor status=skipped reason=rccl_init_failed rank=1 rc=5 note=duplicate_gpu_refusal_expected
+run rc=2
+--- rocm-smi snapshot: mid 2026-09-19T12:29:02-05:00 ---
+===================================================== Concise Info =====================================================
+Device  Node  IDs              Temp    Power     Partitions          SCLK    MCLK    Fan    Perf  PwrCap  VRAM%  GPU%  
+[3m              (DID,     GUID)  (Edge)  (Socket)  (Mem, Compute, ID)                                                    [0m
+========================================================================================================================
+0       1     0x6864,   15942  42.0°C  21.0W     N/A, N/A, 0         300Mhz  945Mhz  9.41%  auto  110.0W  84%    0%    
+1       2     0x6864,   43906  29.0°C  15.0W     N/A, N/A, 0         300Mhz  945Mhz  9.41%  auto  110.0W  84%    0%    
+2       3     0x6864,   63553  41.0°C  13.0W     N/A, N/A, 0         300Mhz  945Mhz  10.2%  auto  110.0W  84%    0%    
+3       4     0x6864,   41352  35.0°C  11.0W     N/A, N/A, 0         300Mhz  945Mhz  9.41%  auto  110.0W  84%    0%    
+========================================================================================================================
+================================================= End of ROCm SMI Log ==================================================
+GPU[2]		: mclk clock level: 3: (945Mhz)
+GPU[2]		: sclk clock level: 0: (300Mhz)
+GPU[2]		: socclk clock level: 3: (960Mhz)
+GPU[3]		: mclk clock level: 3: (945Mhz)
+GPU[3]		: sclk clock level: 0: (300Mhz)
+GPU[3]		: socclk clock level: 3: (960Mhz)
+GPU[3]		: pcie clock level: 0 (8.0GT/s x8)
+=== RUN size=1.5MB (750000 bf16) ===
+HEADER world=4 vrankmap=0:visdev0,1:visdev1,2:visdev0,3:visdev1 vis_env=2,3 ndev_visible=2 dies_law=2,3
+ROW kind=verify arm=R bytes=1500000 t1call_us=4768.06 maxabs=0.03906 maxrel=7.812e+06 big=0 crossrank=0 verdict=PASS
+ROW kind=verify arm=C bytes=1500000 maxabs_vs_truth=0.01562 maxabs_vs_R=0.03125 big=0 crossrank=0 verdict=PASS
+ROW kind=verify arm=C3 bytes=1500000 maxabs_vs_truth=0.0293 maxabs_vs_R=0.0625 big=0 crossrank=0 verdict=PASS
+ROW kind=qerr bytes=1500000 t1call_us=3433.34 maxabs_vs_R=0.2812 maxabs_vs_truth=0.2812 gate=Q1 verdict=FAIL
+MARK size=750000 run=1 begin
+ROW kind=ar arm=R bytes=1500000 run=1 mean_us=2789.72 med_us=2783.51 p5_us=2768.88 p95_us=2824.92 wire_gbs=6.467 busbw_gbs=0.808
+ROW kind=ar arm=C bytes=1500000 run=1 mean_us=2733.60 med_us=2729.57 p5_us=2719.88 p95_us=2757.03 wire_gbs=6.594 busbw_gbs=0.824
+ROW kind=ar arm=C3 bytes=1500000 run=1 mean_us=2796.34 med_us=2790.13 p5_us=2778.81 p95_us=2835.17 wire_gbs=4.301 busbw_gbs=0.806
+ROW kind=ar arm=C2 bytes=1500000 run=1 mean_us=2745.41 med_us=2740.63 p5_us=2733.56 p95_us=2763.47 wire_gbs=6.568 busbw_gbs=0.821
+ROW kind=ar arm=Q bytes=1500000 run=1 mean_us=3233.99 med_us=3229.80 p5_us=3207.61 p95_us=3269.30 wire_gbs=3.715 busbw_gbs=0.697
+MARK size=750000 run=2 begin
+ROW kind=ar arm=R bytes=1500000 run=2 mean_us=2799.63 med_us=2796.15 p5_us=2773.36 p95_us=2831.34 wire_gbs=6.437 busbw_gbs=0.805
+ROW kind=ar arm=C bytes=1500000 run=2 mean_us=2737.54 med_us=2729.31 p5_us=2720.40 p95_us=2754.70 wire_gbs=6.595 busbw_gbs=0.824
+ROW kind=ar arm=C3 bytes=1500000 run=2 mean_us=2795.31 med_us=2785.93 p5_us=2779.07 p95_us=2825.70 wire_gbs=4.307 busbw_gbs=0.808
+ROW kind=ar arm=C2 bytes=1500000 run=2 mean_us=2747.15 med_us=2739.42 p5_us=2733.03 p95_us=2777.82 wire_gbs=6.571 busbw_gbs=0.821
+ROW kind=ar arm=Q bytes=1500000 run=2 mean_us=3243.65 med_us=3241.62 p5_us=3211.56 p95_us=3280.62 wire_gbs=3.702 busbw_gbs=0.694
+ROW kind=hostadd bytes=1500000 us=935.23 note=single_thread_4way_fp32acc
+ROW kind=anchor status=skipped reason=rccl_init_failed rank=3 rc=5 note=duplicate_gpu_refusal_expected
+ROW kind=anchor status=skipped reason=rccl_init_failed rank=2 rc=5 note=duplicate_gpu_refusal_expected
+run rc=2
+--- rocm-smi snapshot: post 2026-09-19T12:29:05-05:00 ---
+===================================================== Concise Info =====================================================
+Device  Node  IDs              Temp    Power     Partitions          SCLK    MCLK    Fan     Perf  PwrCap  VRAM%  GPU%  
+[3m              (DID,     GUID)  (Edge)  (Socket)  (Mem, Compute, ID)                                                     [0m
+========================================================================================================================
+0       1     0x6864,   15942  42.0°C  21.0W     N/A, N/A, 0         300Mhz  945Mhz  9.41%   auto  110.0W  84%    0%    
+1       2     0x6864,   43906  29.0°C  14.0W     N/A, N/A, 0         300Mhz  945Mhz  9.41%   auto  110.0W  84%    0%    
+2       3     0x6864,   63553  41.0°C  12.0W     N/A, N/A, 0         300Mhz  945Mhz  11.76%  auto  110.0W  84%    0%    
+3       4     0x6864,   41352  36.0°C  11.0W     N/A, N/A, 0         300Mhz  945Mhz  9.41%   auto  110.0W  84%    0%    
+========================================================================================================================
+================================================= End of ROCm SMI Log ==================================================
+GPU[2]		: mclk clock level: 3: (945Mhz)
+GPU[2]		: sclk clock level: 0: (300Mhz)
+GPU[2]		: socclk clock level: 3: (960Mhz)
+GPU[3]		: mclk clock level: 3: (945Mhz)
+GPU[3]		: sclk clock level: 0: (300Mhz)
+GPU[3]		: socclk clock level: 3: (960Mhz)
+GPU[3]		: pcie clock level: 0 (8.0GT/s x8)
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda2       116G   99G   11G  91% /
+=== WO_COPYADD runner end 2026-09-19T12:29:05-05:00 ===

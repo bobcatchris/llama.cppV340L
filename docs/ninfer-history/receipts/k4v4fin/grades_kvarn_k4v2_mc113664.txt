@@ -1,0 +1,8 @@
+BOOT REFUSED/FAILED kvarn_k4v2 mc=113664 cap=113664 — receipt tail:
+[preflight] required 8341 MiB / usable 8160 MiB (fixed 7363 MiB, context 978 MiB, prefix cap 256, ws 512 MiB, slack -181 MiB; usable=LIVE min-rank)
+[preflight] live-free dev0: 8160 MiB (gate uses the min over the world)
+[preflight] live-free dev1: 8160 MiB (gate uses the min over the world)
+[preflight] live-free dev2: 8160 MiB (gate uses the min over the world)
+[preflight] live-free dev3: 8160 MiB (gate uses the min over the world)
+[preflight] composition/rank: weights(measured-manifest) 5131 + decoder_fixed(incl drafter) 1360 + workspace 512 + staging 200 + arena_padding 160 + tp2_runtime_reserve(bf16,conc>=2) 0 = fixed 7363 | hidden_state(prefix cap 256) 5 + kv(8976 B/t x 113664 tok + mtp 2) 973
+[2026-09-20 03:59:47.028] [error] ninfer-serve: Requested max_context=113664 (KVarN KV, prefix cap 256) requires 8341 MiB VRAM per rank (fixed: 7363 MiB, context: 978 MiB), exceeding LIVE measured free VRAM 8160 MiB (binding rank dev3; world: dev0=8160 MiB dev1=8160 MiB dev2=8160 MiB dev3=8160 MiB at this instant).

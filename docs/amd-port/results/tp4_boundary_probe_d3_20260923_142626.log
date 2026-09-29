@@ -1,0 +1,41 @@
+rccl_tp4_boundary_probe: single-die isolation, visible devices = 1
+cooperative launch support: 1
+
+==== RCCL-1R (single-rank ncclAllReduce, kernel elided) ====
+INIT: OK in 225566 ms
+RCCL-1R  n=1     16 KB x2000: avg    0.26 us  med    0.26  min    0.24  halves    0.26/   0.26 spread 0.90%
+RCCL-1R  n=1     32 KB x2000: avg    0.18 us  med    0.18  min    0.18  halves    0.18/   0.18 spread 0.26%
+RCCL-1R  n=1     64 KB x2000: avg    0.18 us  med    0.18  min    0.18  halves    0.18/   0.18 spread 0.19%
+RCCL-1R  n=1     80 KB x2000: avg    0.18 us  med    0.18  min    0.18  halves    0.18/   0.18 spread 1.61%
+RCCL-1R  n=1     96 KB x2000: avg    0.18 us  med    0.18  min    0.18  halves    0.18/   0.18 spread 0.01%
+RCCL-1R  n=1    128 KB x2000: avg    0.18 us  med    0.18  min    0.18  halves    0.18/   0.18 spread 1.16%
+
+==== n=4 ranks on one die (in-device emulation) ====
+KLAUNCH  n=4     16 KB x2000: avg   12.01 us  med   11.92  min   11.51  halves   12.08/  11.94 spread 1.14%
+RING1K   n=4     16 KB x2000: avg   33.25 us  med   33.22  min   31.03  halves   33.31/  33.18 spread 0.39%
+KLAUNCH  n=4     32 KB x2000: avg   11.38 us  med   11.31  min   11.04  halves   11.41/  11.36 spread 0.36%
+RING1K   n=4     32 KB x2000: avg   42.55 us  med   42.53  min   40.16  halves   42.32/  42.78 spread 1.08%
+KLAUNCH  n=4     64 KB x2000: avg   12.44 us  med   11.97  min   11.27  halves   13.16/  11.71 spread 12.32%  [SPREAD-FAIL]
+RING1K   n=4     64 KB x2000: avg   60.41 us  med   60.49  min   58.04  halves   60.43/  60.40 spread 0.06%
+KLAUNCH  n=4     80 KB x2000: avg   11.62 us  med   11.58  min   11.28  halves   11.64/  11.61 spread 0.26%
+RING1K   n=4     80 KB x2000: avg   69.49 us  med   69.51  min   67.15  halves   69.47/  69.51 spread 0.05%
+KLAUNCH  n=4     96 KB x2000: avg   11.72 us  med   11.69  min   11.38  halves   11.73/  11.71 spread 0.14%
+RING1K   n=4     96 KB x2000: avg   78.69 us  med   78.68  min   76.61  halves   78.67/  78.71 spread 0.05%
+KLAUNCH  n=4    128 KB x2000: avg   11.99 us  med   11.88  min   11.55  halves   11.92/  12.05 spread 1.10%
+RING1K   n=4    128 KB x2000: avg   97.46 us  med   97.49  min   94.93  halves   97.49/  97.43 spread 0.07%
+
+==== n=2 ranks on one die (in-device emulation) ====
+KLAUNCH  n=2     16 KB x2000: avg   10.96 us  med   10.90  min   10.58  halves   10.96/  10.97 spread 0.09%
+RING1K   n=2     16 KB x2000: avg   27.11 us  med   26.96  min   25.15  halves   27.08/  27.15 spread 0.25%
+KLAUNCH  n=2     32 KB x2000: avg   11.10 us  med   11.05  min   10.78  halves   11.09/  11.11 spread 0.19%
+RING1K   n=2     32 KB x2000: avg   33.14 us  med   33.07  min   31.03  halves   33.15/  33.12 spread 0.10%
+KLAUNCH  n=2     64 KB x2000: avg   11.33 us  med   11.28  min   10.99  halves   11.34/  11.32 spread 0.20%
+RING1K   n=2     64 KB x2000: avg   45.35 us  med   45.40  min   43.12  halves   45.39/  45.31 spread 0.18%
+KLAUNCH  n=2     80 KB x2000: avg   11.36 us  med   11.32  min   11.01  halves   11.36/  11.37 spread 0.10%
+RING1K   n=2     80 KB x2000: avg   51.43 us  med   51.49  min   49.03  halves   51.45/  51.41 spread 0.08%
+KLAUNCH  n=2     96 KB x2000: avg   11.41 us  med   11.36  min   11.06  halves   11.41/  11.41 spread 0.01%
+RING1K   n=2     96 KB x2000: avg   57.47 us  med   57.55  min   54.96  halves   57.49/  57.46 spread 0.06%
+KLAUNCH  n=2    128 KB x2000: avg   11.68 us  med   11.64  min   11.32  halves   11.66/  11.70 spread 0.38%
+RING1K   n=2    128 KB x2000: avg   69.70 us  med   69.74  min   66.99  halves   69.66/  69.73 spread 0.10%
+
+DONE

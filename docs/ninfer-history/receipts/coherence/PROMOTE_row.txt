@@ -1,0 +1,71 @@
+PROMOTE_row — LMHEAD route PROMOTED TO DEFAULT, confirming leg (user order 2026-09-17, GPU-OWNER window, amd/tp4-cure)
+Commit: 8bf74c44d (gate default flip; cites the three banked gates W8_LMHEAD_row / LMHEAD_flip_row /
+  BOOT_BATTERY 20260917_201153). Bin: /home/chris/artifacts_bin/ninfer-serve_c46e352d8c2e8837.bin
+  (sha256 c46e352d8c2e88375e930b46e3009d9bdd695f0757858f46bb906fc547d000f2; build-hip-amd at HEAD
+  8bf74c44d; -O3 -DNDEBUG; whitelist parity 220/220; bank-before-relink verified — the pre-relink
+  build-tree binary was bit-identical to the banked 6c8ae21399516750).
+Strings gate: NINFER_LMHEAD_ARM + NINFER_VERIFY_TAIL_TRACE + new refusal text
+  "default simt since the 2026-09-17 promotion" — ALL PRESENT.
+BOOT_BATTERY 20260917_213446: OVERALL GREEN (step-0 guard + causal_conv_route_parity +
+  bf16_halves_contract + ladder fast arm on THIS binary/server; row + 11-sample clocks sideband banked).
+
+== BOOT (default posture: NINFER_LMHEAD_ARM UNSET — the promotion is what's under test) ==
+serve log: PROMOTE_serve.log | pid 652401 (this window's own boot)
+env: NINFER_ALLOW_NVFP4_TP2=1 NINFER_WORKSPACE_MIB=96 NINFER_DRAFT_VOCAB=<tests copy> +
+  trace family NINFER_LMHEAD_TRACE=1 NINFER_VERIFY_TAIL_TRACE=1 NINFER_TP2_TIMING=1
+  NINFER_TP2_OPTRACE=1 NINFER_VERIFY_LAYER_TRACE=1 (observation only; NO arm env).
+boot: healthy ~10 s; "loaded 40960 draft vocabulary IDs" x1; ZERO refusal lines.
+
+== ROUTE PROOF — DEFAULT SERVES SIMT AT BOTH SITES ==
+[LMHEAD] first-seen lines, verbatim (boot-time self-probe; NO small_t launch in the ENTIRE boot —
+  grep arm=launch_w8_small_t count = 0):
+  [LMHEAD] arm=launch_w8_simt_r8_c4 n=62080 k=5120 T=1 gate=simt (launch #1)
+  [LMHEAD] arm=launch_w8_simt_r8_c4 n=5120 k=10240 T=2 gate=simt (launch #5)
+  [LMHEAD] arm=launch_w8_simt_r8_c4 n=5120 k=10240 T=1 gate=simt (launch #9)
+  [LMHEAD] arm=launch_w8_simt_r8_c4 n=62080 k=5120 T=3 gate=simt (launch #13)
+  [LMHEAD] arm=launch_w8_simt_r8_c4 n=5120 k=10240 T=3 gate=simt (launch #17)
+-> BOTH application sites (lm_head 62080x5120 AND draft-fc 5120x10240) served by the simt arm
+   with the env UNSET. =smallt remains available and refuses-loud value law unchanged (N7).
+
+== CONFIRMING LEG: count600 conc=1 greedy (warmup + 150 s cool gap + one measured leg) ==
+req: /tmp/req_count600_m2.json (67-tok counting prompt, mt=600, temp=0); sideband PROMOTE_clocks.log 2 s.
+warmup: HTTP 200, wall 14.47 s, finish=length, 600 tok.
+measured: HTTP 200, wall 14.61 s (41.1 tok/s e2e), finish=length, prompt 67, completion 600
+  -> resp banked: PROMOTE_count600_resp.json
+
+FINGERPRINT (MERGE GATE): [TAIL-SUM] rank0 n=204 rounds — IN the M1/M2 anchor family
+  (201-204 / acc 0.97-0.99 / t-r 2.94-2.99): t/r 600/204 = 2.94, acc = (600-204)/(204*2) = 0.971.
+  Same family as the banked flip leg (202/0.985/2.97) — round count moved by one accept class
+  within the family, as at every boot in this line (M1/M2 varied 201-204 the same way).
+
+PERF GATE ([TAIL] rank0, measured leg; 183 parseable rounds, leg clean — sync max 65.3 ms):
+                      banked flip leg (all-rounds) -> PROMOTE default leg      verdict
+  lm_head                2.526 (p50 2.466, max 3.46)  -> 2.446 (p50 2.388, max 3.461)  <=4 ms PASS (26x class vs control clean-band 65.8)
+  lgather                0.673                        -> 0.674                          <=1 ms PASS
+  sync (verify phase)    55.713                       -> 55.076 (p50 54.457)            ON anchor
+  align                  2.156                        -> 2.122                          fc share held
+  chain_fwd              1.393                        -> 1.355                          fc share held
+  propose                0.337                        -> 0.333                          unchanged
+  Round arithmetic: ~55.1 + 2.12 + 1.36 + 0.33 + ~1 misc = ~60 ms/round = 2.94 tok / 60 ms
+  = 49 tok/s decode arithmetic — the promoted default REPRODUCES the flip leg exactly.
+
+GREEDY TEXT (MERGE GATE): content byte-IDENTICAL to ALL FOUR banked legs — W3_flip,
+  W3_control, M2_count600, M2_count600_leg2 ("1\n2\n3\n..." 600 numbers). reasoning_content
+  matches the M2 legs byte-exactly and diverges from the W3 legs the same way the W3 legs
+  already diverged from M2 (pre-existing cross-binary generation class on the think-stream;
+  visible content — the gate's object — is unaffected in every comparison ever run).
+
+CLOCK SIDEBAND (PROMOTE_clocks.log): full clocks into the leg (mclk 3/945, sclk 7/1500);
+  one instant-droop sample at leg start (21:42:03 mclk 1/sclk 2 = the burst-start signature,
+  PLOG-043 class) recovering to sclk 5-7 within 4 s; steady decode stayed in the clean band
+  (sync p50 54.5 == flip leg 55.7 anchors).
+
+== VERDICT ==
+PROMOTION CONFIRMED GREEN: default route proof (simt at both sites, zero small_t) +
+  fingerprint in family (204/0.971/2.94) + lm_head 2.45 ms <= 4 bar + greedy content
+  byte-identical to all banked legs. The legacy arm stays reachable via NINFER_LMHEAD_ARM=smallt
+  for A/B; value-parse refusal law unchanged. Window-3's owed "promotion is a coordinator order"
+  is hereby EXECUTED and banked.
+provenance: results/amd/coherence/PROMOTE_serve.log + PROMOTE_clocks.log +
+  PROMOTE_count600_resp.json + BOOT_BATTERY_20260917_213446.row(+_clocks.log);
+  gates cited: W8_LMHEAD_row + LMHEAD_flip_row + BOOT_BATTERY_20260917_201153.

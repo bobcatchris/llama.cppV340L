@@ -1,0 +1,311 @@
+=== NSPAN default M=128 3x20 --dump ===
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+  [s0 ffn_gate   ] post-alloc free 7996.0 MiB
+ggml-cuda: GGML_CUDA_TILE_FP16=1, packed-fp16 tile GEMM route enabled
+ggml-cuda: GGML_CUDA_TILE_FP16_NSPAN=1, N-span full-K weight dequant into a reusable window
+tile_fp16_nspan_run: span window 67.5 MiB (f16 58982400 B + p 11796480 B), 7926.5 MiB free
+operator(): tile route engaged, N-span full-K dequant (K=5120 N_d=5760 M=128 ks=4 spans=1 span=5760 window=67.5 MiB ldc=5760)
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s0 ffn_gate   ] post-warmup free 7914.0 MiB
+  [s1 ffn_up     ] post-alloc free 7896.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s1 ffn_up     ] post-warmup free 7896.0 MiB
+  [s2 ffn_down   ] post-alloc free 7874.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s2 ffn_down   ] post-warmup free 7868.0 MiB
+  [s3 gdn_qkv    ] post-alloc free 7856.0 MiB
+tile_fp16_nspan_run: span window 45.5 MiB (f16 34078720 B + p 13631488 B), 7810.5 MiB free
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s3 gdn_qkv    ] post-warmup free 7878.0 MiB
+  [s4 ssm_out    ] post-alloc free 7868.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s4 ssm_out    ] post-warmup free 7868.0 MiB
+  [s5 gdn_gate   ] post-alloc free 7860.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s5 gdn_gate   ] post-warmup free 7860.0 MiB
+  [s6 attn_q+gate] post-alloc free 7846.0 MiB
+tile_fp16_nspan_run: span window 48.0 MiB (f16 41943040 B + p 8388608 B), 7798.0 MiB free
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s6 attn_q+gate] post-warmup free 7846.0 MiB
+  [s7 attn_out   ] post-alloc free 7836.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s7 attn_out   ] post-warmup free 7836.0 MiB
+  [s8 attn_k     ] post-alloc free 7832.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s8 attn_k     ] post-warmup free 7830.0 MiB
+  [s9 attn_v     ] post-alloc free 7826.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s9 attn_v     ] post-warmup free 7826.0 MiB
+tile-nspan bench [NSPAN]: M=128 reps=3 x 20 iters | TILE_FP16=1 NSPAN=1 WIN_MIB=default | free 8160.0 MiB
+shape              K   N_d    n      qMiB    f16MiB      ms/iter       TF/s    freeMiB   peakMiB
+ffn_gate        5120  5760   64     12.08     56.25      1.70420       4.43     7914.0     102.0
+ffn_up          5120  5760   64     12.08     56.25      1.72605       4.37     7896.0       0.0
+ffn_down       17408  1664   64     11.87     55.25      1.64495       4.51     7868.0       6.0
+gdn_qkv         5120  3328   48      6.98     32.50      1.00155       4.36     7878.0       0.0
+ssm_out         6144  1664   48      4.19     19.50      0.66755       3.92     7868.0       0.0
+gdn_gate        5120  2048   48      4.30     20.00      0.65955       4.07     7860.0       0.0
+attn_q+gate     5120  4096   16      8.59     40.00      1.32990       4.04     7846.0       0.0
+attn_out        6144  1664   16      4.19     19.50      0.66895       3.91     7836.0       0.0
+attn_k          5120   256   16      0.54      2.50      0.15850       2.12     7830.0       2.0
+attn_v          5120   256   16      0.54      2.50      0.15860       2.12     7826.0       0.0
+call-weighted die agg: 2043.3 GF/ubatch, 473.64 ms/ubatch -> 4.31 TF/s/die wall
+VRAM proof [NSPAN]: peak transient delta over shapes 102.0 MiB (envelope 200.0 MiB) -> FIT
+=== UNCHUNK M=128 3x20 --dump ===
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+  [s0 ffn_gate   ] post-alloc free 7996.0 MiB
+ggml-cuda: GGML_CUDA_TILE_FP16=1, packed-fp16 tile GEMM route enabled
+operator(): tile route engaged (K=5120 N_d=5760 M=128 ks=4 ldc=5760)
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s0 ffn_gate   ] post-warmup free 7912.0 MiB
+  [s1 ffn_up     ] post-alloc free 7894.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s1 ffn_up     ] post-warmup free 7894.0 MiB
+  [s2 ffn_down   ] post-alloc free 7872.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s2 ffn_down   ] post-warmup free 7864.0 MiB
+  [s3 gdn_qkv    ] post-alloc free 7852.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s3 gdn_qkv    ] post-warmup free 7838.0 MiB
+  [s4 ssm_out    ] post-alloc free 7828.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s4 ssm_out    ] post-warmup free 7828.0 MiB
+  [s5 gdn_gate   ] post-alloc free 7820.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s5 gdn_gate   ] post-warmup free 7820.0 MiB
+  [s6 attn_q+gate] post-alloc free 7806.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s6 attn_q+gate] post-warmup free 7806.0 MiB
+  [s7 attn_out   ] post-alloc free 7796.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s7 attn_out   ] post-warmup free 7796.0 MiB
+  [s8 attn_k     ] post-alloc free 7792.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s8 attn_k     ] post-warmup free 7790.0 MiB
+  [s9 attn_v     ] post-alloc free 7786.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s9 attn_v     ] post-warmup free 7786.0 MiB
+tile-nspan bench [UNCHUNK]: M=128 reps=3 x 20 iters | TILE_FP16=1 NSPAN=unset WIN_MIB=default | free 8160.0 MiB
+shape              K   N_d    n      qMiB    f16MiB      ms/iter       TF/s    freeMiB   peakMiB
+ffn_gate        5120  5760   64     12.08     56.25      1.70960       4.42     7912.0     102.0
+ffn_up          5120  5760   64     12.08     56.25      1.71565       4.40     7894.0       0.0
+ffn_down       17408  1664   64     11.87     55.25      1.64570       4.51     7864.0       8.0
+gdn_qkv         5120  3328   48      6.98     32.50      0.99965       4.36     7838.0      14.0
+ssm_out         6144  1664   48      4.19     19.50      0.66725       3.92     7828.0       0.0
+gdn_gate        5120  2048   48      4.30     20.00      0.64195       4.18     7820.0       0.0
+attn_q+gate     5120  4096   16      8.59     40.00      1.36575       3.93     7806.0       0.0
+attn_out        6144  1664   16      4.19     19.50      0.65855       3.97     7796.0       0.0
+attn_k          5120   256   16      0.54      2.50      0.15815       2.12     7790.0       2.0
+attn_v          5120   256   16      0.54      2.50      0.15785       2.13     7786.0       0.0
+call-weighted die agg: 2043.3 GF/ubatch, 472.81 ms/ubatch -> 4.32 TF/s/die wall
+VRAM proof [UNCHUNK]: peak transient delta over shapes 102.0 MiB (envelope 200.0 MiB) -> FIT
+=== NSPAN default M=512 3x20 --dump ===
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+  [s0 ffn_gate   ] post-alloc free 7980.0 MiB
+ggml-cuda: GGML_CUDA_TILE_FP16=1, packed-fp16 tile GEMM route enabled
+ggml-cuda: GGML_CUDA_TILE_FP16_NSPAN=1, N-span full-K weight dequant into a reusable window
+tile_fp16_nspan_run: span window 101.2 MiB (f16 58982400 B + p 47185920 B), 7876.8 MiB free
+operator(): tile route engaged, N-span full-K dequant (K=5120 N_d=5760 M=512 ks=4 spans=1 span=5760 window=101.2 MiB ldc=5760)
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s0 ffn_gate   ] post-warmup free 7858.0 MiB
+  [s1 ffn_up     ] post-alloc free 7824.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s1 ffn_up     ] post-warmup free 7824.0 MiB
+  [s2 ffn_down   ] post-alloc free 7774.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s2 ffn_down   ] post-warmup free 7756.0 MiB
+  [s3 gdn_qkv    ] post-alloc free 7732.0 MiB
+tile_fp16_nspan_run: span window 84.5 MiB (f16 34078720 B + p 54525952 B), 7647.5 MiB free
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s3 gdn_qkv    ] post-warmup free 7750.0 MiB
+  [s4 ssm_out    ] post-alloc free 7730.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s4 ssm_out    ] post-warmup free 7730.0 MiB
+  [s5 gdn_gate   ] post-alloc free 7710.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s5 gdn_gate   ] post-warmup free 7710.0 MiB
+  [s6 attn_q+gate] post-alloc free 7682.0 MiB
+tile_fp16_nspan_run: span window 72.0 MiB (f16 41943040 B + p 33554432 B), 7610.0 MiB free
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s6 attn_q+gate] post-warmup free 7696.0 MiB
+  [s7 attn_out   ] post-alloc free 7676.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s7 attn_out   ] post-warmup free 7676.0 MiB
+  [s8 attn_k     ] post-alloc free 7664.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s8 attn_k     ] post-warmup free 7664.0 MiB
+  [s9 attn_v     ] post-alloc free 7652.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s9 attn_v     ] post-warmup free 7652.0 MiB
+tile-nspan bench [NSPAN]: M=512 reps=3 x 20 iters | TILE_FP16=1 NSPAN=1 WIN_MIB=default | free 8160.0 MiB
+shape              K   N_d    n      qMiB    f16MiB      ms/iter       TF/s    freeMiB   peakMiB
+ffn_gate        5120  5760   64     12.08     56.25      5.11070       5.91     7858.0     140.0
+ffn_up          5120  5760   64     12.08     56.25      5.15165       5.86     7824.0       0.0
+ffn_down       17408  1664   64     11.87     55.25      4.95165       5.99     7756.0      18.0
+gdn_qkv         5120  3328   48      6.98     32.50      3.34075       5.22     7750.0       0.0
+ssm_out         6144  1664   48      4.19     19.50      2.21505       4.73     7730.0       0.0
+gdn_gate        5120  2048   48      4.30     20.00      2.02395       5.31     7710.0       0.0
+attn_q+gate     5120  4096   16      8.59     40.00      3.86485       5.56     7696.0       0.0
+attn_out        6144  1664   16      4.19     19.50      2.21255       4.73     7676.0       0.0
+attn_k          5120   256   16      0.54      2.50      0.38610       3.48     7664.0       0.0
+attn_v          5120   256   16      0.54      2.50      0.38785       3.46     7652.0       0.0
+call-weighted die agg: 8173.3 GF/ubatch, 1447.15 ms/ubatch -> 5.65 TF/s/die wall
+VRAM proof [NSPAN]: peak transient delta over shapes 140.0 MiB (envelope 200.0 MiB) -> FIT
+=== UNCHUNK M=512 3x20 --dump ===
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+  [s0 ffn_gate   ] post-alloc free 7980.0 MiB
+ggml-cuda: GGML_CUDA_TILE_FP16=1, packed-fp16 tile GEMM route enabled
+operator(): tile route engaged (K=5120 N_d=5760 M=512 ks=4 ldc=5760)
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s0 ffn_gate   ] post-warmup free 7854.0 MiB
+  [s1 ffn_up     ] post-alloc free 7820.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s1 ffn_up     ] post-warmup free 7820.0 MiB
+  [s2 ffn_down   ] post-alloc free 7770.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s2 ffn_down   ] post-warmup free 7742.0 MiB
+  [s3 gdn_qkv    ] post-alloc free 7718.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s3 gdn_qkv    ] post-warmup free 7718.0 MiB
+  [s4 ssm_out    ] post-alloc free 7698.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s4 ssm_out    ] post-warmup free 7698.0 MiB
+  [s5 gdn_gate   ] post-alloc free 7678.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s5 gdn_gate   ] post-warmup free 7678.0 MiB
+  [s6 attn_q+gate] post-alloc free 7650.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s6 attn_q+gate] post-warmup free 7650.0 MiB
+  [s7 attn_out   ] post-alloc free 7630.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s7 attn_out   ] post-warmup free 7630.0 MiB
+  [s8 attn_k     ] post-alloc free 7618.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s8 attn_k     ] post-warmup free 7618.0 MiB
+  [s9 attn_v     ] post-alloc free 7606.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s9 attn_v     ] post-warmup free 7606.0 MiB
+tile-nspan bench [UNCHUNK]: M=512 reps=3 x 20 iters | TILE_FP16=1 NSPAN=unset WIN_MIB=default | free 8160.0 MiB
+shape              K   N_d    n      qMiB    f16MiB      ms/iter       TF/s    freeMiB   peakMiB
+ffn_gate        5120  5760   64     12.08     56.25      5.06295       5.96     7854.0     144.0
+ffn_up          5120  5760   64     12.08     56.25      5.05045       5.98     7820.0       0.0
+ffn_down       17408  1664   64     11.87     55.25      4.99515       5.94     7742.0      28.0
+gdn_qkv         5120  3328   48      6.98     32.50      3.34940       5.21     7718.0       0.0
+ssm_out         6144  1664   48      4.19     19.50      2.21080       4.74     7698.0       0.0
+gdn_gate        5120  2048   48      4.30     20.00      2.00355       5.36     7678.0       0.0
+attn_q+gate     5120  4096   16      8.59     40.00      3.79020       5.67     7650.0       0.0
+attn_out        6144  1664   16      4.19     19.50      2.22065       4.71     7630.0       0.0
+attn_k          5120   256   16      0.54      2.50      0.37715       3.56     7618.0       0.0
+attn_v          5120   256   16      0.54      2.50      0.37420       3.59     7606.0       0.0
+call-weighted die agg: 8173.3 GF/ubatch, 1438.20 ms/ubatch -> 5.68 TF/s/die wall
+VRAM proof [UNCHUNK]: peak transient delta over shapes 144.0 MiB (envelope 200.0 MiB) -> FIT
+=== NSPAN dial 16 MiB M=128 3x20 ===
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+  [s0 ffn_gate   ] post-alloc free 7996.0 MiB
+ggml-cuda: GGML_CUDA_TILE_FP16=1, packed-fp16 tile GEMM route enabled
+ggml-cuda: GGML_CUDA_TILE_FP16_NSPAN=1, N-span full-K weight dequant into a reusable window
+operator(): span window over budget or free VRAM, shipped route in use
+operator(): tile route engaged (K=5120 N_d=5760 M=128 ks=4 ldc=5760)
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s0 ffn_gate   ] post-warmup free 7912.0 MiB
+  [s1 ffn_up     ] post-alloc free 7894.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s1 ffn_up     ] post-warmup free 7894.0 MiB
+  [s2 ffn_down   ] post-alloc free 7872.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s2 ffn_down   ] post-warmup free 7864.0 MiB
+  [s3 gdn_qkv    ] post-alloc free 7852.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s3 gdn_qkv    ] post-warmup free 7838.0 MiB
+  [s4 ssm_out    ] post-alloc free 7828.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s4 ssm_out    ] post-warmup free 7828.0 MiB
+  [s5 gdn_gate   ] post-alloc free 7820.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s5 gdn_gate   ] post-warmup free 7820.0 MiB
+  [s6 attn_q+gate] post-alloc free 7806.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s6 attn_q+gate] post-warmup free 7806.0 MiB
+  [s7 attn_out   ] post-alloc free 7796.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s7 attn_out   ] post-warmup free 7796.0 MiB
+  [s8 attn_k     ] post-alloc free 7792.0 MiB
+tile_fp16_nspan_run: span window 3.5 MiB (f16 2621440 B + p 1048576 B), 7788.5 MiB free
+operator(): tile route engaged, N-span full-K dequant (K=5120 N_d=256 M=128 ks=8 spans=1 span=256 window=3.5 MiB ldc=256)
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s8 attn_k     ] post-warmup free 7786.0 MiB
+  [s9 attn_v     ] post-alloc free 7782.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s9 attn_v     ] post-warmup free 7782.0 MiB
+tile-nspan bench [NSPAN]: M=128 reps=3 x 20 iters | TILE_FP16=1 NSPAN=1 WIN_MIB=16 | free 8160.0 MiB
+shape              K   N_d    n      qMiB    f16MiB      ms/iter       TF/s    freeMiB   peakMiB
+ffn_gate        5120  5760   64     12.08     56.25      1.69930       4.44     7912.0     104.0
+ffn_up          5120  5760   64     12.08     56.25      1.68555       4.48     7894.0       0.0
+ffn_down       17408  1664   64     11.87     55.25      1.64720       4.50     7864.0       8.0
+gdn_qkv         5120  3328   48      6.98     32.50      1.00100       4.36     7838.0      14.0
+ssm_out         6144  1664   48      4.19     19.50      0.67600       3.87     7828.0       0.0
+gdn_gate        5120  2048   48      4.30     20.00      0.64310       4.17     7820.0       0.0
+attn_q+gate     5120  4096   16      8.59     40.00      1.34345       4.00     7806.0       0.0
+attn_out        6144  1664   16      4.19     19.50      0.67500       3.88     7796.0       0.0
+attn_k          5120   256   16      0.54      2.50      0.15895       2.11     7786.0       6.0
+attn_v          5120   256   16      0.54      2.50      0.15840       2.12     7782.0       0.0
+call-weighted die agg: 2043.3 GF/ubatch, 470.79 ms/ubatch -> 4.34 TF/s/die wall
+VRAM proof [NSPAN]: peak transient delta over shapes 104.0 MiB (envelope 200.0 MiB) -> FIT
+=== NSPAN dial 8 MiB M=128 3x20 ===
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+  [s0 ffn_gate   ] post-alloc free 7996.0 MiB
+ggml-cuda: GGML_CUDA_TILE_FP16=1, packed-fp16 tile GEMM route enabled
+ggml-cuda: GGML_CUDA_TILE_FP16_NSPAN=1, N-span full-K weight dequant into a reusable window
+operator(): span window over budget or free VRAM, shipped route in use
+operator(): tile route engaged (K=5120 N_d=5760 M=128 ks=4 ldc=5760)
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s0 ffn_gate   ] post-warmup free 7912.0 MiB
+  [s1 ffn_up     ] post-alloc free 7894.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s1 ffn_up     ] post-warmup free 7894.0 MiB
+  [s2 ffn_down   ] post-alloc free 7872.0 MiB
+tile_fp16_nspan_run: span window 7.1 MiB (f16 6684672 B + p 786432 B), 7864.9 MiB free
+operator(): tile route engaged, N-span full-K dequant (K=17408 N_d=1664 M=128 ks=8 spans=9 span=192 window=7.1 MiB ldc=1664)
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s2 ffn_down   ] post-warmup free 7862.0 MiB
+  [s3 gdn_qkv    ] post-alloc free 7850.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s3 gdn_qkv    ] post-warmup free 7836.0 MiB
+  [s4 ssm_out    ] post-alloc free 7826.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s4 ssm_out    ] post-warmup free 7826.0 MiB
+  [s5 gdn_gate   ] post-alloc free 7818.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s5 gdn_gate   ] post-warmup free 7818.0 MiB
+  [s6 attn_q+gate] post-alloc free 7804.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s6 attn_q+gate] post-warmup free 7804.0 MiB
+  [s7 attn_out   ] post-alloc free 7794.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s7 attn_out   ] post-warmup free 7794.0 MiB
+  [s8 attn_k     ] post-alloc free 7790.0 MiB
+tile_fp16_nspan_run: span window 3.5 MiB (f16 2621440 B + p 1048576 B), 7786.5 MiB free
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s8 attn_k     ] post-warmup free 7794.0 MiB
+  [s9 attn_v     ] post-alloc free 7790.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s9 attn_v     ] post-warmup free 7790.0 MiB
+tile-nspan bench [NSPAN]: M=128 reps=3 x 20 iters | TILE_FP16=1 NSPAN=1 WIN_MIB=8 | free 8160.0 MiB
+shape              K   N_d    n      qMiB    f16MiB      ms/iter       TF/s    freeMiB   peakMiB
+ffn_gate        5120  5760   64     12.08     56.25      1.69435       4.46     7912.0     104.0
+ffn_up          5120  5760   64     12.08     56.25      1.72215       4.38     7894.0       0.0
+ffn_down       17408  1664   64     11.87     55.25      3.45235       2.15     7862.0      10.0
+gdn_qkv         5120  3328   48      6.98     32.50      0.99855       4.37     7836.0      14.0
+ssm_out         6144  1664   48      4.19     19.50      0.65805       3.98     7826.0       0.0
+gdn_gate        5120  2048   48      4.30     20.00      0.64905       4.14     7818.0       0.0
+attn_q+gate     5120  4096   16      8.59     40.00      1.31700       4.08     7804.0       0.0
+attn_out        6144  1664   16      4.19     19.50      0.66290       3.95     7794.0       0.0
+attn_k          5120   256   16      0.54      2.50      0.16100       2.08     7794.0       0.0
+attn_v          5120   256   16      0.54      2.50      0.15785       2.13     7790.0       0.0
+call-weighted die agg: 2043.3 GF/ubatch, 587.06 ms/ubatch -> 3.48 TF/s/die wall
+VRAM proof [NSPAN]: peak transient delta over shapes 104.0 MiB (envelope 200.0 MiB) -> FIT

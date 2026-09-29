@@ -1,0 +1,8 @@
+== ARM B REPRO BOOT (B2) 20:33:58Z:
+no /health past 120s post-spawn; ps:
+    PID     ELAPSED %CPU
+  89468       04:57  100
+GPU[0]		: GPU use (%): 100
+GPU[1]		: GPU use (%): 0
+GPU[2]		: GPU use (%): 100
+GPU[3]		: GPU use (%): 99

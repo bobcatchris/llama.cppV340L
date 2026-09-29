@@ -1,0 +1,26 @@
+=== stacks (SIGSTOP-frozen) R2_LKG_stopcap pid=222766 2026-09-19T11:14:31,175941106-05:00 ===
+--- tid=222766 wchan=do_signal_stop stat=T syscall=
+--- tid=222773 wchan=do_signal_stop stat=T syscall=
+--- tid=222800 wchan=do_signal_stop stat=T syscall=
+--- tid=222802 wchan=do_signal_stop stat=T syscall=
+--- tid=222805 wchan=do_signal_stop stat=T syscall=
+--- tid=222806 wchan=do_signal_stop stat=T syscall=
+--- tid=222807 wchan=do_signal_stop stat=T syscall=
+--- tid=222839 wchan=do_signal_stop stat=T syscall=
+--- tid=222840 wchan=do_signal_stop stat=T syscall=
+--- tid=222841 wchan=do_signal_stop stat=T syscall=
+--- tid=222842 wchan=do_signal_stop stat=T syscall=
+--- tid=222843 wchan=do_signal_stop stat=T syscall=
+--- tid=222844 wchan=do_signal_stop stat=T syscall=
+--- tid=222845 wchan=do_signal_stop stat=T syscall=
+--- tid=222846 wchan=do_signal_stop stat=T syscall=
+--- tid=222848 wchan=do_signal_stop stat=T syscall=
+--- tid=222849 wchan=do_signal_stop stat=T syscall=
+--- tid=222850 wchan=do_signal_stop stat=T syscall=
+--- tid=222851 wchan=do_signal_stop stat=T syscall=
+--- tid=223560 wchan=do_signal_stop stat=T syscall=
+--- tid=223561 wchan=do_signal_stop stat=T syscall=
+--- tid=223562 wchan=do_signal_stop stat=T syscall=
+Could not attach to process.  If your uid matches the uid of the target
+process, check the setting of /proc/sys/kernel/yama/ptrace_scope, or try
+again as the root user.  For more details, see /etc/sysctl.d/10-ptrace.conf

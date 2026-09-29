@@ -1,0 +1,45 @@
+# W7 k4v4 ROW — WO_Q4KV_K4V4 enablement findings — 2026-09-19T20:02:12Z — desk amd/wo-w7-body
+# Host: chris-MS-7D28, 4x gfx900 (V340/MI25), ROCm 6.2. Clocks at tests: mclk lvl3 945 MHz, sclk idle 300 MHz (no perf claims made — boot-behavior evidence only).
+# Bin under test: /home/chris/artifacts_bin/ninfer-serve_2c8901d3d18adef1.bin (canonical, sha16 2c8901d3d18adef1). No cmake --build performed (no BUILD CLAIM needed; no code edits made).
+
+== VERDICT: k4v4 enablement is NOT config-level on the HIP lane. The dial, widths, budget and engine are all ready; the BLOCKER is the KVarN cached-attention route (T3/A3 roster remainder) + its parse-time capability gate. Production KV tier on this box is BF16, not k4v2. ==
+
+-- (1) DIAL EXISTS, FULLY WIRED (in-tree, this branch amd/wo-w7-body == amd/main content for src) --
+ dial: --kv-dtype kvarn_k4v4 (accepted-name table include/ninfer/types.h:89-103, 'kvarn_k4v4'|'k4v4')
+ widths registered: types.h:124-134 is_registered_kvarn_widths has (4,4) [docs/117 Step D wired the prologue]
+ tier table: types.h:63-70 kvarn_tier_widths(KvarnK4V4) = {4,4}
+ budget width-generic: tp2_budget.h:138 kvarn_kv_bytes_per_token(k_bits,v_bits) — no hardcoded 2-bit V sizing anywhere (pool sizing kvarn_workspace.cpp:459-460/532-533 follows bits)
+ engine dispatch: gqa_attention_kvarn.cu:130/134/155-158 routes k4v4 via slice6 KSide=4 (single-seq AND MultiBatch)
+ batched gates tier-generic: tp_engine.cpp:190-196 (is_kvarn_storage)
+
+-- (2) BLOCKER B1: parse-time capability gate on HIP (G-AMD-31, commit f23197980 2026-09-13) --
+ src/serve/serve_options.cpp (#if defined(NINFER_HIP_ROSTER)): throws for ANY kvarn tier naming the roster line + dying stub
+ TEST A (RED row): shipped bin 2c8901d3 + --kv-dtype kvarn_k4v4 -> exit 1 in <1s (parse, pre-model-load):
+   "--kv-dtype kvarn tiers are not servable on the HIP lane: the cached-attention route (gqa_attention_kvarn_cached_launch) is a named roster remainder owned by the T3 device-port lane (HipSources.cmake:215-218), linked only by a dying stub (hip_link_stub_arms_perf.cpp:179). This is CAPABILITY, not capacity"
+ transcript: results/amd/coherence/W7_k4v4_testA_parse_refusal.log
+
+-- (3) BLOCKER B2 (behind B1): the fused kvarn attention TU is absent from the HIP roster --
+ src/HipSources.cmake: gqa_attention_kvarn.cu NOT listed (deliberate, lane-exclusivity; stub arms hip_link_stub_arms_perf.cpp:179/:182/:185 perf_stub_die: cached_launch, cached_batched_launch, capacity_bytes)
+ deleting B1 without the port = agent2's k5v4 death-row class (mid-request stub death on request 1)
+ port surface is NARROWER than the old WO-06 era: gqa_attention_prefill.cu + gqa_attention_decode.cu already joined the roster (A3-wave, HipSources.cmake:304-305); the remainder is the kvarn launcher TU + its kernel headers (slice4/slice6 .cuh, kvarn_mma.cuh, packed .inc)
+
+-- (4) PRODUCTION TIER CORRECTION (WO premise fix) --
+ WO said 'KV cache ALREADY quantized in production k4v2'. MEASURED: this box's serving line (serve_10k.sh/serve_fast.sh) passes NO --kv-dtype; ServeOptions default = BFloat16 (serve_options.h:48); boot preflight prints kv(34816 B/t x 36352 tok) = BF16 class (serve_fast.log 2026-09-19 13:08). The '[rank 0] kvarn reset inflight' log lines are unconditional bookkeeping (tp2_backend.cpp:2094/2343), not tier evidence. k4v2-as-production holds on the CUDA/main line, not here.
+
+-- (5) CEILING: 36352 is the auto-KV result, not a cap; 200k at bf16 is MEASURED-impossible --
+ auto-KV line: free=8160 MiB (min both ranks) -> capacity=36352 tokens (auto headroom policy, ws 96 MiB)
+ TEST B (measured refusal, legal live-gate class): bin 2c8901d3 + --max-context 200704 --kv-capacity 200704 (bf16) -> exit 1:
+   required 14544 MiB / usable 8160 MiB per rank (fixed 7875 incl ws 1024, context 6669, slack -6384); kv(34816 B/t x 200704 tok) 6664 MiB/rank
+ transcript: results/amd/coherence/W7_k4v4_testB_200k_ceiling_bf16.log
+ => the 200k ceiling is INSEPARABLE from the KV tier: bf16 needs 6664 MiB/rank vs ~1213 MiB free-after-fixed; k4v4 arithmetic on measured anchors (34816/512 = 68 K+V head-slots/rank = 34 KV heads; 34 x ~140 B = 4760 B/t -> 200704 tok = ~912 MiB/rank) FITS the auto-ws budget (6947 fixed + ~912 + 5 = ~7864 < 8160) but NOT the explicit-capacity ws=1024 posture (fixed 7875 + 912 = ~8792 > 8160) — a k4v4 200k boot must keep workspace auto. PREDICTION ONLY: allocator is the gate at boot.
+
+-- (6) STATE OF THE WO PHASES --
+ Phase 1: dial FOUND (above); ceiling raise = explicit --max-context/--kv-capacity flags, no code edit; native log field already prints tier in preflight/kv_tag. BOTH HALVES blocked on B1+B2.
+ Phase 2 (parity/needle/MTP/soak) + Phase 3 (perf pairs): IMPOSSIBLE until a kvarn tier boots on HIP. No gates run; no quality claims.
+ Promotion: NOT EMPTIED — default stays (bf16 production line); k4v2 remains the CUDA-line default; nothing flipped.
+
+-- FILES BANKED --
+ results/amd/coherence/W7_k4v4_row.txt (this file)
+ results/amd/coherence/W7_k4v4_testA_parse_refusal.log
+ results/amd/coherence/W7_k4v4_testB_200k_ceiling_bf16.log (+ .output)
+ docs/amd/WO_Q4KV_K4V4.md (PROGRESS LOG + BLOCKER tag)

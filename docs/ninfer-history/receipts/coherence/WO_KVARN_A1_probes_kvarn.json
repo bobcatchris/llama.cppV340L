@@ -1,0 +1,49 @@
+{
+ "label": "A1_kvarn_k4v4_8192_bin63a3d37e",
+ "port": "8100",
+ "verdict": "RED",
+ "n_pass": 0,
+ "needle6k": false,
+ "rows": [
+  {
+   "probe": "P1_blue_2k",
+   "pass": false,
+   "finish": "stop",
+   "wall_s": 17.0,
+   "coherent": false,
+   "answer": ""
+  },
+  {
+   "probe": "P2_word_1k",
+   "pass": false,
+   "finish": "stop",
+   "wall_s": 8.9,
+   "coherent": false,
+   "answer": ""
+  },
+  {
+   "probe": "P3_arith",
+   "pass": false,
+   "finish": "length",
+   "wall_s": 5.6,
+   "coherent": false,
+   "answer": ""
+  },
+  {
+   "probe": "P4_needle_3k",
+   "pass": false,
+   "finish": "stop",
+   "wall_s": 26.4,
+   "coherent": false,
+   "answer": ""
+  },
+  {
+   "probe": "P5_needle_6k",
+   "pass": false,
+   "finish": "stop",
+   "wall_s": 67.0,
+   "coherent": false,
+   "answer": ""
+  }
+ ]
+}

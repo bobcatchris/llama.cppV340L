@@ -1,0 +1,123 @@
+=== NSPAN default M=128 ===
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+  [s0 ffn_gate   ] post-alloc free 7996.0 MiB
+ggml-cuda: GGML_CUDA_TILE_FP16=1, packed-fp16 tile GEMM route enabled
+ggml-cuda: GGML_CUDA_TILE_FP16_NSPAN=1, N-span full-K weight dequant into a reusable window
+tile_fp16_nspan_run: span window 67.5 MiB (f16 58982400 B + p 11796480 B), 7926.5 MiB free
+operator(): tile route engaged, N-span full-K dequant (K=5120 N_d=5760 M=128 ks=4 spans=1 span=5760 window=67.5 MiB ldc=5760)
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s0 ffn_gate   ] post-warmup free 7914.0 MiB
+  [s1 ffn_up     ] post-alloc free 7896.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s1 ffn_up     ] post-warmup free 7896.0 MiB
+  [s2 ffn_down   ] post-alloc free 7874.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s2 ffn_down   ] post-warmup free 7868.0 MiB
+  [s3 gdn_qkv    ] post-alloc free 7856.0 MiB
+tile_fp16_nspan_run: span window 45.5 MiB (f16 34078720 B + p 13631488 B), 7810.5 MiB free
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+ROCm error: operation not permitted when stream is capturing
+  current device: 0, in function tile_fp16_nspan_run at /media/chris/ssd128/llamacpp/wt-tile-nspan/ggml/src/ggml-cuda/tile-gemm.cu:545
+  hipStreamSynchronize(stream)
+tile-nspan bench [NSPAN]: M=128 reps=3 x 20 iters | TILE_FP16=1 NSPAN=1 WIN_MIB=default | free 8160.0 MiB
+shape              K   N_d    n      qMiB    f16MiB      ms/iter       TF/s    freeMiB   peakMiB
+ffn_gate        5120  5760   64     12.08     56.25      1.72640       4.37     7914.0     102.0
+ffn_up          5120  5760   64     12.08     56.25      1.73220       4.36     7896.0       0.0
+ffn_down       17408  1664   64     11.87     55.25      1.63220       4.54     7868.0       6.0
+/media/chris/ssd128/llamacpp/wt-tile-nspan/ggml/src/ggml-cuda/ggml-cuda.cu:106: ROCm error
+[New LWP 962898]
+[New LWP 962897]
+[New LWP 962896]
+[New LWP 962895]
+[New LWP 962894]
+[New LWP 962893]
+[New LWP 962892]
+[New LWP 962891]
+[New LWP 962890]
+[New LWP 962889]
+[New LWP 962888]
+[New LWP 962887]
+[New LWP 962886]
+[New LWP 962885]
+[New LWP 962884]
+[New LWP 962883]
+[New LWP 962882]
+[New LWP 962881]
+[New LWP 962880]
+[New LWP 962879]
+[New LWP 962877]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.ubuntu.com>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+0x0000798007b10913 in __GI___wait4 (pid=963386, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+warning: 30	../sysdeps/unix/sysv/linux/wait4.c: No such file or directory
+#0  0x0000798007b10913 in __GI___wait4 (pid=963386, stat_loc=0x0, options=0, usage=0x0) at ../sysdeps/unix/sysv/linux/wait4.c:30
+30	in ../sysdeps/unix/sysv/linux/wait4.c
+#1  0x000079800c11d663 in ggml_print_backtrace () from /media/chris/ssd128/llamacpp/wt-tile-nspan/build-tile-nspan/bin/libggml-base.so.0
+#2  0x000079800c11d80b in ggml_abort () from /media/chris/ssd128/llamacpp/wt-tile-nspan/build-tile-nspan/bin/libggml-base.so.0
+#3  0x000079800b77fb42 in ggml_cuda_error(char const*, char const*, char const*, int, char const*) () from /media/chris/ssd128/llamacpp/wt-tile-nspan/build-tile-nspan/bin/libggml-hip.so.0
+#4  0x000079800b8bbae7 in ggml_cuda_tile_fp16_mul_mat(ggml_backend_cuda_context&, int, ggml_tensor const*, ggml_tensor const*, ggml_tensor const*, char const*, float const*, float*, long, long, long, ihipStream_t*) () from /media/chris/ssd128/llamacpp/wt-tile-nspan/build-tile-nspan/bin/libggml-hip.so.0
+#5  0x000079800b7986b5 in ggml_cuda_op_mul_mat_cublas(ggml_backend_cuda_context&, ggml_tensor const*, ggml_tensor const*, ggml_tensor*, char const*, float const*, char const*, float*, long, long, long, long, ihipStream_t*) () from /media/chris/ssd128/llamacpp/wt-tile-nspan/build-tile-nspan/bin/libggml-hip.so.0
+#6  0x000079800b7979de in ggml_cuda_op_mul_mat(ggml_backend_cuda_context&, ggml_tensor const*, ggml_tensor const*, ggml_tensor*, void (*)(ggml_backend_cuda_context&, ggml_tensor const*, ggml_tensor const*, ggml_tensor*, char const*, float const*, char const*, float*, long, long, long, long, ihipStream_t*), void (*)(float const*, int const*, void*, ggml_type, long, long, long, long, long, long, long, long, ihipStream_t*)) () from /media/chris/ssd128/llamacpp/wt-tile-nspan/build-tile-nspan/bin/libggml-hip.so.0
+#7  0x000079800b7921fb in ggml_cuda_mul_mat(ggml_backend_cuda_context&, ggml_tensor const*, ggml_tensor const*, ggml_tensor*) () from /media/chris/ssd128/llamacpp/wt-tile-nspan/build-tile-nspan/bin/libggml-hip.so.0
+#8  0x000079800b78af0f in ggml_cuda_graph_evaluate_and_capture(ggml_backend_cuda_context*, ggml_cgraph*, bool, bool, void const*) () from /media/chris/ssd128/llamacpp/wt-tile-nspan/build-tile-nspan/bin/libggml-hip.so.0
+#9  0x000079800b786ae6 in ggml_backend_cuda_graph_compute(ggml_backend*, ggml_cgraph*) () from /media/chris/ssd128/llamacpp/wt-tile-nspan/build-tile-nspan/bin/libggml-hip.so.0
+#10 0x000079800c1355f2 in ggml_backend_graph_compute () from /media/chris/ssd128/llamacpp/wt-tile-nspan/build-tile-nspan/bin/libggml-base.so.0
+#11 0x00005eb80c68fdf4 in main ()
+[Inferior 1 (process 962876) detached]
+bash: line 5: 962876 Aborted                 (core dumped) /tmp/bench_tile_nspan 128 3 20 --dump 2>&1
+=== UNCHUNK control M=128 ===
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+  [s0 ffn_gate   ] post-alloc free 7996.0 MiB
+ggml-cuda: GGML_CUDA_TILE_FP16=1, packed-fp16 tile GEMM route enabled
+operator(): tile route engaged (K=5120 N_d=5760 M=128 ks=4 ldc=5760)
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s0 ffn_gate   ] post-warmup free 7912.0 MiB
+  [s1 ffn_up     ] post-alloc free 7894.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s1 ffn_up     ] post-warmup free 7894.0 MiB
+  [s2 ffn_down   ] post-alloc free 7872.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s2 ffn_down   ] post-warmup free 7864.0 MiB
+  [s3 gdn_qkv    ] post-alloc free 7852.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s3 gdn_qkv    ] post-warmup free 7838.0 MiB
+  [s4 ssm_out    ] post-alloc free 7828.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s4 ssm_out    ] post-warmup free 7828.0 MiB
+  [s5 gdn_gate   ] post-alloc free 7820.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s5 gdn_gate   ] post-warmup free 7820.0 MiB
+  [s6 attn_q+gate] post-alloc free 7806.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s6 attn_q+gate] post-warmup free 7806.0 MiB
+  [s7 attn_out   ] post-alloc free 7796.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s7 attn_out   ] post-warmup free 7796.0 MiB
+  [s8 attn_k     ] post-alloc free 7792.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s8 attn_k     ] post-warmup free 7790.0 MiB
+  [s9 attn_v     ] post-alloc free 7786.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s9 attn_v     ] post-warmup free 7786.0 MiB
+tile-nspan bench [UNCHUNK]: M=128 reps=3 x 20 iters | TILE_FP16=1 NSPAN=unset WIN_MIB=default | free 8160.0 MiB
+shape              K   N_d    n      qMiB    f16MiB      ms/iter       TF/s    freeMiB   peakMiB
+ffn_gate        5120  5760   64     12.08     56.25      1.69050       4.47     7912.0     104.0
+ffn_up          5120  5760   64     12.08     56.25      1.69060       4.47     7894.0       0.0
+ffn_down       17408  1664   64     11.87     55.25      1.66040       4.47     7864.0       8.0
+gdn_qkv         5120  3328   48      6.98     32.50      0.99685       4.38     7838.0      14.0
+ssm_out         6144  1664   48      4.19     19.50      0.66475       3.94     7828.0       0.0
+gdn_gate        5120  2048   48      4.30     20.00      0.64580       4.16     7820.0       0.0
+attn_q+gate     5120  4096   16      8.59     40.00      1.35300       3.97     7806.0       0.0
+attn_out        6144  1664   16      4.19     19.50      0.66335       3.95     7796.0       0.0
+attn_k          5120   256   16      0.54      2.50      0.15770       2.13     7790.0       2.0
+attn_v          5120   256   16      0.54      2.50      0.15775       2.13     7786.0       0.0
+call-weighted die agg: 2043.3 GF/ubatch, 470.72 ms/ubatch -> 4.34 TF/s/die wall
+VRAM proof [UNCHUNK]: peak transient delta over shapes 104.0 MiB (envelope 200.0 MiB) -> FIT

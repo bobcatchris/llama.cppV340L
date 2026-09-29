@@ -1,0 +1,120 @@
+W7_roundwall_row — decode MTP round-wall budget table, lane amd/wo-w7-body, 2026-09-19
+Desk: round-wall attribution (resumed 05:26 CDT). Mission: name every ms of the ~60 ms MTP
+decode round (k=2, TP4), rank cures, kill the biggest.
+VINTAGE LABELS (all instruments on THIS box, count600-class greedy decode, conc=1):
+  [M1] = VERIFY_DECOMP_row.txt 09-17 bin 409450b8 pre-LMHEAD-flip, traces ON (+5.4 ms/round vs
+         no-trace anchor 128.43), clean-band treatment;
+  [M2] = VERIFY_TAIL_row.txt 09-17 bin 248630d1 (NINFER_VERIFY_TAIL_TRACE=1, the per-op [TAIL]
+         tracer, still in-tree and in every newer bin), clean-band;
+  [FLIP] = LMHEAD_flip_row.txt 09-18 PLOG-044 window-3 flip leg, [TAIL] on, fully clean band,
+         the round-60.0 arithmetic of record;
+  [GATEB] = W7_gateb_row.txt 09-18 23:05-23:12 bin 07fcf7a5 + PINNED_STAGE=1 (cure config),
+         NO traces — the current-stack decode WALL anchor;
+  [b1] = W7_b1_ar_floor_row.txt isolated world=4 RCCL ring floor;
+  [GATE-T] = this desk's banked transport bench (W7_ar_transport_run{1,2}.log, world=2 dies 2,3).
+
+== ROUND WALL (current cure stack, no traces) [GATEB] ==
+  mt=100 counting: 40.7 t/s decode, acc 0.69, tok/round 2.38  -> 58.5 ms/round
+  mt=600 counting: 27.0 t/s decode, acc 0.94, tok/round 2.87  -> 106.3 ms/round (KV-attention
+    growth included: the round GROWS ~45% from 2k to 2.6k context — evaluate cures at target length)
+  family anchor: 60.0 ms/round = 49.5 tok/s decode arithmetic [FLIP/PLOG-044]
+
+== PER-ROUND BUDGET TABLE (k=2 round; T=3 verify + 2 draft forwards) ==
+  line                       ms/round   instrument+vintage
+  ------------------------------------------------------------
+  A. 64-layer verify loop       52.3    implied: verify 55.7 [FLIP] minus tail 3.4;
+     (loop bodies)                      cross-checks: 52.60 direct LTRACE [M1] (traces on,
+                                        pre-flip era); M1 loop=62.2 incl AR — era variance
+                                        +-5-10 ms thermal/trace band, see note N1
+  B. in-loop AR (64x mixer)      9.6    LTRACE direct [M1]; =150 us/collect in-serve vs
+                                        isolated floor 135.62 us @10 KiB w4 [b1]; sizes
+                                        30 KiB (5120xbf16 x T=3)
+  C. lm_head (verify proj)       2.53   [FLIP] (was 61.9 pre-flip [M2] — HARVESTED 26.0x)
+  D. lgather (logits shard)      0.67   [FLIP] (ranks1-3 wait on rank0 root)
+  E. ar_argmax+accept+finalnorm ~0.35    [M2] (0.20+0.08+0.02)
+  F. align fwd (T=1)             2.16   [FLIP]
+  G. chain_fwd (T=1)             1.39   [FLIP]
+  H. propose+chain_head          0.67   [FLIP] (0.34+0.33)
+  I. prepnext/book/select/rebase 0.12   [FLIP]
+  J. host ADDITIVE               0.20   [M2]: sync field = OVERLAP (host sleeps through the
+                                        round at the single hard sync, tp2_backend.cpp:3222 —
+                                        NOT additive); additive = d2h 0.026 + book 0.11 +
+                                        chain_enq 0.06
+  ------------------------------------------------------------
+  SUM                          ~60.0-69.9 (vintage spread; [FLIP] arithmetic = 60.0 exactly:
+                                verify 55.7 + 2.16+1.39+0.67+0.12 + host 0.2)
+  NOTE N1: the table's components were measured across three bins/eras; the [FLIP] leg's own
+  round arithmetic (60.0) is internally consistent and matches the [GATEB] 58.5 at mt=100 within
+  2.5%. The M1 loop numbers (52.6 bodies + 9.6 AR) carry traces-on + pre-flip-era thermal band;
+  the pending cure-bin [TAIL] re-run (blocked 05:37-06:3x by the V-arm window, see desk file)
+  is the ONLY missing instrument leg for a same-boot same-era table. UNATTRIBUTED RESIDUE on the
+  current stack: <= ~5 ms (the era-spread), not the ~56 ms the mission opened with — M1+M2+FLIP
+  already named every component class.
+
+== CURE RANKING (pre-registered GATE-K order, desk file 05:40) ==
+  1. host-additive = 0.20 ms < 2.0 gate -> NO-FIRE. The accept-D2H host sync is NOT an additive
+     round component (M2 semantics, re-derived in code: sync at :3222 drains the graphed round;
+     d2h is pinned us-class ints). Deferred/async accept: FALSIFIED as an additive-ms lever on
+     this stack (same family as the cured finalize stall — that one was PREFILL-side pageable-H2D,
+     a different mechanism, cured by PINNED_STAGE).
+  2. in-loop AR 9.6 >= 5.0 gate -> FIRES: Branch-B host-staged capture-safe one-shot.
+     QUANTIFICATION (this desk; kernel edit owned by the W4AR desk — no code from here):
+       - AR inventory/round: 64x 30 KiB verify collectives (9.6 ms) dominate; draft-side argmax
+         ARs are 12 B champion wire (negligible); lgather 0.67 separate class.
+       - Transport receipt: isolated world=2 pipelined H/R = 0.47x at 30 KiB (46.2->21.7 us,
+         GATE-T run1/run2 <=2.6% reproduce); latency convention 0.47x (78.1->36.6).
+       - Projection: 9.6 x 0.47 ~= 4.5 ms -> round 60.0 -> ~54.9 (-8.5%) -> ~44-45 tok/s e2e at
+         the mt=100 anchor (proportional more at short rounds, less at mt=600 KV-grown rounds).
+       - PREREQUISITE (the actual cure): delete the per-call cudaStreamSynchronize at
+         src/core/multi_gpu/one_shot_allreduce.cu:1033 (deferred status consumption + device-
+         bumped gen counter — the exact shape GATE-T proved capture-safe by 32-collect graph
+         replay, zero wedge). W4AR desk owns the edit + serve-leg A/B (ordinal-paired fresh
+         boots, +-2% within-pair, fire iff decode t/s +>=3%).
+  3. loop bodies ~42.7-52.6 own the round but are kernel-class: OUT of desk scope per
+     W7_decoderetune_row A3 (GEMVs measured at 1.15x floor; do NOT re-attack). The non-GEMV
+     body residue (~0.8 ms) and GDN/FULL split are M1-tabled; no desk-worthy misfit found.
+
+== PROVENANCE ==
+  Row: this file + docs/amd/W7_ROUNDWALL_desk.md (gates + full window forensics 05:26-06:3x).
+  Instruments: M2_serve.log/W7_ar_transport_run{1,2}.log/M1_serve.log/LMHEAD_flip_row.txt/
+  W7_gateb_row.txt/W7_b1_ar_floor_row.txt (results/amd/coherence + results/amd/p3).
+  Pending: cure-bin [TAIL] leg (GATE-R) to collapse note N1 — fired after the V-arm window
+  closes; row to be amended in place with the same-boot table.
+
+== AMENDMENT 06:5x CDT — GATE-R SAME-BOOT LEG FIRED (the N1 pending leg) ==
+Boot: lottery green on attempt 5 of the night (c618d356f0cdc401, VPERM code present,
+NINFER_VPERM_ARM UNSET = behaviorally canonical per its promotion law; carries [TAIL]).
+Env: canonical cures + NINFER_VERIFY_TAIL_TRACE=1 + NINFER_TP2_OPTRACE=1. Log:
+/home/chris/w7_roundwall_tail_serve.log (896 [TAIL] lines, 4 ranks). Clocks: all four dies
+98-99% busy, box COLD (32-42C edge at boot), sclk top — COLD-BAND sample.
+Leg: counting prompt 'Count from 1 to 500, one number per line.', mt=600 temp0 greedy conc=1,
+finish=length 600, 206 rounds, acc 0.96, tok/round 2.91, decode 12.16 s = 49.3 tok/s,
+round 59.0 ms (engine line; rank0 round-period p50 59.2 ms).
+  GATE-R (ii) verdict: FAILS the +-10% vs the gateb 27.0 t/s mt=600 anchor — LOUD. Read: the
+  decode round is a THERMAL STATE FUNCTION (cold ~59 ms <-> hot ~106 ms at mt=600; gateb was a
+  hot-box sample 6.5 h earlier; same doctrine as PLOG-064's prefill state function, 1.6-1.8x
+  band). Structure (ratios/fields) is the deliverable and is thermal-robust; the 49.3 is the
+  FASTEST mt=600 decode yet measured on this box (unpaired, quarantined absolute).
+SAME-BOOT PER-ROUND BUDGET ([TAIL-SUM] n=206 rank0; ranks 1-3 agree within 6%):
+  lm_head 2.355 | lgather 0.715 | ar_argmax 0.239 | accept+finalnorm+embed+argmax+prep 0.087
+  align 2.032 | chain_fwd 1.332 | propose 0.323 | chain_head 0.328 | prepnext 0.015
+  rebase 0.006 | select 0.011                                -> device tail+book 7.44 ms
+  host additive (d2h 0.028 + book 0.118 + chain_enq 0.060)   -> 0.21 ms
+  sync field 52.09 = OVERLAP re-confirmed on the cure stack (host sleeps through the round at
+  tp2_backend.cpp:3222; 52.1 < 59.2 round period)
+  64-layer loop (bodies + in-loop AR) = implied 51.5 ms (59.2 - 7.44 - 0.21)
+  SUM = 59.2 ms — EVERY MS NAMED ON ONE BOOT.
+  Cross-check vs [FLIP] era: lm_head 2.526->2.355, align 2.156->2.032, chain_fwd 1.393->1.332,
+  propose 0.34->0.32, chain_head 0.33->0.33 — the cure-stack tail is the flip-era tail (no
+  regression, small cold-band gains). The M1-era loop split (bodies 52.6 + AR 9.6 = 62.2) now
+  EXCEEDS this boot's entire loop budget (51.5) -> the in-loop AR on the current cold stack is
+  bounded <= ~8 ms and likely ~6-8 (M1's 9.6 was traces-on + hot band). Branch-B projection
+  restated: in-loop AR x 0.47 (GATE-T pipelined ratio, 30 KiB) -> round saving ~3-4.5 ms
+  (-5 to -7.5%), e2e +6 to +10% at the cold-band anchor; the W4AR desk's serve-leg A/B
+  (ordinal-paired, same thermal edge per PLOG-060/064) is the decisive cell.
+  (n=29 foreign-probe block shows the droop signature: sync 142.8, lm_head 7.08 — banked as
+  the hot-band cross-reference inside the same log.)
+CONTAMINATION NOTE: three foreign 46-gen/17-round probes (2k-class, 18 s prefills — the
+  V-arm B-leg probe json class) hit :8100 DURING my leg; the 206-round engine line and per-op
+  device fields are clean (digit-for-digit vs [FLIP]), one 19.1 s inter-round gap is their
+  prefill interleaving (visible in round-period max; p50 robust).

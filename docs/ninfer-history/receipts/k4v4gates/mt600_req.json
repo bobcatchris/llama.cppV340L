@@ -1,0 +1,1 @@
+{"model": "qwen3.8-27b", "messages": [{"role": "user", "content": "Count from 1 to 500 as digits, one number per line. Output only the numbers, no commentary, no markdown."}], "max_tokens": 600, "temperature": 0}

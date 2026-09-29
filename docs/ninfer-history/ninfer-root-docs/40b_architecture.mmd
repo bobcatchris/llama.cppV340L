@@ -1,0 +1,40 @@
+flowchart TB
+    subgraph APPS["apps / tests"]
+        SV["serve (OpenAI API)"]
+        TD["test driver (tp2_decode_test)<br/>+ verify_battery.sh"]
+    end
+    subgraph SERVE["src/serve"]
+        HS["http_server: SSE, /v1/chat/completions,<br/>sampling params per request"]
+    end
+    subgraph RT["src/runtime/tp2  (our layer)"]
+        TPE["TPEngine: options, preflight VRAM,<br/>single-flight FIFO, factory"]
+        TPG["TpEngine: rank process group,<br/>NCCL comms"]
+        TBE["TpBackend: make_rank, run_tp2_request<br/>MTP rounds · prefix cache · I8 KV<br/>arena scopes · sampling plumbing"]
+    end
+    subgraph MG["src/core/multi_gpu"]
+        TGR["TpGroup: NCCL allreduce/send/recv<br/>weight_shard (geometry, 256B align)<br/>tp_kernel"]
+    end
+    subgraph CORE["src/core (HW-adjacent)"]
+        AR["arena (per-rank GPU memory<br/>+ scoped sub-arenas)"]
+        PK["paged_kv_cache (64 tok/page,<br/>one row per request)"]
+        LA["linear_attention_state<br/>(GDN slots: committed + verify + cache)"]
+        DE["device.h / tensor (CUDA)"]
+    end
+    subgraph OPS["src/ops — kernels"]
+        K1["Q4 GEMV (TP)"]
+        K2["GQA attention prefill/decode<br/>(BF16 + I8-group64 KV)"]
+        K3["GDN gated-delta-net (linear attn)"]
+        K4["speculative_round<br/>(draft/verify/accept/sampling)"]
+        K5["sampling (temp, top-k/p, min-p,<br/>penalties, seed)"]
+    end
+    subgraph ART["src/artifact + targets"]
+        AB["artifact: reader, binder, storage_layouts,<br/>typed_binding, materializer"]
+        QT["targets/qwen3_6_27b: config,<br/>tp_load (sharded loader), layouts,<br/>mtp_impl, schedule"]
+    end
+    SV --> HS --> TPE --> TPG --> TBE
+    TD --> TBE
+    TBE --> TGR
+    TBE --> AR & PK & LA
+    TBE --> K1 & K2 & K3 & K4 & K5
+    AB --> QT --> TBE
+    DE -.->|used by| OPS

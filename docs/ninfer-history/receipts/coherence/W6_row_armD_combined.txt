@@ -1,0 +1,24 @@
+W6 ARM-D rows — combined GGATE+GQA (env NINFER_GGATE_SIMT=1 NINFER_GQA_SPLITK=1) — TWO legs, BOTH disqualified for the master number; fixes themselves unaffected, 2026-09-18 06:5x-07:0x
+NOTE (mission deviation, declared): the mission's "ALL-THREE" leg is UNRUNNABLE as specified — NINFER_GDN_SIMT=1
+  wedges the box deterministically (arm A). The combined leg ran the two non-wedging fixes. GDN's absence is the
+  honest state of the tree: its 510 ms remains on the body until the desk cures the T=128 wedge.
+
+== LEG 1: armD (W6_boot_armD_ggate_gqa_serve.log) — BAND-POLLUTED, kept as within-band evidence ==
+probe: plen-2016 first+only: finish=stop content='BLUE' completion=40 (content BYTE-IDENTICAL; completion -1 token
+  vs the 41-class = decode-trajectory margin from the composed order changes, not a text change), client wall 29.87 s
+route proofs: [GGATE] col_tile line + [GQA] splits=4/96ctas@128 — both fixes fired together
+BODYSUM n=16 means: gate 11.59 | gqa 30.40 | dn 512.7 (rank0 593.6 elevated) | unbr EXPLODED 87.7 -> ~161 (ranks1-3
+  150-180) | body 681.5 | wall 1684.1 (worse than baseline 1674.7 — the savings swallowed by unbr + rank0 dn)
+sideband verdict: DEEPER droop band than arms B/C (sclk levels 2-4 on 14/45 samples vs 3/42 and 6/43) — the leg ran
+  band-polluted (4th sustained leg of the window); per PLOG-043 clean-band treatment this leg CANNOT be compared
+  cross-band; clean-band re-leg ordered.
+
+== LEG 2: armD2 (W6_boot_armD2_ggate_gqa_serve.log) — BOOT WEDGE at warmup (window's 2nd OPS LAW event) ==
+identical env/leg script as armD; boot loaded (19.4 s) then warmup WEDGED: dies 1/2/3 pinned ~100% for 10+ min,
+  log frozen after LMHEAD launch #9 (pre finish-trace/pre-listening), zero progress -> bounded-wait timeout
+flaky, not deterministic: same env booted+served clean on leg 1 (and GGATE-alone + GQA-alone boots were clean)
+RECOVERY receipts: anchored TERM pid=1719903 (honored); KFD=0; sudo rocm-smi --gpureset -d 1 / -d 2 / -d 3 ->
+  "Successfully reset GPU 1/2/3"; box idle 4/4 at 0%
+VERDICT: combined-fix number NOT BANKED as a perf claim (no clean-band combined leg this window; arms B and C
+  stand individually: gate -69.1, gqa -27.9 arithmetic). The flaky warmup wedge (GGATE+GQA combined, 1-in-2 boots)
+  is FILED for the desk alongside the GDN T=128 deterministic wedge and the GQA cell harness NaN.

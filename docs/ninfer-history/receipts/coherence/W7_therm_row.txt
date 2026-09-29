@@ -1,0 +1,6 @@
+=== W7 THERMAL INTEGRATOR CHARACTERIZATION (cure config, inline sweep leg) ===
+ts: 2026-09-19 00:18-00:26 CDT | boot: canonical 2c8901d3d18adef1 + PINNED_STAGE=1 | card0 edge temp + pp_dpm_sclk @ 5 s (W7_therm_drain.log)
+LOAD (4x 2k probes back-to-back, ~85 s): edge 46 -> 80 C; sclk bouncing 991-1500 MHz (auto DVFS under the 110 W cap); probe walls 18.5/18.8/18.9/19.6 s — the integrator loads +6% even on the cure config under continuous bursts
+DRAIN (idle after load): sclk parks to 300 MHz IMMEDIATELY (no slow clock decay — the DVFS hysteresis is fast); edge temp decays 80 -> 66 C in 90 s -> 60 C at 3 min -> 54 C asymptote at ~5.5 min (exponential, ~90 s time constant, ~53 C floor)
+SERVING RULE OF THUMB (measured): ~3 min idle returns the box to near-standby thermal state; a heavy request fired within the first 90 s of post-load starts at 70-80 C and lands in the degraded band. This IS the soak-band mechanism (PLOG-061): 10k at a hot start = 63.1; cool start = 70.7
+caveat: single card0 die sampled; four-die gradient not taken (read-only sweep posture)

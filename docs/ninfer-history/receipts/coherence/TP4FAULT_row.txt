@@ -1,0 +1,59 @@
+== TP4FAULT ROW — node-3 Memory-access-fault class on TP4 serve warmup, 2026-09-17
+== Seat: GEMV-TUNE perf window (branch amd/tp4-cure, head 4f5c0e2b0 at write time).
+== STATUS: OPEN — machine-level; requires ROOT driver reset / reboot before the next TP4
+== window. Do NOT burn windows re-trying TP4 boots on this state. Single-die work is
+== unaffected (proven below).
+==
+== VERBATIM SIGNATURE (one full line; all six faults identical but handle+address vary):
+Memory access fault by GPU node-3 (Agent handle: 0x1dd5a6c0) on address 0x78a35e31d000. Reason: Page not present or supervisor privilege.
+== All six faults land at THE SAME log point (line 38 of each serve log): immediately after
+== "ninfer-serve: warming up..." — never at load, never at listen, never mid-request.
+==
+== THE 6/6 BOTH-BINARIES PROOF (this is what makes it machine-level, not a kernel regression):
+==  #  UTC    binary (sha16)         flags delta        log
+==  1  06:10  6c1fe9366f0ef83d       (baseline flags)   /tmp/gemv_baseline_serve.log   handle 0x1dd5a6c0 addr 0x78a35e31d000
+==  2  06:17  6c1fe9366f0ef83d       (retry, 3-min idle) /tmp/gemv_baseline_serve2.log  handle 0x411656c0 addr 0x75ce0331d000
+==  3  06:21  6c1fe9366f0ef83d       (retry, 2-min idle) /tmp/gemv_baseline_serve3.log  handle 0x314ce6c0 addr 0x732714151000
+==  4  06:24  6c1fe9366f0ef83d       +--no-cuda-graph   /tmp/gemv_baseline_nograph.log handle 0x2e3f6960 addr 0x789a5f11c000
+==  5  06:26  e341a2072c6f5078       (tuned)            /tmp/gemv_tune_serve2.log      handle 0x451b76c0 addr 0x74330251c000
+==  6  06:32  e341a2072c6f5078       (retry, 5-min idle) /tmp/gemv_tune_serve3.log     handle 0x1fac96c0 addr 0x753c7711c000
+== Binary provenance:
+==  - e341a2072c6f5078 = the TUNED binary (GEMV-TUNE commit 2f44a6ef8), banked, and REBUILT
+==    at ~06:15 with sha256 IDENTICAL (byte-reproducible link).
+==  - 6c1fe9366f0ef83d = the PRE-TUNING binary (N7 boot binary, PLOG-029); rebuilt from
+==    commit 9751436f6 (pre-tuning kernel source) with sha256 IDENTICAL — byte-reproducible.
+==    => the fault is NOT explained by my kernel diff: the OLD source faults too, in the
+==    same window, at the same point.
+== Healthy control points (same binaries, earlier same day):
+==  - 04:15Z: 6c1fe9366f0ef83d booted GREEN (N7 arm C, BOOTBAT_20260917_041518 row, prior session).
+==  - 05:55Z: e341a2072c6f5078 booted GREEN — model loaded 19.1 s, listened, BOOT_BATTERY
+==    20260917_055635 OVERALL GREEN, 4 requests served 05:59-06:06 (GEMV_TUNING_row.txt).
+==  - => machine state changed between 06:06 and 06:10; both binaries fault since.
+== Fault characteristics: address DIFFERS every attempt (0x78a3/0x75ce/0x7327/0x789a/
+== 0x7433/0x753c ...) => layout-dependent dereference, not a fixed bad page; graphless
+== boot faults identically => RCCL/graph-capture path NOT implicated; node-3 = GPU[3]
+== (4th die) in all attempts => die-specific or die-triggering.
+== Cleanliness probes DURING/AFTER the faulting state (06:30-06:35Z):
+==  - KFD process count: 0 at every check (rocm-smi --showpids, tab-tolerant grep).
+==  - Host RAM: 62G total, 54G available (no pressure).
+==  - VRAM: all 4 dies at ~18.6 MB used (desktop baseline only) — no leaked allocations.
+==  - Single-die bench on dev0 AFTER faults began: copy 369.3 GB/s / read 385.1 GB/s =
+==    FULL ceiling — dies other than the TP4-warmup path are healthy; compute + copy +
+==    KFD paths all normal.
+== Root-cause hypothesis (NOT proven; for the reset owner to confirm): ROCm 6.2 driver
+== VM/state corruption on the node-3 die after ~6 rapid kill/boot cycles of a 4-rank TP4
+== server within ~35 min (each cycle materializes 5131 MB x 4 ranks); the faulting warmup
+== dereference hits an unmapped VA class the driver no longer backs. Reset is the fix;
+== no source change is indicated (both sources behave identically).
+== REMEDIATION:
+==  1. ROOT: reset the driver / reboot the box before the next TP4 window
+==     (e.g. `sudo rocm-smi --reset` class or full reboot; nothing less was attempted —
+==     no root in the perf seat).
+==  2. After reset: FIRST TP4 boot should re-run BOOT_BATTERY.sh (it is the per-window
+==     battery; a GREEN there re-opens TP4 work).
+==  3. Until reset: NO TP4 boots (stop burning windows); single-die benches/agents OK.
+==  4. Hygiene for the future: space rapid TP4 kill/boot cycles (>=60-90 s between
+==     release and next spawn) until this class is understood — circumstantial, unproven,
+==     but the healthy day had slower cycles.
+== Cross-refs: GEMV_TUNING_row.txt (incident first noted) · PLOG-030 ·
+== BOOT_BATTERY_20260917_055635.row · NIGHT_HANDOFF_2026-09-16_mtp_thermal.md (WARNING block).

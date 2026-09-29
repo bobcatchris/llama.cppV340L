@@ -1,0 +1,354 @@
+lock held by mmvq-bw
+== producer emit (quantize_q8_1 clone, K=5120 T=4): 640 blocks, value memcmp IDENTICAL
+   legacy emit 4.22 us | aln emit 4.23 us | delta +0.1%
+== iq3_xxs [K=5120 N=17408 98 B/block] off=969405216 len=34119680
+  t1_aln     BITEXACT vs iq3_xxs t1_base (memcmp, 17408 rows x 1 tokens)
+  t4_base2   in-run control IDENTICAL (memcmp)
+  t2_share   BITEXACT vs iq3_xxs t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_share   BITEXACT vs iq3_xxs t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_share   BITEXACT vs iq3_xxs t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_share2  BITEXACT vs iq3_xxs t4_base (memcmp, 17408 rows x 4 tokens)
+  t2_aln     BITEXACT vs iq3_xxs t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_aln     BITEXACT vs iq3_xxs t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_aln     BITEXACT vs iq3_xxs t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_aln2    BITEXACT vs iq3_xxs t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_cfull2  in-run control IDENTICAL (determinism memcmp)
+  t2_wide    BITEXACT vs iq3_xxs t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_wide    BITEXACT vs iq3_xxs t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_wide    BITEXACT vs iq3_xxs t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_wide2   BITEXACT vs iq3_xxs t4_base (memcmp, 17408 rows x 4 tokens)
+  t2_s2r     BIT MISMATCH vs iq3_xxs t2_base - REFUSED
+  t3_s2r     BIT MISMATCH vs iq3_xxs t3_base - REFUSED
+  t4_s2r     BIT MISMATCH vs iq3_xxs t4_base - REFUSED
+  t4_s2r2    BIT MISMATCH vs iq3_xxs t4_base - REFUSED
+  config        T    us/call       GB/s    spread   per-rep us
+  t1_base       1      400.0       85.5     1.37%   [396.6 400.0 402.1]
+  t1_aln        1      412.3       82.9     2.44%   [405.4 412.3 415.5]
+  t2_base       2      500.2       68.5     0.20%   [499.3 500.2 500.3]
+  t3_base       3      666.6       51.5     0.12%   [666.6 666.2 667.0]
+  t4_base       4      752.2       45.8     1.97%   [749.3 752.2 764.1]
+  t4_base2      4      756.8       45.5     1.61%   [751.2 756.8 763.3]
+  t2_share      2      496.0       69.1     0.88%   [493.6 496.0 498.0]
+  t3_share      3      636.8       53.9     2.21%   [626.8 636.8 640.9]
+  t4_share      4      726.5       47.4     1.44%   [722.3 726.5 732.8]
+  t4_share2     4      727.2       47.3     1.51%   [723.1 727.2 734.1]
+  t2_aln        2      499.3       68.6     0.69%   [496.4 499.3 499.8]
+  t3_aln        3      666.5       51.5     0.09%   [667.1 666.5 666.5]
+  t4_aln        4      791.5       43.5     1.59%   [782.4 791.5 795.0]
+  t4_aln2       4      791.1       43.5     1.71%   [783.0 791.1 796.6]
+  t4_cfull      4      453.6       75.9     1.76%   [447.5 455.5 453.6]
+  t4_cfull2     4      452.6       76.1     1.17%   [451.8 452.6 457.1]
+  t4_cx         4      310.0      111.0     0.43%   [308.8 310.0 310.2]
+  t4_cy         4      330.7      104.1     0.77%   [328.3 330.7 330.8]
+  t2_wide       2      500.5       68.5     0.93%   [499.7 500.5 504.4]
+  t3_wide       3      666.0       51.6     0.22%   [666.0 665.8 667.2]
+  t4_wide       4      752.0       45.8     0.49%   [748.5 752.0 752.2]
+  t4_wide2      4      751.9       45.8     0.56%   [749.0 753.2 751.9]
+  t2_s2r        2      489.2       70.0   100.13%   [0.0 489.2 489.9]
+  t3_s2r        3      615.0       55.9   100.03%   [0.0 615.0 615.2]
+  t4_s2r        4      694.6       49.6   100.22%   [0.0 694.6 696.1]
+  t4_s2r2       4      695.4       49.5   100.19%   [0.0 695.4 696.7]
+  iq3_xxs T=4 share verdict: -3.4% vs base
+  iq3_xxs T=4 aln verdict: +5.2% vs base, +9.0% vs share (the served increment)
+  iq3_xxs T=4 wide verdict: -0.0% vs base, +3.5% vs share (the served increment)
+  iq3_xxs T=4 consume ceilings: cfull 453.6 us (75.9 GB/s) | cx 310.0 us (111.0 GB/s) | cy 330.7 us (104.1 GB/s)
+  iq3_xxs T=4 decode+dp4a tax: +60.1% (share vs cfull); x-only / y-only load time ratio: 0.94
+  iq3_xxs T=4 s2r verdict: -7.7% vs base, -4.4% vs share (the served increment)
+  iq3_xxs session law: worst per-config spread 100.22% VOID (gate 1%)
+== q4_K [K=5120 N=17408 144 B/block] off=12025224992 len=50135040
+  t1_aln     BITEXACT vs q4_K t1_base (memcmp, 17408 rows x 1 tokens)
+  t4_base2   in-run control IDENTICAL (memcmp)
+  t2_share   BITEXACT vs q4_K t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_share   BITEXACT vs q4_K t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_share   BITEXACT vs q4_K t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_share2  BITEXACT vs q4_K t4_base (memcmp, 17408 rows x 4 tokens)
+  t2_aln     BITEXACT vs q4_K t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_aln     BITEXACT vs q4_K t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_aln     BITEXACT vs q4_K t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_aln2    BITEXACT vs q4_K t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_cfull2  in-run control IDENTICAL (determinism memcmp)
+  t2_s2r     BIT MISMATCH vs q4_K t2_base - REFUSED
+  t3_s2r     BIT MISMATCH vs q4_K t3_base - REFUSED
+  t4_s2r     BIT MISMATCH vs q4_K t4_base - REFUSED
+  t4_s2r2    BIT MISMATCH vs q4_K t4_base - REFUSED
+  config        T    us/call       GB/s    spread   per-rep us
+  t1_base       1      274.9      182.7     0.40%   [273.8 274.9 274.9]
+  t1_aln        1      479.2      104.8     0.23%   [480.2 479.1 479.2]
+  t2_base       2      498.5      100.9     0.08%   [498.9 498.5 498.5]
+  t3_base       3      807.3       62.4     0.90%   [806.6 807.3 813.9]
+  t4_base       4      993.2       50.8     0.13%   [993.2 993.4 992.1]
+  t4_base2      4      994.9       50.7     0.27%   [997.4 994.7 994.9]
+  t2_share      2      402.4      125.0     0.07%   [402.4 402.4 402.6]
+  t3_share      3      634.6       79.4     0.61%   [633.4 634.6 637.3]
+  t4_share      4      777.0       64.9     0.19%   [776.3 777.0 777.7]
+  t4_share2     4      777.7       64.9     0.08%   [778.3 777.6 777.7]
+  t2_aln        2      829.8       60.6     0.08%   [830.1 829.8 829.4]
+  t3_aln        3     1318.3       38.2     0.61%   [1313.8 1318.3 1321.8]
+  t4_aln        4     1668.4       30.2     0.26%   [1666.9 1668.4 1671.2]
+  t4_aln2       4     1669.8       30.2     0.09%   [1668.7 1669.8 1670.2]
+  t4_cfull      4      515.3       97.9     1.98%   [508.5 518.7 515.3]
+  t4_cfull2     4      514.9       98.0     1.93%   [506.9 516.8 514.9]
+  t4_cx         4      407.9      123.7     0.24%   [407.2 407.9 408.2]
+  t4_cy         4      293.4      171.9     2.29%   [292.0 298.7 293.4]
+  t2_wide       2        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t3_wide       3        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t4_wide       4        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t4_wide2      4        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t2_s2r        2      406.2      123.8   100.02%   [0.0 406.2 406.3]
+  t3_s2r        3      625.9       80.5   100.36%   [0.0 628.2 625.9]
+  t4_s2r        4      736.7       68.5   100.16%   [0.0 737.9 736.7]
+  t4_s2r2       4      737.7       68.4   100.00%   [0.0 737.7 737.8]
+  q4_K T=4 share verdict: -21.8% vs base
+  q4_K T=4 aln verdict: +68.0% vs base, +114.7% vs share (the served increment)
+  q4_K T=4 consume ceilings: cfull 515.3 us (97.9 GB/s) | cx 407.9 us (123.7 GB/s) | cy 293.4 us (171.9 GB/s)
+  q4_K T=4 decode+dp4a tax: +50.8% (share vs cfull); x-only / y-only load time ratio: 1.39
+  q4_K T=4 s2r verdict: -25.8% vs base, -5.2% vs share (the served increment)
+  q4_K session law: worst per-config spread 100.36% VOID (gate 1%)
+== iq4_xs [K=5120 N=17408 136 B/block] off=1595404832 len=47349760
+  t4_base2   in-run control IDENTICAL (memcmp)
+  t2_share   BITEXACT vs iq4_xs t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_share   BITEXACT vs iq4_xs t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_share   BITEXACT vs iq4_xs t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_share2  BITEXACT vs iq4_xs t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_cfull2  in-run control IDENTICAL (determinism memcmp)
+  t2_wide    BITEXACT vs iq4_xs t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_wide    BITEXACT vs iq4_xs t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_wide    BITEXACT vs iq4_xs t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_wide2   BITEXACT vs iq4_xs t4_base (memcmp, 17408 rows x 4 tokens)
+  t2_s2r     BIT MISMATCH vs iq4_xs t2_base - REFUSED
+  t3_s2r     BIT MISMATCH vs iq4_xs t3_base - REFUSED
+  t4_s2r     BIT MISMATCH vs iq4_xs t4_base - REFUSED
+  t4_s2r2    BIT MISMATCH vs iq4_xs t4_base - REFUSED
+  config        T    us/call       GB/s    spread   per-rep us
+  t1_base       1      231.8      204.6     0.88%   [231.8 230.5 232.5]
+  t2_base       2      278.1      170.8     0.99%   [278.1 275.7 278.5]
+  t3_base       3      522.6       91.0     0.29%   [522.4 522.6 523.9]
+  t4_base       4      613.8       77.6     0.21%   [614.2 612.9 613.8]
+  t4_base2      4      614.6       77.5     0.13%   [613.9 614.6 614.8]
+  t2_share      2      296.3      160.3     3.96%   [296.3 288.6 300.3]
+  t3_share      3      539.0       88.3     0.56%   [539.0 536.4 539.4]
+  t4_share      4      648.5       73.5     0.17%   [649.2 648.5 648.1]
+  t4_share2     4      647.7       73.6     0.41%   [649.4 646.8 647.7]
+  t4_cfull      4      483.0       98.7     0.30%   [482.7 483.0 484.2]
+  t4_cfull2     4      481.4       99.0     0.89%   [479.6 481.4 483.9]
+  t4_cx         4      381.2      125.0     0.42%   [381.2 382.6 381.0]
+  t4_cy         4      333.6      142.8     0.27%   [333.9 333.0 333.6]
+  t2_wide       2      274.9      172.8     0.38%   [275.8 274.7 274.9]
+  t3_wide       3      537.8       88.5     0.15%   [538.6 537.8 537.8]
+  t4_wide       4      607.3       78.5     0.27%   [605.8 607.4 607.3]
+  t4_wide2      4      605.9       78.6     0.20%   [605.9 605.8 607.0]
+  t2_s2r        2      289.5      164.1   100.95%   [0.0 289.5 292.2]
+  t3_s2r        3      499.7       95.2   100.06%   [0.0 499.7 500.0]
+  t4_s2r        4      592.1       80.5   100.36%   [0.0 592.1 594.2]
+  t4_s2r2       4      594.3       80.2   100.25%   [0.0 595.7 594.3]
+  iq4_xs T=4 share verdict: +5.7% vs base
+  iq4_xs T=4 wide(base u2 x-loads) verdict: -1.1% vs base
+  iq4_xs T=4 consume ceilings: cfull 483.0 us (98.7 GB/s) | cx 381.2 us (125.0 GB/s) | cy 333.6 us (142.8 GB/s)
+  iq4_xs T=4 decode+dp4a tax: +34.3% (share vs cfull); x-only / y-only load time ratio: 1.14
+  iq4_xs T=4 s2r verdict: -3.5% vs base, -8.7% vs share (the served increment)
+  iq4_xs session law: worst per-config spread 100.95% VOID (gate 1%)
+== q5_K [K=5120 N=12288 176 B/block] off=5220080544 len=43253760
+  t1_aln     BITEXACT vs q5_K t1_base (memcmp, 12288 rows x 1 tokens)
+  t4_base2   in-run control IDENTICAL (memcmp)
+  t2_share   BITEXACT vs q5_K t2_base (memcmp, 12288 rows x 2 tokens)
+  t3_share   BITEXACT vs q5_K t3_base (memcmp, 12288 rows x 3 tokens)
+  t4_share   BITEXACT vs q5_K t4_base (memcmp, 12288 rows x 4 tokens)
+  t4_share2  BITEXACT vs q5_K t4_base (memcmp, 12288 rows x 4 tokens)
+  t2_aln     BITEXACT vs q5_K t2_base (memcmp, 12288 rows x 2 tokens)
+  t3_aln     BITEXACT vs q5_K t3_base (memcmp, 12288 rows x 3 tokens)
+  t4_aln     BITEXACT vs q5_K t4_base (memcmp, 12288 rows x 4 tokens)
+  t4_aln2    BITEXACT vs q5_K t4_base (memcmp, 12288 rows x 4 tokens)
+  t4_cfull2  in-run control IDENTICAL (determinism memcmp)
+  t2_s2r     BIT MISMATCH vs q5_K t2_base - REFUSED
+  t3_s2r     BIT MISMATCH vs q5_K t3_base - REFUSED
+  t4_s2r     BIT MISMATCH vs q5_K t4_base - REFUSED
+  t4_s2r2    BIT MISMATCH vs q5_K t4_base - REFUSED
+  config        T    us/call       GB/s    spread   per-rep us
+  t1_base       1      226.7      191.0     0.24%   [226.2 226.7 226.7]
+  t1_aln        1      389.6      111.2     0.10%   [389.9 389.6 389.6]
+  t2_base       2      351.4      123.4     0.54%   [353.3 351.4 351.4]
+  t3_base       3      598.3       72.6     0.63%   [595.9 599.7 598.3]
+  t4_base       4      724.5       60.0     0.09%   [724.5 723.9 724.6]
+  t4_base2      4      723.4       60.1     0.36%   [723.3 725.8 723.4]
+  t2_share      2      315.8      137.3     0.58%   [315.8 315.0 316.8]
+  t3_share      3      491.8       88.3     0.83%   [488.8 491.8 492.9]
+  t4_share      4      576.7       75.4     0.57%   [575.4 576.7 578.7]
+  t4_share2     4      578.5       75.2     0.47%   [578.9 576.2 578.5]
+  t2_aln        2      601.6       72.1     0.19%   [601.6 602.0 600.9]
+  t3_aln        3      982.7       44.2     0.15%   [981.4 982.7 982.9]
+  t4_aln        4     1252.2       34.7     0.17%   [1250.1 1252.2 1252.2]
+  t4_aln2       4     1251.2       34.8     0.16%   [1250.3 1252.2 1251.2]
+  t4_cfull      4      397.3      109.4     0.84%   [397.3 394.4 397.8]
+  t4_cfull2     4      399.9      108.7     0.80%   [396.8 399.9 399.9]
+  t4_cx         4      318.9      136.3     0.12%   [318.8 318.9 319.2]
+  t4_cy         4      197.8      219.8     0.37%   [197.8 197.8 197.1]
+  t2_wide       2        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t3_wide       3        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t4_wide       4        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t4_wide2      4        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t2_s2r        2      325.9      133.1   100.30%   [0.0 325.9 326.9]
+  t3_s2r        3      464.9       93.4   100.20%   [0.0 464.9 465.8]
+  t4_s2r        4      550.2       79.0   100.47%   [0.0 550.2 552.8]
+  t4_s2r2       4      549.5       79.1   100.15%   [0.0 549.5 550.3]
+  q5_K T=4 share verdict: -20.4% vs base
+  q5_K T=4 aln verdict: +72.8% vs base, +117.1% vs share (the served increment)
+  q5_K T=4 consume ceilings: cfull 397.3 us (109.4 GB/s) | cx 318.9 us (136.3 GB/s) | cy 197.8 us (219.8 GB/s)
+  q5_K T=4 decode+dp4a tax: +45.2% (share vs cfull); x-only / y-only load time ratio: 1.61
+  q5_K T=4 s2r verdict: -24.1% vs base, -4.6% vs share (the served increment)
+  q5_K session law: worst per-config spread 100.47% VOID (gate 1%)
+== q6_K [K=5120 N=129272 210 B/block] off=4637536 len=542942400
+  t1_aln     BITEXACT vs q6_K t1_base (memcmp, 129272 rows x 1 tokens)
+  t4_base2   in-run control IDENTICAL (memcmp)
+  t2_share   BITEXACT vs q6_K t2_base (memcmp, 129272 rows x 2 tokens)
+  t3_share   BITEXACT vs q6_K t3_base (memcmp, 129272 rows x 3 tokens)
+  t4_share   BITEXACT vs q6_K t4_base (memcmp, 129272 rows x 4 tokens)
+  t4_share2  BITEXACT vs q6_K t4_base (memcmp, 129272 rows x 4 tokens)
+  t2_aln     BITEXACT vs q6_K t2_base (memcmp, 129272 rows x 2 tokens)
+  t3_aln     BITEXACT vs q6_K t3_base (memcmp, 129272 rows x 3 tokens)
+  t4_aln     BITEXACT vs q6_K t4_base (memcmp, 129272 rows x 4 tokens)
+  t4_aln2    BITEXACT vs q6_K t4_base (memcmp, 129272 rows x 4 tokens)
+  t4_cfull2  in-run control IDENTICAL (determinism memcmp)
+  t2_s2r     BIT MISMATCH vs q6_K t2_base - REFUSED
+  t3_s2r     BIT MISMATCH vs q6_K t3_base - REFUSED
+  t4_s2r     BIT MISMATCH vs q6_K t4_base - REFUSED
+  t4_s2r2    BIT MISMATCH vs q6_K t4_base - REFUSED
+  config        T    us/call       GB/s    spread   per-rep us
+  t1_base       1     3057.4      177.8     2.33%   [3026.1 3057.4 3097.3]
+  t1_aln        1     3722.9      146.0     1.14%   [3720.6 3722.9 3763.0]
+  t2_base       2     3858.6      141.0     1.32%   [3840.4 3858.6 3891.5]
+  t3_base       3     5502.8       99.0     0.93%   [5500.1 5502.8 5551.5]
+  t4_base       4     6576.6       82.9     1.56%   [6563.2 6576.6 6665.8]
+  t4_base2      4     6592.9       82.7     1.64%   [6560.8 6592.9 6668.6]
+  t2_share      2     3719.8      146.2     3.17%   [3709.2 3719.8 3827.3]
+  t3_share      3     5283.1      103.1     1.62%   [5258.7 5283.1 5344.4]
+  t4_share      4     6289.8       86.7     1.53%   [6277.4 6289.8 6373.4]
+  t4_share2     4     6299.0       86.5     1.58%   [6277.4 6299.0 6376.7]
+  t2_aln        2     6156.6       88.4     4.28%   [6022.6 6156.6 6286.3]
+  t3_aln        3     8819.7       61.7     4.71%   [8587.5 8819.7 9002.5]
+  t4_aln        4    12528.7       43.5     0.29%   [12551.6 12515.5 12528.7]
+  t4_aln2       4    12529.6       43.5     0.26%   [12545.5 12512.6 12529.6]
+  t4_cfull      4     4514.8      120.7     4.74%   [4496.8 4514.8 4711.0]
+  t4_cfull2     4     4519.8      120.6     6.35%   [4493.5 4519.8 4780.6]
+  t4_cx         4     4020.4      135.6     9.26%   [4020.4 4004.7 4376.9]
+  t4_cy         4     2499.3      218.1     1.22%   [2488.1 2499.3 2518.6]
+  t2_wide       2        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t3_wide       3        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t4_wide       4        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t4_wide2      4        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t2_s2r        2     3761.2      144.6   103.18%   [0.0 3761.2 3880.8]
+  t3_s2r        3     5196.2      104.8   101.09%   [0.0 5196.2 5253.0]
+  t4_s2r        4     6523.5       83.5   100.62%   [0.0 6564.3 6523.5]
+  t4_s2r2       4     6380.7       85.4   103.03%   [0.0 6573.8 6380.7]
+  q6_K T=4 share verdict: -4.4% vs base
+  q6_K T=4 aln verdict: +90.5% vs base, +99.2% vs share (the served increment)
+  q6_K T=4 consume ceilings: cfull 4514.8 us (120.7 GB/s) | cx 4020.4 us (135.6 GB/s) | cy 2499.3 us (218.1 GB/s)
+  q6_K T=4 decode+dp4a tax: +39.3% (share vs cfull); x-only / y-only load time ratio: 1.61
+  q6_K T=4 s2r verdict: -0.8% vs base, +3.7% vs share (the served increment)
+  q6_K session law: worst per-config spread 103.18% VOID (gate 1%)
+== q3_K [K=5120 N=17408 110 B/block] off=10469424416 len=38297600
+  t1_aln     BITEXACT vs q3_K t1_base (memcmp, 17408 rows x 1 tokens)
+  t4_base2   in-run control IDENTICAL (memcmp)
+  t2_share   BITEXACT vs q3_K t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_share   BITEXACT vs q3_K t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_share   BITEXACT vs q3_K t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_share2  BITEXACT vs q3_K t4_base (memcmp, 17408 rows x 4 tokens)
+  t2_aln     BITEXACT vs q3_K t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_aln     BITEXACT vs q3_K t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_aln     BITEXACT vs q3_K t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_aln2    BITEXACT vs q3_K t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_cfull2  in-run control IDENTICAL (determinism memcmp)
+  t2_s2r     BIT MISMATCH vs q3_K t2_base - REFUSED
+  t3_s2r     BIT MISMATCH vs q3_K t3_base - REFUSED
+  t4_s2r     BIT MISMATCH vs q3_K t4_base - REFUSED
+  t4_s2r2    BIT MISMATCH vs q3_K t4_base - REFUSED
+  config        T    us/call       GB/s    spread   per-rep us
+  t1_base       1      541.8       70.8     3.08%   [526.8 541.8 543.4]
+  t1_aln        1      698.1       55.0     1.79%   [689.8 698.1 702.3]
+  t2_base       2      632.6       60.8     1.83%   [627.1 632.6 638.6]
+  t3_base       3      857.7       44.9     2.63%   [851.8 857.7 874.4]
+  t4_base       4     1001.1       38.6     0.39%   [998.6 1001.1 1002.5]
+  t4_base2      4      999.3       38.6     0.05%   [999.3 999.7 999.2]
+  t2_share      2      467.9       82.2     0.25%   [467.3 467.9 468.5]
+  t3_share      3      610.0       63.2     0.62%   [607.9 610.0 611.7]
+  t4_share      4      707.9       54.5     2.06%   [707.6 707.9 722.1]
+  t4_share2     4      707.3       54.6     1.80%   [706.4 707.3 719.2]
+  t2_aln        2     1162.4       33.1     0.96%   [1157.6 1162.4 1168.8]
+  t3_aln        3     1679.7       22.9     1.26%   [1679.7 1679.5 1700.6]
+  t4_aln        4     3355.7       11.5     0.84%   [3350.6 3355.7 3378.9]
+  t4_aln2       4     3360.8       11.5     0.80%   [3353.6 3360.8 3380.4]
+  t4_cfull      4      575.5       67.1     2.56%   [565.8 575.5 580.5]
+  t4_cfull2     4      583.5       66.1     0.20%   [583.2 583.5 584.4]
+  t4_cx         4      473.4       81.5     0.50%   [473.4 475.3 473.0]
+  t4_cy         4      317.6      121.5     2.77%   [317.6 315.2 324.1]
+  t2_wide       2        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t3_wide       3        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t4_wide       4        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t4_wide2      4        0.0        inf     -nan%   [0.0 0.0 0.0]
+  t2_s2r        2      469.7       81.9   100.39%   [0.0 469.7 471.6]
+  t3_s2r        3      600.1       64.2   100.85%   [0.0 605.2 600.1]
+  t4_s2r        4      739.1       52.2   100.21%   [0.0 739.1 740.7]
+  t4_s2r2       4      742.5       52.0   100.05%   [0.0 742.9 742.5]
+  q3_K T=4 share verdict: -29.3% vs base
+  q3_K T=4 aln verdict: +235.2% vs base, +374.0% vs share (the served increment)
+  q3_K T=4 consume ceilings: cfull 575.5 us (67.1 GB/s) | cx 473.4 us (81.5 GB/s) | cy 317.6 us (121.5 GB/s)
+  q3_K T=4 decode+dp4a tax: +23.0% (share vs cfull); x-only / y-only load time ratio: 1.49
+  q3_K T=4 s2r verdict: -26.2% vs base, +4.4% vs share (the served increment)
+  q3_K session law: worst per-config spread 100.85% VOID (gate 1%)
+== iq3_s [K=5120 N=17408 110 B/block] off=4301102016 len=38297600
+  t1_aln     BITEXACT vs iq3_s t1_base (memcmp, 17408 rows x 1 tokens)
+  t4_base2   in-run control IDENTICAL (memcmp)
+  t2_share   BITEXACT vs iq3_s t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_share   BITEXACT vs iq3_s t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_share   BITEXACT vs iq3_s t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_share2  BITEXACT vs iq3_s t4_base (memcmp, 17408 rows x 4 tokens)
+  t2_aln     BITEXACT vs iq3_s t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_aln     BITEXACT vs iq3_s t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_aln     BITEXACT vs iq3_s t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_aln2    BITEXACT vs iq3_s t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_cfull2  in-run control IDENTICAL (determinism memcmp)
+  t2_wide    BITEXACT vs iq3_s t2_base (memcmp, 17408 rows x 2 tokens)
+  t3_wide    BITEXACT vs iq3_s t3_base (memcmp, 17408 rows x 3 tokens)
+  t4_wide    BITEXACT vs iq3_s t4_base (memcmp, 17408 rows x 4 tokens)
+  t4_wide2   BITEXACT vs iq3_s t4_base (memcmp, 17408 rows x 4 tokens)
+  t2_s2r     BIT MISMATCH vs iq3_s t2_base - REFUSED
+  t3_s2r     BIT MISMATCH vs iq3_s t3_base - REFUSED
+  t4_s2r     BIT MISMATCH vs iq3_s t4_base - REFUSED
+  t4_s2r2    BIT MISMATCH vs iq3_s t4_base - REFUSED
+  config        T    us/call       GB/s    spread   per-rep us
+  t1_base       1      470.6       81.5     0.25%   [470.6 471.5 470.4]
+  t1_aln        1      467.4       82.1     0.37%   [466.8 467.4 468.5]
+  t2_base       2      616.4       62.4     0.58%   [613.0 616.4 616.6]
+  t3_base       3      774.2       49.8     0.65%   [770.5 774.2 775.6]
+  t4_base       4      867.7       44.5     0.23%   [867.7 865.9 867.9]
+  t4_base2      4      867.0       44.5     0.18%   [867.0 866.0 867.6]
+  t2_share      2      547.6       70.2     0.42%   [546.1 547.6 548.4]
+  t3_share      3      726.4       53.0     0.49%   [726.4 726.2 729.7]
+  t4_share      4      828.8       46.6     0.18%   [828.8 828.4 829.9]
+  t4_share2     4      829.9       46.5     0.33%   [828.5 829.9 831.2]
+  t2_aln        2      554.6       69.3     0.45%   [553.2 555.7 554.6]
+  t3_aln        3      749.4       51.4     0.38%   [747.5 749.4 750.4]
+  t4_aln        4      919.6       42.0     0.46%   [919.5 923.7 919.6]
+  t4_aln2       4      920.3       42.0     1.24%   [913.6 920.3 924.9]
+  t4_cfull      4      491.5       78.5     0.37%   [490.1 491.5 492.0]
+  t4_cfull2     4      491.6       78.5     0.52%   [491.6 491.6 489.1]
+  t4_cx         4      366.8      105.2     1.46%   [369.5 366.8 364.2]
+  t4_cy         4      351.4      109.8     0.32%   [351.4 351.2 352.3]
+  t2_wide       2      572.7       67.1     0.25%   [571.8 572.7 573.2]
+  t3_wide       3      750.5       51.3     0.29%   [748.8 750.9 750.5]
+  t4_wide       4      857.9       45.0     0.07%   [858.0 857.4 857.9]
+  t4_wide2      4      858.6       45.0     0.14%   [857.6 858.6 858.8]
+  t2_s2r        2      527.4       72.9   100.28%   [0.0 527.4 528.9]
+  t3_s2r        3      697.1       55.3   100.04%   [0.0 697.4 697.1]
+  t4_s2r        4      806.4       47.9   100.22%   [0.0 806.4 808.2]
+  t4_s2r2       4      794.8       48.6   101.64%   [0.0 794.8 807.8]
+  iq3_s T=4 share verdict: -4.5% vs base
+  iq3_s T=4 aln verdict: +6.0% vs base, +11.0% vs share (the served increment)
+  iq3_s T=4 wide verdict: -1.1% vs base, +3.5% vs share (the served increment)
+  iq3_s T=4 consume ceilings: cfull 491.5 us (78.5 GB/s) | cx 366.8 us (105.2 GB/s) | cy 351.4 us (109.8 GB/s)
+  iq3_s T=4 decode+dp4a tax: +68.6% (share vs cfull); x-only / y-only load time ratio: 1.04
+  iq3_s T=4 s2r verdict: -7.1% vs base, -2.7% vs share (the served increment)
+  iq3_s session law: worst per-config spread 101.64% VOID (gate 1%)
+
+control: t4_base2/t4_share2 are the in-run controls (bit + spread);
+base-vs-share deltas at same T are the A/B verdicts; session law 1%.
+session done rc=1, releasing lock

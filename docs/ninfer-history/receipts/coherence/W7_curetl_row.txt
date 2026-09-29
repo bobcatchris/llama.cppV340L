@@ -1,0 +1,10 @@
+=== W7 CURE-BIN TIMELINE (rocprof leg) — AR-overlap hypothesis FALSIFIED: nccl ARs are 100% serialized with GEMM on all four dies, cure or no cure ===
+ts: 2026-09-19 01:09-01:16 CDT | bin 2c8901d3d18adef1 (cure + honest ar instrument) under rocprofv3 --hip-runtime-trace --kernel-trace --memory-copy-trace (desk leg-B recipe, absolute path /opt/rocm-6.2.0/bin/rocprofv3); ONE 2k probe: parity BLUE/stop/52, wall 19.1 s (trace overhead small vs desk's +7.7% on the stalled bin)
+steady 1.0 s window (median nccl start +-0.5 s), per agent/die:
+  agent 1: nccl busy 101.0 ms | gemm busy 806.1 ms | OVERLAP 0.0 ms (0.0% of nccl)
+  agent 2: nccl 141.4 | gemm 768.9 | OVERLAP 0.0 (die-to-die AR spread 101-141 = straggler variance, matches desk's max-11.1 ms straggler note)
+  agent 3: nccl 132.3 | gemm 778.0 | OVERLAP 0.0
+  agent 4: nccl 116.0 | gemm 792.2 | OVERLAP 0.0
+VERDICT: the ARs run on the same in-order stream as compute — overlap is impossible by construction. The PLOG-060 paired-A/B gain is therefore FULLY attributed to the thermal-integrator + enqueue-pattern mechanism (PLOG-060's primary story); the AR-overlap alternative is dead. And the honest-instrument books close: gemm ~756-806 + ar ~101-141 + body + gap ~= wall per window (756+123+43+69 = 991 vs OPTRACE wall 978-992 at PLOG-062)
+consequence for the AR floor desk premise: TRUE prefill AR ~120 ms/chunk serialized (12% of chunk wall) is REAL and NOT hideable by software overlap on this stream structure — reducing it needs fewer/fuser/cheapen ARs (algorithmic), not scheduling. That is the #2 prefill item's honest shape
+provenance: w7_cure_tl/W7_cure_tl_{kernel_trace 78.6 MB, hip_api_trace 105.0 MB, memory_copy_trace 6.4 MB, agent_info}.csv + W7_cure_tl_serve.log + resp_curetl_1.json + this row; CSVs committed per desk precedent; parse method: python csv stream, per-agent nccl/gemm intervals, two-pointer overlap in median-centered 1 s window

@@ -1,0 +1,10 @@
+== ninfer W4 one-shot-AR liveness guard suite (host CI class, W4-LOCKSTEP-LIVENESS) ==
+[L1] OK  src/core/multi_gpu/ar_liveness.h — constants at anchors + scanner/dump/census single home
+[L2] OK  src/core/multi_gpu/ar_watchdog.h — ArWatchdog present; default death = dump + _exit(72)
+[L3] OK  src/core/multi_gpu/one_shot_allreduce.cu — gate = PASS-fresh / PASS-stale(bit4+diag) / TIMEOUT(diag); stall injector wired
+[L4] OK  src/core/multi_gpu/one_shot_allreduce.cu — 2-rank kernel + launch site carry zero cure/injector tokens
+[L5] OK  src/core/multi_gpu/one_shot_allreduce.cu — B2: stamp -> census -> deadline; deaths 71/73; N-rank retries loud
+[L6] OK  src/core/multi_gpu/tp_group.cpp — gate default-OFF; watchdog arm env-branch-only; disarm in dtor; world>2 heartbeats
+[L7] OK  src/core/multi_gpu/one_shot_allreduce.cu — 3 injector envs present in the .cu only; defaults dormant
+[BH] OK  behavioral harness — PASS (20 scenarios, incl. real _exit(72) child)
+GUARD RESULT: GREEN — L1-L7 clean + behavioral harness PASS; exit 0

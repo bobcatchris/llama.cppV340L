@@ -1,0 +1,82 @@
+W7 MAD-MIX ROW — the v_mad_mix_f32 GEMM arm: measured KILL at 0.48x V0 (pre-registered <1.10x), 2026-09-18
+bin: bin/w7_madmix_bench (hipcc -O3 -DNDEBUG -std=gnu++20 gfx900 -DUSE_PROF_API=1; production law line +
+  src/core/device.cu; lane amd/wo-w7-body). log: W7_madmix_bench_run1.log. Harness VALIDATED: V0 same-run
+  reproduced the banked pk16-row numbers within 0.5-2.3% (3123.5/2773.0/3094.3/2384.5 vs 3157.5/2830.1/
+  3166.4/2396.1), mclk ramped to level-3 (945 MHz), CEILING copy 358.7 GB/s — clean window, ratios same-band.
+
+PROVENANCE (step 1 of the work order): upstream precedent Fetched and read —
+  github.com/daimonionnn/amd-vega-rocm-vulkan-llm-toolkit patches/0001-ggml-cuda-mad-gfx900-mad-mix.patch
+  (+ patches/README.md). Exact inline-asm spelling adopted verbatim (two ops per half2):
+    v_mad_mix_f32 %0, %1, %2, %0 op_sel:[0,0,0] op_sel_hi:[1,1,0]   (low halves)
+    v_mad_mix_f32 %0, %1, %2, %0 op_sel:[1,1,0] op_sel_hi:[1,1,0]   (high halves)
+  PROBE (this part, 2026-09-18): hipcc 6.2.41133 --offload-arch=gfx900 assembles the op (2 emitted from the
+  literal spelling) and a 1-thread semantics kernel returned EXACTLY 1+255*255-3 = 65023 vs the fp64
+  reference (a fp16-formed product reads 65024-3+1 = 65022 — the product IS formed in fp32; op_sel halves
+  confirmed). mad-mix (LLVM feature mad-mix-insts) is PRESENT and correct on this ROCm/gfx900. Their
+  measured llama.cpp wins (+24%/+157% decode, FA spills 10598->6) were in FA-TILE KQ accumulation —
+  short asm chains, no big accumulator tile. That context matters for the verdict scope (below).
+
+ARMS (bench-local in tools/v340l/w7_pk16_bench.cu, --madmix mode; the shipped
+  src/ops/linear/nvfp4/nvfp4_tiled_gemm_hip.cu is BYTE-IDENTICAL — promotion was contingent on PASS):
+  madmix-FLUSH: the work order's literal design — e2m1 pair LUT emits packed fp16 pairs, x staged fp16
+    (D3 bridge), raw w*x products accumulate in an fp32 gacc[4][kS], per-group flush acc=fmaf(gacc,coeff,acc).
+  madmix-wpair: the census-driven rescue — coeff2-in-pair fold (pw2=__hmul2(pair,coeff2), the pk16 W=32
+    exact-class fold), mad-mix accumulates DIRECTLY into the fp32 acc. NO gacc file, NO flush, NO fp16
+    window. Mantissa-exact: e2m1(<=2 sig bits) x e4m3(3 sig bits) <= 6 <= fp16's 10 sig bits, and with
+    divisor=1 fl32(pw2*x+acc) is the SAME single-rounding op as V0's fmaf(w*coeff,x,acc).
+
+KILL-SWITCH CENSUS (R3, w3_census.py on the -S compile, BEFORE any bench; same-compile V0 anchor):
+                                  V0 <80,128> shipped | FLUSH <80,128>  | wpair <80,128>  | wpair @minBlk2
+  instructions                    3143                | 4872            | 4753            | 5140
+  VGPR (next_free)                128                 | 256 (FULL CAP)  | 256 (FULL CAP)  | 128
+  private (scratch)               80 B                | 376 B           | 268 B           | 780-888 B
+  MAC-class ops                   1024 fma + 144 mul  | 2048 mad-mix (+128 fma flush) | 2048 mad-mix | 2048
+  decode stream (bfe/lshl/and/or) 490                 | 326             | 326             | —
+  ds_read (b32-equiv)             272                 | 368             | 368             | —
+  s_waitcnt                       212                 | 396             | 454             | —
+  occupancy                        2 blocks/CU        | 1 block/CU      | 1 block/CU      | 2 blocks/CU
+  VERDICT: the pre-registered bar (VGPR <=128, scratch ~0) is TRIPPED by BOTH arms. Mechanism: ONE
+  k-tile body = 2048 back-to-back mad-mix ops (4g x 8v x 8t x 4r x 2elem) in opaque asm chains ->
+  the allocator hoards to the 256-VGPR cap and spills; occupancy halves to 1 wave/SIMD. The
+  minBlocks=2 resourcing restores 128 VGPR but at 3x the spill traffic (780 B) — strictly worse
+  class, not benched. FLUSH carries the extra gacc file (+32 VGPR class) and is worse than wpair
+  everywhere (measured +15% slower), confirming the census ordering. The wpair arm was benched
+  anyway because its 268 B spill is V0's own 80 B spill class (not the 2.9 KB/lane pk death), the
+  window is small, and the measured number — not the static census — is the decisive record.
+
+PRE-REGISTERED ACCEPTANCE (in the bench banner before firing): madmix/V0 mean over the 4 geometries
+  >=1.25 PASS -> integration desk | 1.10-1.25 AMBER | <1.10 KILL. relL2 vs REF gate 1e-2 every row.
+
+MEASURED (M=128, four full geometries, GF/s | relL2 vs REF | ratio vs V0):
+  AttnInput   14336x5120: V0 3123.5 | FLUSH 1129.1 (0.36x) | wpair 1458.2 (0.47x) | relL2 0.00e+00 PASS
+  GdnInput    16384x5120: V0 2773.0 | FLUSH 1078.9 (0.39x) | wpair 1395.3 (0.50x) | relL2 0.00e+00 PASS
+  MlpGateUp   34816x5120: V0 3094.3 | FLUSH 1106.2 (0.36x) | wpair 1429.8 (0.46x) | relL2 0.00e+00 PASS
+  Residual6144 5120x6144: V0 2384.5 | FLUSH  933.2 (0.39x) | wpair 1149.9 (0.48x) | relL2 0.00e+00 PASS
+  MEAN madmix-wpair/V0 = 0.48x  =>  PRE-REGISTERED VERDICT: KILL (<1.10x AMBER floor).
+
+NUMERICS NOTE (the insight was RIGHT; the delivery was WRONG): relL2 = 0.00e+00 — madmix-wpair is
+  BIT-IDENTICAL to V0/REF on device, exactly as the mantissa-exactness argument predicted (e2m1 x e4m3
+  in fp16 is exact; mad-mix's fl32 product+acc equals V0's fmaf). The mad-mix op itself works and is
+  accurate on this part. What failed is RESOURING, not math or the ISA feature.
+
+WHY (mechanism): the GEMM tile's 32-accumulator working set is irreducible (64r x 128t / 256 threads),
+  and the 2048-op asm MAC body is opaque to the scheduler — it cannot interleave the chains with the
+  decode stream the way it does for V0's transparent fmaf nest. Result: 256 VGPR + spill + occupancy 1
+  block/CU (V0: 128 VGPR, 2 blocks), and the ~2000-op LDS/addressing/wait floor (454 waits vs V0's 212;
+  368 ds_reads; 230 v_lshl_or address ops) now dominates an issue stream that mad-mix only halved. V0's
+  wasted 52% decode stream was NEVER free lunch — it was the scheduler's latency-hiding material. The
+  same pattern that killed pk16 (its best resourcing point measured 1.34x under a 2.0x bar) kills this
+  family at the resourcing stage before the MAC-density gain can even be quoted.
+
+LEDGER CONSEQUENCE: the mad-mix GEMM lever on THIS hardware/compiler (gfx900, ROCm 6.2.0) is CLOSED —
+  KILL, first and only bench, no tuning loop (same closure grammar as the pk16 row: the gap is 2.1x,
+  not a knob). This REINFORCES W7_pk16_bench_row's conclusion: the GEMM front has no software lever on
+  gfx900/6.2; REV2's additive path (finalize + AR floor + capture => ~140-160 tok/s class) stands and
+  300+ still requires the hardware/compiler reopeners (gfx906 dot10, ROCm wait-emission change).
+  SCOPE (honest): this kills the GEMM use ONLY. v_mad_mix_f32 itself is probe-verified on this part and
+  upstream-measured in FA-style KQ accumulation (short chains, small accumulator sets) — future
+  attention (not GEMM) desks may cite this row's probe sections, not its verdict.
+FILES: tools/v340l/w7_pk16_bench.cu (madmix namespace + --madmix mode; shipped TU untouched),
+  tools/v340l/w3_census.py (+v_mad_mix_f32 census class, additive), bin/w7_madmix_bench,
+  results/amd/coherence/W7_madmix_bench_run1.log. /tmp probe artifacts (mm_probe.*, mm_run.*, mm_census*.s)
+  are throwaways — cleaned.

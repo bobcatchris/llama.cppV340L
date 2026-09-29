@@ -1,0 +1,28 @@
+# COORDINATOR RESTART KIT — successor chair (AMD/V340 line)
+
+**From**: coordinator pi 01a09a03 (this desk, cold-started 09:04Z, handing off ~12:0xZ). **Read in this order**: (1) this kit; (2) `docs/amd/INDEX.md` (front door to action-changing docs); (3) `docs/amd/COORDINATOR.md` STATE blocks newest-first (rules + history); (4) `BOOT_LAUNCH_RUNBOOK.md` before any device word; (5) `WO_VRAM_1_deconstant_preflight.md` + `WO_TP4_all_lanes.md` (live work orders).
+
+## FIRST TWO MOVES (both owed by the chair personally)
+1. **CLAIM FILE**: `echo pi-dual_5060_ti_ninfer-<your-hub-number> > ~/.pi/agent/tmp/pinger_amd/coordinator_id.txt` — mine currently says 106391 (inherited hub identity; my sends resolve there). Verify with one comm_send; if the pinger's "no online coordinator claim" alert fires, your name is wrong.
+2. **USER ESCALATION — item 7** (nondeterminism) — drafted below, deliver verbatim-ish; the user already knows the shape.
+
+## LIVE QUEUE (12:0xZ), with seats — everything dispatched to the LANE NAMES (agent2/3/4/5/gemini), which survive session changes; session ids are never addressed or recorded — they decay at restart and citing one is addressing a ghost
+- **agent4**: WO-VRAM-1 fix → WO-TP4-A engine parameterization → item 5 remainder (B4 window + warp.cuh comment fix) → tp1-control only if agent2 goes quiet (ask first). Comm rules delivered with the assignment.
+- **agent5**: WO-TP4-B transport cost table (zero-card, RCCL-first chair prior overridable by data, cycle-class mandatory); item-6 seed-doc duty; gen-64 + second-request cells ride agent2's window as reader add-ons. Ready-stance confirmed; they cited a stale main tip once — fetch-before-cite will self-heal.
+- **agent2**: item 3 host suite (9 tests, four-count, CPU) → tp1-control stamp request → USER-TASK real-context TPS cell (their directive: "real context, a few thousand tokens, decode and refill") on dev2,3. Their "04:00→08:00 grant" citation remains STRUCK (no locus produced); user-directive basis stands.
+- **agent3**: ITEM 7 seat (zero-card code-read arena/comm-init → intra-server 5× repeat grant request ~60 s = the per-boot-vs-per-request bisector) → B4 parallel-track → WO-TP4-C. Also holds the forensics inquiry (freeze: no fetch --prune, no new worktrees; registry verified; boot-stamps carry one logged fetch each).
+- **Gemini (hub-only)**: two OPEN tickets — (a) hip_shim README registration row (unblocks the clipped hunk re-merge, text on agent2's branch), (b) shim-verifier poison-gap falsifier (v340l/21, chair-reproduced; any-#define-touching-__shfl* refusal or -E witness, LAW-17 falsifier required). Comm rule for them: hub-direct to chairs only, read #general before composing (their relay-lag history: three mails per one commit, #696-#712).
+- **Cards**: all four idle, KFD-zero measured 11:5xZ; dev0 = DISPLAY (never pair on it); dev2,3 = the working pair; dev1/dev3 single-card windows grantable.
+
+## STATE OF THE GOALS
+- **TP2 (Phase 1)**: item 1 CLOSED-PASS reworded-bar (coherent/zero-fault/arms-traced; cross-replay same-token DEAD — killed by 17g4/17g5 data, STATE b2ea6c4a); items 4/5/6 remain in the queue above; closeout ≈ 2 h of focused lane work. main is BOOTABLE and BOOTED (17g3/g5) — merged tree serves q3 TP2 on this hardware, 32/32 coherent, ~4.8 tok/s marginal decode / ~16 prefill at smoke shape.
+- **TP4 (Phase 2/3)**: delta-map merged + RULED (pure engine port, artifact frozen); WO-TP4 spec published with hard prereqs — P0 = TP2 device items consumed, P1 = item 7 adjudicated BEFORE any TP4 parity gate is written (byte-identity semantics now load-bearing on that answer). One 4-card window ends in G-AMD-18 first-light; estimate ≈ one CPU day + window after TP2 closes.
+
+## WHAT NOT TO TRUST (including this kit)
+Every sha/tip here ages at merge speed (main moved ~25 times this shift). Re-derive at use; the pinger text (`ping_msg.txt`) is the fast-facts mirror and carries the same expiry. Tonight's whole ledger exists because trusted prose went stale — the successor's own laws: verify-before-rule, receipts name artifact+command+baseline+HASH-ALGORITHM, counts name predicates, stamps name refs, status docs ship their falsifier, fixed-resource assignments get measured before they get obeyed ("blocked on X owes: is X the only place X can happen" — the pair-convention ruling that unblocked everything).
+
+## COMM PROTOCOL (user order, binding, in the board record)
+pi↔pi = intercom to the LANE NAME (agent2/agent3/agent4/agent5) — names are stable, session ids are not; a recipient addressed by pid is a recipient who has already restarted and lost the mail. #general = chair rulings + explicitly-requested board rows. gemini = hub-direct by necessity. Chair obeys it symmetrically — rulings on the channel, running commentary nowhere. If lanes start broadcasting again, the fix is the 1:1 reminder, not a channel post about it.
+
+## ITEM 7 — USER ESCALATION DRAFT (deliver on resume)
+"The swap/replay experiment you authorized closed TP2's item 1 and found something bigger: greedy serve is nondeterministic ACROSS BOOT even at identical config+pair-order (17g4 vs 17g5, machine-decided sha), but 17g5 reverted byte-identical to 17f — a small discrete attractor-set, warm-cycle-correlated, pointing at uninitialized/timing-sensitive state before the first logits, not RNG. agent3 owns the hunt (zero-card first; the decisive test is one 60-s warm boot repeating the request inside ONE server). Consequences being managed: 'same-token' bars are retired board-wide until it's adjudicated; parity tables and future TP4 gates use coherent/zero-fault/arms-traced instead, and TP4's parity-gate authoring is gated on the answer. Nothing ships is false — coherence held every boot."

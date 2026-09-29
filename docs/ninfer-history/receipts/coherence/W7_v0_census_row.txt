@@ -1,0 +1,17 @@
+W7 V0 CENSUS ROW — the NVFP4 conversion tax, measured on the SHIPPED kernel (answers "is the conversion hurting us": YES), 2026-09-18
+method: hipcc -S (6.2.0, -O3, gfx900, production flags) on src/ops/linear/nvfp4/nvfp4_tiled_gemm_hip.cu; V0 = <80,128> instantiation (the served posture); body lines 2100-5490 of /tmp/v0_census.s
+V0 <80,128> body mix (per kernel body):
+  MAC stream:        v_fma_f32 1024
+  conversion/addr:   v_lshl(+rev) 365, v_and_b32 181, ds_read 208, v_mov_b32 127, v_mul_f32 144 (scale muls),
+                     v_or_b32 43, v_bfe 33, v_lshl_or 1   => ~1102 ops = 52% of the body
+  sync:              s_waitcnt 212
+  mem:               private_segment_fixed_size 80 (the known scratch), VGPR 128-class
+VERDICT: the NVFP4 decode/addressing stream EXCEEDS the MAC stream (52% of issued instructions) on an
+  issue-bound kernel (22-29% of fp32 nominal). The conversion tax is REAL and is the direct mechanism
+  behind V0's floor. Corroborates the W3 sketch census (decode 169 vs fma 128 in that family) on the
+  SHIPPED kernel. The fix-shaped lever (weight materialization, deletes the 1100-op stream) is PARKED
+  by user order (REV2 §2.5, NVIDIA precedent) — this number is banked so the future decision is informed.
+NOT a win for standard q4: Q4_0-style formats pay the SAME nibble-extraction + per-block-scale structure
+  (the tax is the 4-bit PACKING, not the NVFP4 encoding), plus a requantization quality loss on an
+  NVFP4-native model. int8 would ADD load ops per value (worse for issue-bound). In-family amortization
+  was already falsified by the sweep (V2, the more-tokens-per-thread point, lost 25% — LDS occupancy beat it).

@@ -1,0 +1,8 @@
+PREFILL_BODY_row (P2 probe, 2026-09-18 ~02:4x, coordinator-run; bin 74219298c4f3d4a4, NINFER_PREFILL_OPTRACE=2, plen-2016 conc=1 first-request, finish=stop content='BLUE' sane)
+VERDICT — body split NAMED (mean_ms/chunk, 4-rank, rank-uniform 2% = compute class):
+  dn (delta-net chunked trio wy/sp/out) 501.6-513.7 = 73% of body — FIX-A
+  gate (gdn gating proj gmma) 78.1-82.1 — FIX-B
+  gqa (prompt SIMT flash) 54.7-57.4 — FIX-C
+  rest (gate/upk/conv/gbet/gnorm/aunpack/qknorm/agate/mnorm/mact) ~15; unbr 57.9-91.3; body sum 677.5-698.3 (vs P1 645 @1996 — +2% probe len consistent)
+wall 28.2 s incl decode tail => ~70.7 tok/s prefill-class, on the 75.5 anchor
+STAFFING ORDER: FIX-A dn -> FIX-B gate -> FIX-C gqa (descending ms, body 690 -> ~75-90 target)

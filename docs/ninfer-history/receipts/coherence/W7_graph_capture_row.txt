@@ -1,0 +1,13 @@
+W7 GRAPH CAPTURE ROW — NINFER_PREFILL_GRAPH=1 steady chunk capture: PRE-REGISTERED KILL (no wall change), 2026-09-18
+bin 75957b8c62822b8a (branch amd/wo-w7-graph, compile-proven, host guards GREEN); platform: pinned clocks + iommu=pt
+leg A (accidental control): env missing (sed miss) -> unset path, zero graph traces, steady walls 1028-1035 — byte-identity claim VALIDATED
+leg B (armed): [PREFILL-GRAPH] captured on all 4 ranks (arena 1.31..86.2 MB span, 85 MB body), replayed chunks 3-16
+  replayed chunk-16 wall 1026.9 vs eager 1028-1035 => delta ~-1..-8 ms => KILL (<20 ms pre-registered floor)
+MECHANISM (why the W2 desk's +40..-90 estimate was wrong): steady prefill chunks are NOT host-launch-bound —
+  the async queue hides kernel launches ahead of the device (W6 observation: host raced 336 launches ahead);
+  steady gap was already ~20 ms. Graph capture eliminates HOST enqueue cost, which was never the bottleneck.
+  The unbr 53 ms is in-layer device-side slack the graph replay does not remove (same kernels, same device time).
+FINALIZE NOTE: chunk-17 in this leg: gap 355 (the named stem quantum; the 660 H2D cure IS active in this bin's lineage),
+  wall 1022 — consistent with the finalize desk's post-cure numbers.
+VERDICT: family CLOSED at steady state. The implementation (commits on amd/wo-w7-graph, merged) is preserved for the
+  day the GEMM wall shrinks enough that host enqueue becomes the bottleneck — reopen only then.

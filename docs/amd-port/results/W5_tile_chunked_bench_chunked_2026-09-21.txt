@@ -1,0 +1,50 @@
+ggml_cuda_init: found 1 ROCm devices (Total VRAM: 8176 MiB):
+  Device 0: AMD Radeon Graphics, gfx900:xnack- (0x900), VMM: no, Wave Size: 64, VRAM: 8176 MiB
+  [s0 ffn_gate   ] post-alloc free 7996.0 MiB
+ggml-cuda: GGML_CUDA_TILE_FP16=1, packed-fp16 tile GEMM route enabled
+ggml-cuda: GGML_CUDA_TILE_FP16_CHUNKED=1, chunked weight dequant into a reusable slice window
+tile_fp16_chunked_run: slice window 17.1 MiB (f16 14745600 B + q 3168000 B), 7976.9 MiB free
+operator(): tile route engaged, chunked dequant (K=5120 N_d=5760 M=128 ks=4 window=17.1 MiB ldc=5760)
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s0 ffn_gate   ] post-warmup free 7964.0 MiB
+  [s1 ffn_up     ] post-alloc free 7946.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s1 ffn_up     ] post-warmup free 7946.0 MiB
+  [s2 ffn_down   ] post-alloc free 7924.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s2 ffn_down   ] post-warmup free 7918.0 MiB
+  [s3 gdn_qkv    ] post-alloc free 7906.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s3 gdn_qkv    ] post-warmup free 7906.0 MiB
+  [s4 ssm_out    ] post-alloc free 7896.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s4 ssm_out    ] post-warmup free 7896.0 MiB
+  [s5 gdn_gate   ] post-alloc free 7888.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s5 gdn_gate   ] post-warmup free 7888.0 MiB
+  [s6 attn_q+gate] post-alloc free 7874.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s6 attn_q+gate] post-warmup free 7874.0 MiB
+  [s7 attn_out   ] post-alloc free 7864.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s7 attn_out   ] post-warmup free 7862.0 MiB
+  [s8 attn_k     ] post-alloc free 7858.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s8 attn_k     ] post-warmup free 7858.0 MiB
+  [s9 attn_v     ] post-alloc free 7854.0 MiB
+ggml_backend_cuda_graph_compute: CUDA graph warmup complete
+  [s9 attn_v     ] post-warmup free 7854.0 MiB
+tile-chunked bench [CHUNKED]: M=128 reps=3 x 20 iters | TILE_FP16=1 CHUNKED=1 WIN_MIB=default | free 8160.0 MiB
+shape              K   N_d    n      qMiB    f16MiB      ms/iter       TF/s    freeMiB   peakMiB
+ffn_gate        5120  5760   64     12.08     56.25      1.89650       3.98     7964.0      52.0
+ffn_up          5120  5760   64     12.08     56.25      1.89920       3.98     7946.0       0.0
+ffn_down       17408  1664   64     11.87     55.25      3.40360       2.18     7918.0       6.0
+gdn_qkv         5120  3328   48      6.98     32.50      1.53485       2.84     7906.0       0.0
+ssm_out         6144  1664   48      4.19     19.50      1.36185       1.92     7896.0       0.0
+gdn_gate        5120  2048   48      4.30     20.00      1.26535       2.12     7888.0       0.0
+attn_q+gate     5120  4096   16      8.59     40.00      1.60230       3.35     7874.0       0.0
+attn_out        6144  1664   16      4.19     19.50      1.36335       1.92     7862.0       2.0
+attn_k          5120   256   16      0.54      2.50      0.90315       0.37     7858.0       0.0
+attn_v          5120   256   16      0.54      2.50      0.89750       0.37     7854.0       0.0
+call-weighted die agg: 2043.3 GF/ubatch, 736.79 ms/ubatch -> 2.77 TF/s/die wall
+VRAM proof [CHUNKED]: peak transient delta over shapes 52.0 MiB (envelope 200.0 MiB) -> FIT

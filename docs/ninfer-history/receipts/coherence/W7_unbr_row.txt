@@ -1,0 +1,132 @@
+W7 UNBR-ATTRIBUTION ROW — the prefill "unbr ~53 ms/chunk" is NAMED (2026-09-18, W7 unbr desk)
+=============================================================================================
+Bin under test: /home/chris/artifacts_bin/ninfer-serve_0572d4108317ee85.bin (serve_10k.sh
+canonical; OPTRACE knob strings-verified pre-boot). Worktree amd/wo-w7-body. Desk file:
+docs/amd/W7_UNBR_desk.md (checkpoint law, appended per step).
+
+PROBES (parity GREEN both): 2k = plen-2075 mt64 temp0 (exact fintail_async shape) ->
+'BLUE'/stop/52 wall 19.5 s. 10k = serve_10k shape (9938 alphas, mt192) -> 'BLUE'/stop,
+wall 102.5 s (~97.6 tok/s class, band-uncontrolled). Clocks: AUTO policy per §6 thermal
+reversal; read-only pp_dpm_sclk sidebands in W7_unbr_clocks.log (sclk rests 300 MHz between
+chunks, boosts under load; no sysfs writes).
+
+RE-DERIVATION (R5, from this window's own legs, not the plan's arithmetic):
+- Steady chunks 3-16 (2k leg): unbr 49.5-57.9, mean ~52.3; chunk2 94.2 (first steady, 2x);
+  finalize chunk17 398.9. Boot-A BODYSUM rank0 n=17: unbr=72.2 body=159.6 (request mean,
+  finalize-pulled). 10k leg BODYSUM n=79: unbr=54.9 — CONTEXT-LENGTH-INDEPENDENT (gqa grows
+  8->55 ms through the 2k request and to 160 mean at 10k; unbr flat). The body "droop rise"
+  in REV2 §1 was partly misread: it is causal-attention context growth (gqa), not clocks.
+
+INSTRUMENTS: (a) NINFER_PREFILL_OPTRACE=3 leg (knob verified in the serving bin; no tree
+edits needed) -> W7_unbr_optrace3_serve.log; (b) SAME BIN under rocprofv3
+(--hip-runtime-trace --kernel-trace --memory-copy-trace, csv) + OPTRACE=1, ONE 2k probe
+(parity GREEN; +7.7% wall trace overhead) -> w7_unbr_tl/W7_unbr_tl_{kernel,hip_api,
+memory_copy}_trace.csv. Timeline timestamps share CLOCK_MONOTONIC with OPTRACE t= stamps
+(verified: 3948/3952 tiled GEMMs fall inside the log-derived probe window).
+
+===========================================================================================
+1. PER-CHUNK BUDGET — where the ~53 ms "unbr" goes (steady T=128 chunk, TP4, this window)
+===========================================================================================
+Chunk-5 device timeline (GPU0/rank0; ONE queue, ZERO overlap, 98.5% busy, wall 1025.0 ms):
+  gemm kernels     821.4 ms  (nvfp4 tiled 714.2 + w8_rowsplit 107.2 — full-attn qkv/o-proj
+                             run W8-SIMT, ~5.4-6.4 ms/launch, NOT nvfp4; all inside gemm col)
+  nccl AR busy     119.5 ms  (125 ARs, mean 956 us, p50 742, max 11.1 ms straggler)
+  axpy (AR fold)     1.0 ms
+  named-12 op busy  ~73   ms  (gqa 20.0 rising, dn trio 31.2, gate gmma 9.9, mact 4.3,
+                             conv 2.1, upk 1.3, unpacks 0.8, norms 2.3, rope 0.2, ...)
+  unnamed kernels    2.3   ms  (A)  full-attn input rmsnorm 16x/chunk (~0.2), i32 position
+                             helpers, fill, misc glue — the ONLY truly unbracketed kernels
+  IDLE              15.2   ms  (618 intervals):  C = 14.3 sync-class (host blocked) +
+                             B = 0.9 launch-gap (host free) 
+  H2D in-window      0.016 ms (D, 4 copies) — but see FINDING 2 for their HOST cost
+  E (unexplained)    ~0     (closes within cross-boot band slop)
+
+OPTRACE unbr bucket (body − Σ12 spans) vs timeline:
+  unbr_measured ≈ 52-72 ms (band/leg dependent; steady-chunk 50-56)
+  = ~59-60 ms  AR-BRACKET UNDERCOUNT (see FINDING 1) — real AllReduce device time,
+               misattributed into body->unbr by P1's span arithmetic
+  + ~14.3 ms   SYNC-CLASS DEVICE IDLE (FINDING 2) — real recoverable waste
+  + ~0.9 ms    launch gaps
+  + ~0.3-2 ms  unnamed kernels (A) + in-body H2D (D)
+  E ≈ 0: the bucket CLOSES (resid |3.5-7.7| in BODYSUM reconciliation, as designed).
+
+===========================================================================================
+2. FINDINGS (mechanisms, each measured)
+===========================================================================================
+FINDING 1 — the ar bracket drops the mixer AR (accounting, not waste):
+  OPTRACE ar column = 60.3 ms/chunk but nccl device busy = 119.5 ms (2.0x). VerifyLayerTrace
+  holds ONE ar event pair per layer (ev_ar[layer][slot][0/1]); BOTH per-layer allreduces call
+  vt.ar_begin/ar_end (mixer: attn o-proj :2603-2605 and gdn out :3013-3016; mlp: mlp_tail
+  :3219-3221). The mlp site RE-RECORDS ev_ar[..][0], so the pair times only the MLP AR; the
+  ~64 mixer ARs/chunk (~59-60 ms) fall outside every bracket -> P1's body = window − gemm −
+  ar absorbs them -> unbr prints them. EXCERPT (per-layer device sequence, one GDN layer):
+    axpy 8us | rmsnorm 14.8us | gating 213us | tiled<80> 2869us | unpack 27 | conv 41 |
+    gbet 8 | dn(l2,wy,sp,out) 657 | gnorm 9 | tiled<24> 922 | NCCL 1010us | axpy |   <- mixer AR
+    mnorm 14 | tiled<80> 5556 | silu 69 | tiled<68> 2522 | NCCL 726us | axpy           <- mlp AR (the only one timed)
+  Fix = instrumentational (2 pairs/layer or per-AR slots); zero wall ms; restores honest
+  attribution (ar 60 -> ~120) and re-premises the AR floor desk (see fixes).
+
+FINDING 2 — the per-chunk pageable-H2D enqueue stall (real waste, the cure target):
+  Per chunk EACH rank thread (4/4 identical; 16 giant blocked calls each over the prefill)
+  issues small pageable H2Ds whose HOST calls block ~the full chunk:
+    hipMemcpyAsync cid281609: host block 991.5 ms; device transfer 3.7 us (~512 B);
+      executes at chunk end (in-order stream drains; pageable staging cannot return until
+      the DMA retires). Zero other API calls overlap the block (thread fully pinned).
+    plus a medium 27.5-us H2D blocking the host 51-60 ms/chunk.
+  Class = the CURED finalize bug (PLOG-055 "108-B staging size class", 659 ms -> 0.008),
+  still live on the steady-chunk path: the 512-B size and the per-chunk cadence match the
+  chunk-ids/worker-MTP-redo copy_i32 H2D class (copy_i32 = pageable memcpyAsync wrapper,
+  text_context_impl.h :57-64; call sites :3598 chunk ids, :3883 legacy mtp ids; the
+  TAIL_ASYNC device recipe removed it only from the finalize tail).
+  Consequences (measured): all launches land in one ~65 ms burst; the compute queue runs
+  ~1 chunk deep and thin -> 618 device micro-idles (14.3 ms/chunk, sync-class C) + a 15.5 ms
+  host chunk-end sync (P1 gap col 17-24 ms is this + embed); fragility: any device hiccup
+  drains the thin queue straight to the host stall.
+
+===========================================================================================
+3. RANKED FIX LIST (biggest first; mechanism + expected recoverable ms)
+===========================================================================================
+1. PIN (or D2D) the per-chunk pageable H2D ids copies — same cure class as PLOG-055, cells
+   prove the mechanism (below). Mechanism: pageable staging cannot return until the DMA
+   retires; on a ~1-chunk-deep in-order stream that is ~1 chunk of host stall per copy.
+   Expected: the ~14.3 ms/chunk device idle closes (device then runs queue-fed end to end),
+   i.e. ~1.4% wall at the 2k class (~1025 ms chunk), PLUS robustness (today's queue depth is
+   1 — any compute hiccup serializes straight to the host). Serve-leg A/B NOT run: cure needs
+   a bin rebuild (cmake banned this window, disk 96%); standalone cell = the measured coupon.
+2. Fix the ar event-pair re-record (2 pairs/layer or per-AR slots, VerifyLayerTrace +
+   the three call sites): zero wall ms, but unbr collapses into ar where it belongs and the
+   AR optimization target is honest.
+3. RE-PREMISE the AR floor desk on the TRUE number: AR device time = 119.5 ms/chunk (not
+   60.3) = the #2 wall after GEMM (W2_AR_FLOOR_desk spec'd floor ~35 against the old 60).
+   Ring efficiency 940 us/1.05 MB/AR at TP4 PCIe — tuning RCCL/fragmentation now prices
+   against 2x the assumed target; max 11.1 ms straggler AR per chunk is its own skew clue.
+4. (informational) unnamed kernels 2.3 ms (full-attn input rmsnorm fuseable into the qkv
+   GEMM prologue, ~0.2 ms; rest glue) — below the noise bar; NOT worth a desk.
+5. (retracted premise) REV2 §4 "capture medicine (unbr 53)": graph capture's real target was
+   never 53 ms — 45 of it is AR misattribution and 14 ms is the H2D stall class; consistent
+   with the §8 capture kill (re-open condition unchanged).
+
+===========================================================================================
+4. DELIVERABLE-3 CELL (top fix, standalone, pre-registered gate PASSED)
+===========================================================================================
+Cell: results/amd/coherence/w7_h2d_stall_cell.cu (src) / w7_h2d_stall_cell (bin, gfx900)
+Gate pre-registered BEFORE first run (in the .cu header): on a stream queued with ~200 ms of
+kernels, a 512-B pageable hipMemcpyAsync must block >=100 ms while the byte-identical PINNED
+copy returns <1 ms, parity byte-equal.
+Results (3 runs, HIP_VISIBLE_DEVICES=0, box otherwise idle, W7_h2d_stall_cell_run.log):
+  run1: pageable 167.24 ms | pinned 0.66 ms | parity OK  -> PASS
+  run2: pageable 184.22 ms | pinned 0.58 ms | parity OK  -> PASS
+  run3: pageable 184.54 ms | pinned 0.63 ms | parity OK  -> PASS
+Verdict: the cure mechanism (pin the staging buffer / D2D from resident ids) is MEASURED:
+host block collapses ~300x (167-185 ms -> <0.7 ms) at identical queue depth.
+
+===========================================================================================
+5. PROVENANCE
+===========================================================================================
+Logs: W7_unbr_optrace3_serve.log (leg A, OPTRACE=3, 2k+10k), W7_unbr_tl_serve.log (leg B),
+W7_unbr_tl/ (rocprofv3 csv: kernel 54 MB, hip_api 70 MB, memory_copy 6.3 MB, agent_info),
+W7_unbr_clocks.log, W7_unbr_10k_resp.json, W7_h2d_stall_cell_run.log.
+Desk: docs/amd/W7_UNBR_desk.md. Bins: 0572d4108317ee85 only (banked; serving restored from it
+via serve_10k.sh — see restore note below). No tree source edits (knob was in-bin; the only
+new files are this desk's results/ + docs/ artifacts).
+Restore: appended below after the window closed.

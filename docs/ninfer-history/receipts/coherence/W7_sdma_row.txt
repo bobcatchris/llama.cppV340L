@@ -1,0 +1,5 @@
+=== W7 SDMA CELL — the DRAM-in-the-AR-data-plane door is CLOSED (pre-registered bar not met) ===
+ts: 2026-09-19 06:2x CDT | die 3, HIP_VISIBLE_DEVICES=3 | pinned 256 MiB buffers, 4-deep queued async copies | pre-registered: door OPEN if >=10 GB/s sustained either direction; CLOSED if <6.5 (no better than the hosted-KV kernel path)
+D2H: 3.6 GB/s | H2D: 3.3 GB/s | 1.5 MiB queued: 6.8 GB/s effective (230.7 us/copy)
+VERDICT: CLOSED. SDMA copies run at HALF the hosted-KV kernel-read path (6.5) and a third of the OPEN bar (10). A hand-rolled AR over SDMA (2 hops x ~231 us + collective sync) lands ~500-600 us/call — exactly where the RCCL SHM ring already sits (646-771 us at 1.31-1.5 MB, GATE-T). No win exists on this transport.
+completes the DRAM-for-prefill answer with receipts: (1) hosted KV = capacity play, 0.1% prefill tax (W7_kvhosted_row); (2) AR through host memory = ring optimal, SDMA/pinned/env all measured worse-or-equal (this row + GATE-T + RCCL matrix); (3) converted weights in DRAM = 50x read penalty, dead. Remaining DRAM-adjacent lever = send fewer bytes (AR quantize, A3).

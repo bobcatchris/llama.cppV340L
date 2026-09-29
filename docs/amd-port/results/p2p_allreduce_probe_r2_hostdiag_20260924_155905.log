@@ -1,0 +1,21 @@
+p2p_allreduce_probe: visible devices = 4
+
+==== FEAS: hipDeviceCanAccessPeer / EnablePeerAccess / kernel peer store / hipMemcpyPeerAsync ====
+HOSTMAP: hipHostMalloc(Mapped) -> OK, hipHostGetDevicePointer -> OK (h=0x7ce86656f000 d=0x7ce86656f000)
+HOSTMAP: post+verify from device: mism=0 token=7 -> OK
+FEAS 0->1: canAccess=0 enable=0
+FEAS 0->2: canAccess=0 enable=0
+FEAS 0->3: canAccess=0 enable=0
+FEAS 1->0: canAccess=0 enable=0
+FEAS 1->2: canAccess=0 enable=0
+FEAS 1->3: canAccess=0 enable=0
+FEAS 2->0: canAccess=0 enable=0
+FEAS 2->1: canAccess=0 enable=0
+FEAS 2->3: canAccess=0 enable=0
+FEAS 3->0: canAccess=0 enable=0
+FEAS 3->1: canAccess=0 enable=0
+FEAS 3->2: canAccess=0 enable=0
+FEAS verdict: P2P NOT available for all pairs (p2p arm skipped, host arm carries the design)
+
+==== BENCH ne=20480 (80 KB fp32), n=2, chunk 10240 elems ====
+probe timeout

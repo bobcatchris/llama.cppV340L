@@ -1,0 +1,78 @@
+WO_LEANMAC CENSUS ROW — the LEANMAC fp32 op-count-reduction GEMM arm: KILL AT THE CENSUS
+KILL-SWITCH, no window (pre-registered R1 branch), 2026-09-19, work order docs/amd/WO_LEANMAC_bench.md
+compile: census TU tools/v340l/wo_leanmac_bench.cu (includes the shipped
+  src/ops/linear/nvfp4/nvfp4_tiled_gemm_hip.cu + bench-local leanmac namespace = V0's exact
+  kernel with the design §3 pw hoist), production -O3 law line, --offload-arch=gfx900,
+  --save-temps=obj; AMD clang 18.0.0git (roc-6.2.0). NO GPU was touched — the work order's
+  step 3 gates step 4 on this census, and the bar failed. bin/wo_leanmac_bench was never
+  linked; step 4/5 perf gates never activated (nothing to measure against a falsified model).
+
+THE CENSUS (w3_census.py on the .s; V0 = both benched STILES instantiations, same compile):
+                                   V0 <80,128> shipped | V0 <96,128> shipped | LEANMAC <80/96,128>
+  instructions                     3143                | 3143                | 5773
+  VGPR (next_free)                 128                 | 128                 | 256 (FULL CAP)
+  private (scratch)                80 B                | 80 B                | 884 B
+  s_waitcnt                        212                 | 212                 | 611
+  v_fma_f32                        1024 (= 64/(g,v))   | 1024                | 2048 (= 64/(g,v))
+  v_mul_f32                        144 (= 9/(g,v))     | 144                 | 272 (= 8.5/(g,v))
+  ds_read b32-equiv                272                 | 272                 | 372
+  decode stream (bfe/lshl/and/or)  490                 | 490                 | 830
+  occupancy                        2 blocks/CU         | 2 blocks/CU         | 1 block/CU
+  (V0 numbers reproduce the banked W7_madmix_row census exactly: 3143 / 128 VGPR / 80 B /
+  1024 fma + 144 mul / 272 b32-equiv / 490 — same compile, same method, harness-anchored.)
+
+FINDING 1 — V0's shipped binary ALREADY CONTAINS THE LEANMAC DESIGN (R1 branch CONFIRMED).
+The census model (GEMM_LEANMAC §1) priced V0 at 64 v_mul per (g,v) — the coeff*e2m1_pair
+product re-issued per (row, token, element). The ISA says otherwise: 144 muls per
+16-(g,v) machine pass = 9 per (g,v), and 8 of them are THE HOISTED pw0/pw1 — the FMA
+multiplicands are pre-computed registers (v0,v4,v8,v12 / v1,v5,v9,v13 = one pw pair file
+per row), not per-token re-derivations. LLVM's LICM hoisted the loop-invariant product out
+of the kS token loop years-of-iterations before the desk did: V0 issues 64 v_fma + 9 v_mul
+per (g,v) = LEANMAC's own target form ("must show 8 v_mul + 64 v_fma", §5 step 0) is ALREADY
+the shipped signature. LLVM also split the kt body at 16 (g,v) per pass (register-pressure
+fission, 2 passes/k-tile, staging once) — V0's real issued ledger is ~97 ops per 64 MACs
+= ~1.52 ops/MAC, i.e. THE SHIPPED BINARY ALREADY SITS AT LEANMAC'S MODELED 1.50 TARGET,
+down from the model's 2.375 premise. The banked prediction (3.15-3.87 TF/s = V0's measured
+1.989-2.444 x 152/96) double-counts a gain that was already banked inside V0's measured
+band; there is nothing left to delete (ceil of the class: -1 addressing mul/(g,v), ~1%).
+
+FINDING 2 — the restructured body trips its own pre-registered resourcing bar (RED before
+any window). The explicit pw0/pw1 arrays took the scheduler's freedom away from LLVM's own
+fission/interleave: 256 VGPR (full cap, 1 block/CU) + 884 B scratch + 611 waits vs V0's
+128 / 80 B / 212 at 2 blocks/CU. Bar (work order step 3 + §5 step 0): "VGPR <= V0+~10, 0
+spills; ANY scratch/spill op in the loop body = RED" — tripped at 256/884 B. Same death
+class as the madmix FLUSH/wpair arms (256 VGPR + spill) and the pk resourcing death: the
+2-CTA/CU occupancy V0 keeps is the resource the whole family keeps losing.
+
+PRE-REGISTERED BRANCH FIRED (GEMM_LEANMAC §5 step 0, quoted): "~8 v_mul (already hoisted)
+=> NO BUILD — the census model was wrong about the wall (V0 already issues ~96; its
+0.28-0.34-of-model gap is LDS-port/barrier class) => post-mortem desk, the fp32-restructure
+family closes without a window." Measured V0 = 9 v_mul/(g,v) => branch condition met
+exactly. Work order step 3: "bench only if it clears the census bar" => step 4 (bench) and
+the step-5 perf gates (>=1.4x PASS / 1.2-1.4 AMBER / <1.2 KILL) never activated; the
+census verdict IS the work order's kill-switch outcome.
+
+VERDICT: KILL — census class, no window, no bench. The fp32 op-count-reduction GEMM family
+(LEANMAC) closes at the desk per its own pre-registered branch. The GEMM front on
+gfx900/ROCm 6.2 remains at the W7_pk16/W7_madmix measured floor (no software GEMM lever;
+REV2 additive path stands; 300+ tok/s requires the hardware/compiler reopeners — gfx906
+dot10, ROCm wait-emission change). The V0 2.0-2.4 TF/s measured band is now EXPLAINED, not
+open: it is a ~1.5-ops/MAC issue stream (the model's 4.54 TF/s x the 0.44-0.54 silicon
+efficiency = LDS-port/barrier/wait floor, exactly the R1 post-mortem the doc reserved).
+
+POST-MORTEM NOTE (owed by the branch): the census doc's §1 ledger was SOURCE-static and
+correct about the SOURCE (V0's C++ does re-issue the product per element); what it missed
+is that the -O3 production toolchain had already performed the desk's design. "Count ops on
+the ISA, never on the source, before pricing a lever" — the same lesson HFMA2_notes §static
+ISA encoded (S5 kept 34 v_mul alive where the source showed 96); this row is its second
+witness, and the second time the static-source method would have burned a window on a
+already-banked gain. The two numbers the doc could not settle are settled: LLVM already
+hoists (9 v_mul/(g,v) = yes, including v_bfe for the code extract, 33/body), and the
+restructure does not merely buy nothing — as written it costs a resourcing class.
+
+FILES: tools/v340l/wo_leanmac_bench.cu (bench TU + leanmac arm; header carries the verdict
+  stamp — DO NOT run without re-censusing), tools/v340l/w3_census.py (unchanged),
+  results/amd/coherence/WO_LEANMAC_census_V0_80_128.txt, WO_LEANMAC_census_V0_96_128.txt,
+  WO_LEANMAC_census_leanmac_arm.txt, WO_LEANMAC_V0_80_128_body.s.extract.txt (the 3462-line
+  body extract with the 1024-FMA inner loop + pw multiplicands, the row's primary receipt).
+  /tmp/leanmac_census/* (23 MB .s) are throwaways — cleaned.

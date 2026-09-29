@@ -1,0 +1,11 @@
+== ARM B WEDGE EVIDENCE 20:26:20Z:
+    PID     ELAPSED %CPU NLWP
+  65086       17:07  100   21
+GPU[0]		: GPU use (%): 100
+GPU[1]		: GPU use (%): 100
+GPU[2]		: GPU use (%): 100
+GPU[3]		: GPU use (%): 0
+log tail:
+[2026-09-17 15:09:32.448] [info] ninfer-serve: model loaded in 19.5669 s
+[2026-09-17 15:09:32.448] [info] ninfer-serve: KV capacity explicit resolved=36352 tokens pages=0/0 runtime=0.00 MiB free-after-weights=0.00 MiB free-after-startup=0.00 MiB headroom=0.00 MiB slack=0.00 MiB graphs=0.00 MiB/0.00 MiB
+[2026-09-17 15:09:32.448] [info] ninfer-serve: warming up...

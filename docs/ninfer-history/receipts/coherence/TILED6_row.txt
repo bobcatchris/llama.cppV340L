@@ -1,0 +1,4 @@
+== MANIFEST 2026-09-17T19:28:31Z TILED6 race-fix certification: bin 409450b83ffa4be8 (thread-local tiled-verify buffers), N7 flags + DRAFT_VOCAB env
+KFD=0
+0
+== TILED6 CERTIFIED 14:3xZ: race-fix binary 409450b83ffa4be8 (thread-local tiled-verify buffers) — battery GREEN (ladder PASS, sideband banked), rounds healthy (acc 0.53-0.58), KFD=0. The dead-agent's uncommitted dispatch fix = the server-crash root cause (shared statics raced across 4 rank threads; cudaFreeHost resize crash mid-ladder = the user-facing reboot). /tmp request files lost in reboot — BLUE re-probe deferred to next window (ladder legs already cover the class).

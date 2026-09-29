@@ -1,0 +1,30 @@
+{
+  "arm": "V1 v1-flag (campaign line + --spec-mtp-device ROCm3, STRICT unset)",
+  "phase": "boot-ready",
+  "stamp": "20260922_141309",
+  "map": "HIP0=card1 HIP1=card3 HIP2=card0 HIP3=card4",
+  "dies": [
+    {
+      "card": "card1",
+      "vram_used_mib": 7074.8
+    },
+    {
+      "card": "card3",
+      "vram_used_mib": 7052.9
+    },
+    {
+      "card": "card0",
+      "vram_used_mib": 7105.0
+    },
+    {
+      "card": "card4",
+      "vram_used_mib": 1440.8
+    }
+  ],
+  "labels": [
+    "HIP0",
+    "HIP1",
+    "HIP2",
+    "HIP3"
+  ]
+}

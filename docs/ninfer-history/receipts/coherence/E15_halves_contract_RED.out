@@ -1,0 +1,13 @@
+MISMATCH low2bfloat16: in=(3f40,3f40) got=467d want=3f40
+MISMATCH low2bfloat162.low: in=(3f40,3f40) got=468d want=3f40
+MISMATCH low2bfloat162.high: in=(3f40,3f40) got=467d want=3f40
+MISMATCH high2bfloat162.low: in=(3f40,3f40) got=467d want=3f40
+MISMATCH lowhigh2highlow.low: in=(3f40,3f40) got=467d want=3f40
+MISMATCH low2bfloat16: in=(3f40,3f80) got=467d want=3f40
+MISMATCH low2bfloat162.low: in=(3f40,3f80) got=468d want=3f40
+MISMATCH low2bfloat162.high: in=(3f40,3f80) got=467d want=3f40
+MISMATCH high2bfloat162.low: in=(3f40,3f80) got=467e want=3f80
+MISMATCH lowhigh2highlow.low: in=(3f40,3f80) got=467e want=3f80
+MISMATCH low2bfloat16: in=(3f40,bf40) got=467d want=3f40
+MISMATCH low2bfloat162.low: in=(3f40,bf40) got=468d want=3f40
+FAIL bf16_halves_contract (256 cases x 8 assertions, 1200 mismatches)

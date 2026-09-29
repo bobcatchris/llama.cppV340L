@@ -1,0 +1,21 @@
+== /tmp/combo_slice.log: 9461 timeline events ==
+device blocking (inside graph_compute):
+  verify issue (ctx_tgt, 4 tok)      n=42   mean  176.117  med  167.481  p10  165.155  p90  176.973
+  catchup issue (ctx_dft, 4 tok)     n=42   mean   12.323  med   12.389  p10   11.515  p90   12.757
+  process line (proc total)          n=42   mean   14.575  med   14.651  p10   13.760  p90   14.992
+  draft step issue/step              n=42   mean    2.447  med    2.398  p10    2.324  p90    2.525
+host gaps:
+  G1: draft line -> verify entry     n=41   mean    0.840  med    0.154  p10    0.151  p90    0.163
+  G2: verify drain -> catchup entry  n=42   mean   -1.623  med   -1.627  p10   -1.745  p90   -1.577
+  G3: proc line -> step1 entry       n=42   mean    1.002  med    0.999  p10    0.964  p90    1.070
+other:
+  verify build                       n=42   mean    0.030  med    0.000  p10    0.000  p90    0.000
+  verify inputs                      n=42   mean    0.043  med    0.042  p10    0.041  p90    0.046
+  outputs extract (4 rows)           n=42   mean    0.061  med    0.060  p10    0.059  p90    0.063
+  verify drain                       n=42   mean    1.899  med    1.895  p10    1.865  p90    2.011
+  draft sample+batch/step            n=42   mean    0.056  med    0.055  p10    0.052  p90    0.061
+  draft total                        n=42   mean   10.348  med   10.183  p10    9.963  p90   10.585
+  round wall (draft line deltas)     n=41   mean  201.543  med  193.283  p10  190.789  p90  198.788
+
+  median budget: wall 193.3 = verify 167.5 + catchup 12.4 + draft 10.2 + G1 0.2 + G2 -1.63 + G3 1.00 + outputs/drain 1.96 -> residual 1.75
+

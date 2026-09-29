@@ -1,0 +1,85 @@
+WORLD x MTP sweep @-c4096, ASCII-P1M GGUF, q4_0 KV, FA on, 2075-tok prompt 06:17:09
+=== TP2 spec=none 06:17:09 ===
+TP2/none: pp 96.3 | decode 9.65 | gen 78
+=== TP2 spec=draft-mtp 06:17:46 ===
+Traceback (most recent call last):
+  File "<string>", line 3, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+=== TP3 spec=none 06:17:57 ===
+TP3/none: pp 88.0 | decode 9.75 | gen 78
+=== TP3 spec=draft-mtp 06:18:36 ===
+TP3/draft-mtp: pp 84.7 | decode 12.33 | gen 83
+draft acceptance = 0.60920 (   53 accepted /    87 generated), mean len =  2.83
+=== TP4 spec=none 06:19:14 ===
+TP4/none: pp 83.4 | decode 9.53 | gen 78
+=== TP4 spec=draft-mtp 06:19:58 ===
+TP4/draft-mtp: pp 80.8 | decode 12.04 | gen 83
+draft acceptance = 0.60920 (   53 accepted /    87 generated), mean len =  2.83
+NINFER RESTORED OK 06:22:17
+SWEEP DONE 06:22:17
+=== TP2 draft-mtp RETRY -c4096 06:23:00 ===
+Traceback (most recent call last):
+  File "<string>", line 3, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+NINFER RESTORED OK
+RETRY DONE
+=== TENSOR-split cells, MTP on 07:07:22 ===
+--- TP2-tensor-MTP (bs=256, ub=128) 07:07:22 ---
+TP2-tensor-MTP: pp 81.1 | decode 16.87 | gen 48
+draft acceptance = 0.64583 (   31 accepted /    48 generated), mean len =  2.94
+--- TP3-tensor-MTP (bs=384, ub=128) 07:08:01 ---
+Traceback (most recent call last):
+  File "<string>", line 3, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+=== TENSOR-split cells, MTP on 07:08:34 ===
+--- TP2-tensor-MTP (bs=256, ub=128) 07:08:34 ---
+TP2-tensor-MTP: pp 81.8 | decode 16.7 | gen 48
+draft acceptance = 0.64583 (   31 accepted /    48 generated), mean len =  2.94
+--- TP3-tensor-MTP (bs=512, ub=128) 07:09:13 ---
+TP3-tensor-MTP: pp 96.9 | decode 17.78 | gen 26
+draft acceptance = 0.70833 (   17 accepted /    24 generated), mean len =  3.12
+NINFER RESTORED OK 07:10:57
+T2T3 DONE
+NINFER RESTORED OK 07:11:15
+T2T3 DONE
+=== TP3 TENSOR bs256/ub128 + MTP 07:22:28 ===
+TP3 bs256/ub128: pp 96.5 | decode 17.78 | gen 26
+draft acceptance = 0.70833 (   17 accepted /    24 generated), mean len =  3.12
+=== TP4 TENSOR bs256/ub128 + MTP 07:23:14 ===
+TP4 bs256/ub128: pp 84.1 | decode 15.53 | gen 25
+draft acceptance = 0.66667 (   16 accepted /    24 generated), mean len =  3.00
+NINFER RESTORED OK 07:25:01
+UB256 SWEEP DONE

@@ -1,0 +1,128 @@
+=== WO_FP8_RING runner start 2026-09-19T15:47:12-0500 host=chris-MS-7D28 mode=both ===
+--- pre 2026-09-19T15:47:12-0500 ---
+/dev/sda2       116G  105G  5.9G  95% /
+GPU[0]		: GPU use (%): 0
+GPU[1]		: GPU use (%): 0
+GPU[2]		: GPU use (%): 0
+GPU[3]		: GPU use (%): 0
+GPU[0]		: sclk clock level: 0: (300Mhz)
+GPU[1]		: sclk clock level: 0: (300Mhz)
+GPU[2]		: sclk clock level: 0: (300Mhz)
+GPU[3]		: sclk clock level: 0: (300Mhz)
+592343 /home/chris/artifacts_bin/ninfer-serve_73eecb3370b6334e.bin /home/chris/models/qwen3_8_27b_nvfp4.ninfer --port 8100 --devices 0,1,2,3 --prefill-chunk 128 --no-prefix-reuse --prefix-cache-capacity 256 --greedy --default-max-tokens 16 --allow-nvfp4-weights --max-context 8192 --kv-capacity 8192 --kv-dtype kvarn_k4v4
+WINDOW UP — a ninfer-serve process is live (k4v4 first boots). NOTHING launched.
+Re-run when the window drops. Desk file: docs/amd/WO_FP8_ON_RING_desk.md
+=== WO_FP8_RING runner start 2026-09-19T16:18:24-0500 host=chris-MS-7D28 mode=both ===
+--- pre 2026-09-19T16:18:24-0500 ---
+/dev/sda2       116G  105G  5.4G  96% /
+GPU[0]		: GPU use (%): 0
+GPU[1]		: GPU use (%): 0
+GPU[2]		: GPU use (%): 0
+GPU[3]		: GPU use (%): 0
+GPU[0]		: sclk clock level: 0: (300Mhz)
+GPU[1]		: sclk clock level: 0: (300Mhz)
+GPU[2]		: sclk clock level: 0: (300Mhz)
+GPU[3]		: sclk clock level: 0: (300Mhz)
+BUILD OK 55039812b9030cb8
+--- run mode=staged HIP_VISIBLE_DEVICES=2,3 16:18:26 ---
+HEADER mode=staged ndev_visible=2 vrankmap=0:0,1:1,2:0,3:1
+ROW kind=verify arm=stage-R dist=0 bytes=1310720 (uniform) maxabs=7.883 maxrel=1 relL2=1 big=634822 crossrank=0
+ROW kind=verify arm=stage-FR dist=0 bytes=1310720 (uniform) maxabs=7.883 maxrel=1 relL2=1 big=634822 crossrank=0
+ROW kind=verify arm=stage-FS dist=0 bytes=1310720 (uniform) maxabs=7.883 maxrel=1 relL2=1 big=634822 crossrank=0
+ROW kind=falsifier arm=stage-FS dist=0 bytes=1310720 maxabs=7.883 verdict=CAUGHT
+ROW kind=verify arm=stage-R dist=1 bytes=1310720 (kappa0) maxabs=76.58 maxrel=1 relL2=1 big=639092 crossrank=0
+ROW kind=verify arm=stage-FR dist=1 bytes=1310720 (kappa0) maxabs=76.58 maxrel=1 relL2=1 big=639092 crossrank=0
+ROW kind=verify arm=stage-FS dist=1 bytes=1310720 (kappa0) maxabs=76.58 maxrel=1 relL2=1 big=639092 crossrank=0
+ROW kind=verify arm=stage-R dist=2 bytes=1310720 (kappa1) maxabs=148.5 maxrel=1 relL2=1 big=648021 crossrank=0
+ROW kind=verify arm=stage-FR dist=2 bytes=1310720 (kappa1) maxabs=148.5 maxrel=1 relL2=1 big=648021 crossrank=0
+ROW kind=verify arm=stage-FS dist=2 bytes=1310720 (kappa1) maxabs=148.5 maxrel=1 relL2=1 big=648021 crossrank=0
+ROW kind=verify arm=stage-R dist=3 bytes=1310720 (kappa3) maxabs=257.8 maxrel=1 relL2=1 big=651446 crossrank=0
+ROW kind=verify arm=stage-FR dist=3 bytes=1310720 (kappa3) maxabs=257.8 maxrel=1 relL2=1 big=651446 crossrank=0
+ROW kind=verify arm=stage-FS dist=3 bytes=1310720 (kappa3) maxabs=257.8 maxrel=1 relL2=1 big=651446 crossrank=0
+ROW kind=ar arm=stage-R dist=0 bytes=1310720 run=1 mean_us=286.62 med_us=286.07 p5_us=279.99 p95_us=293.54 wire_gbs=54.982
+ROW kind=ar arm=stage-R dist=0 bytes=1310720 run=2 mean_us=283.81 med_us=284.43 p5_us=276.44 p95_us=289.78 wire_gbs=55.299
+ROW kind=ar arm=stage-FR dist=0 bytes=1310720 run=1 mean_us=1055.33 med_us=1048.58 p5_us=1039.03 p95_us=1078.53 wire_gbs=3.750
+ROW kind=ar arm=stage-FR dist=0 bytes=1310720 run=2 mean_us=1049.08 med_us=1045.75 p5_us=1037.59 p95_us=1069.73 wire_gbs=3.760
+ROW kind=ar arm=stage-FS dist=0 bytes=1310720 run=1 mean_us=136.99 med_us=136.75 p5_us=135.96 p95_us=138.15 wire_gbs=47.924
+ROW kind=ar arm=stage-FS dist=0 bytes=1310720 run=2 mean_us=141.19 med_us=136.74 p5_us=135.84 p95_us=163.01 wire_gbs=47.929
+ROW kind=ar arm=stage-R dist=0 bytes=1500000 run=1 mean_us=277.85 med_us=273.70 p5_us=267.86 p95_us=300.59 wire_gbs=65.766
+ROW kind=ar arm=stage-R dist=0 bytes=1500000 run=2 mean_us=273.96 med_us=273.06 p5_us=264.83 p95_us=290.91 wire_gbs=65.918
+ROW kind=ar arm=stage-FR dist=0 bytes=1500000 run=1 mean_us=1046.61 med_us=1046.26 p5_us=1039.54 p95_us=1055.29 wire_gbs=4.301
+ROW kind=ar arm=stage-FR dist=0 bytes=1500000 run=2 mean_us=1046.99 med_us=1046.07 p5_us=1039.79 p95_us=1057.51 wire_gbs=4.302
+ROW kind=ar arm=stage-FS dist=0 bytes=1500000 run=1 mean_us=137.73 med_us=137.47 p5_us=135.95 p95_us=139.67 wire_gbs=54.557
+ROW kind=ar arm=stage-FS dist=0 bytes=1500000 run=2 mean_us=136.95 med_us=136.84 p5_us=136.06 p95_us=137.85 wire_gbs=54.810
+DONE
+--- rc=0 mode=staged ---
+--- run mode=rccl HIP_VISIBLE_DEVICES=0,1,2,3 16:18:27 ---
+HEADER mode=rccl ndev_visible=4 vrankmap=0:0,1:1,2:2,3:3
+ROW kind=anchor status=init_ok world=4 devs=0,1,2,3
+ROW kind=verify arm=rig-RING dist=0 bytes=1310720 maxabs=0.03906 maxrel=7.812e+06 relL2=0.002612 big=0 crossrank=0 t1call_us=1118.60
+ROW kind=verify arm=rig-I8P dist=0 bytes=1310720 maxabs=0.1719 maxrel=6.25e+07 relL2=0.01624 big=33568 crossrank=0 t1call_us=2205.36
+ROW kind=falsifier arm=rig-I8P dist=0 bytes=1310720 maxabs=4.109 t1call_us=795.76 verdict=CAUGHT
+ROW kind=verify arm=rig-RING dist=1 bytes=1310720 maxabs=0.375 maxrel=3.125e+07 relL2=0.002682 big=0 crossrank=0 t1call_us=1116.38
+ROW kind=verify arm=rig-I8P dist=1 bytes=1310720 maxabs=2.699 maxrel=6.914e+08 relL2=0.02966 big=180599 crossrank=0 t1call_us=799.90
+ROW kind=verify arm=rig-RING dist=2 bytes=1310720 maxabs=0.625 maxrel=6.25e+07 relL2=0.002511 big=0 crossrank=0 t1call_us=1129.46
+ROW kind=verify arm=rig-I8P dist=2 bytes=1310720 maxabs=2.938 maxrel=9.062e+08 relL2=0.01603 big=149424 crossrank=0 t1call_us=842.68
+ROW kind=verify arm=rig-RING dist=3 bytes=1310720 maxabs=1.125 maxrel=1.562e+07 relL2=0.002451 big=0 crossrank=0 t1call_us=1139.84
+ROW kind=verify arm=rig-I8P dist=3 bytes=1310720 maxabs=3.875 maxrel=3.477e+08 relL2=0.01082 big=104829 crossrank=0 t1call_us=760.88
+ROW kind=ar arm=rig-RING dist=0 bytes=1310720 run=1 mean_us=846.21 med_us=846.81 p5_us=833.94 p95_us=857.45 wire_gbs=18.574
+ROW kind=ar arm=rig-RING dist=0 bytes=1310720 run=2 mean_us=842.20 med_us=844.16 p5_us=823.83 p95_us=852.24 wire_gbs=18.632
+ROW kind=ar arm=rig-I8P dist=0 bytes=1310720 run=1 mean_us=518.65 med_us=523.81 p5_us=496.54 p95_us=531.03 wire_gbs=7.507
+ROW kind=ar arm=rig-I8P dist=0 bytes=1310720 run=2 mean_us=516.25 med_us=519.45 p5_us=495.78 p95_us=530.94 wire_gbs=7.570
+ROW kind=ar arm=rig-RING dist=0 bytes=1500000 run=1 mean_us=942.06 med_us=942.11 p5_us=917.08 p95_us=956.12 wire_gbs=19.106
+ROW kind=ar arm=rig-RING dist=0 bytes=1500000 run=2 mean_us=941.71 med_us=942.57 p5_us=927.46 p95_us=952.65 wire_gbs=19.097
+ROW kind=ar arm=rig-I8P dist=0 bytes=1500000 run=1 mean_us=572.35 med_us=572.66 p5_us=557.22 p95_us=589.67 wire_gbs=7.858
+ROW kind=ar arm=rig-I8P dist=0 bytes=1500000 run=2 mean_us=573.81 med_us=576.54 p5_us=558.68 p95_us=583.41 wire_gbs=7.805
+ROW kind=verify arm=rig-FP8 dist=0 bytes=1310720 maxabs=4.003 maxrel=1.25e+08 relL2=0.05506 big=258010 crossrank=0 t1call_us=1923.27
+ROW kind=verify arm=rig-FP8 dist=1 bytes=1310720 maxabs=16 maxrel=5e+08 relL2=0.05343 big=271893 crossrank=0 t1call_us=2044.13
+ROW kind=verify arm=rig-FP8 dist=2 bytes=1310720 maxabs=24.19 maxrel=5e+08 relL2=0.04545 big=334461 crossrank=0 t1call_us=2008.09
+ROW kind=verify arm=rig-FP8 dist=3 bytes=1310720 maxabs=21 maxrel=5e+08 relL2=0.04228 big=368748 crossrank=0 t1call_us=2013.76
+ROW kind=ar arm=rig-FP8 dist=0 bytes=1310720 run=1 mean_us=1381.28 med_us=1394.45 p5_us=1296.18 p95_us=1432.57 wire_gbs=2.820
+ROW kind=ar arm=rig-FP8 dist=0 bytes=1310720 run=2 mean_us=1301.09 med_us=1300.33 p5_us=1285.83 p95_us=1313.72 wire_gbs=3.024
+ROW kind=ar arm=rig-FP8 dist=0 bytes=1500000 run=1 mean_us=1342.32 med_us=1341.82 p5_us=1330.30 p95_us=1354.33 wire_gbs=3.354
+ROW kind=ar arm=rig-FP8 dist=0 bytes=1500000 run=2 mean_us=1340.04 med_us=1339.03 p5_us=1329.75 p95_us=1354.84 wire_gbs=3.361
+ROW kind=gatesummary arm=rig-RING med_run1_us=942.11 med_run2_us=942.57 note=last-timed-size
+ROW kind=gatesummary arm=rig-FP8 med_run1_us=1341.82 med_run2_us=1339.03 note=last-timed-size
+ROW kind=gatesummary arm=rig-I8P med_run1_us=572.66 med_run2_us=576.54 note=last-timed-size
+ROW kind=gate note=G-FP8-0 bar 419.9us@1.31MB 500.9us@1.5MB (0.65x646/771); G-FP8-1 relL2<=1e-2 at kappa=1 (nominal) + falsifier CAUGHT; evaluated from ROW kind=ar / ROW kind=verify by the desk runner
+DONE
+--- rc=0 mode=rccl ---
+--- post 2026-09-19T16:18:29-0500 ---
+/dev/sda2       116G  105G  5.4G  96% /
+GPU[0]		: GPU use (%): 0
+GPU[1]		: GPU use (%): 0
+GPU[2]		: GPU use (%): 0
+GPU[3]		: GPU use (%): 0
+GPU[0]		: sclk clock level: 0: (300Mhz)
+GPU[1]		: sclk clock level: 0: (300Mhz)
+GPU[2]		: sclk clock level: 0: (300Mhz)
+GPU[3]		: sclk clock level: 0: (300Mhz)
+638456 /bin/bash -c . '/home/chris/.zcode/cli/exec/shell-snapshots/snapshot-bash-1789825165470-tmtng8.sh' 2>/dev/null || true . '/home/chris/.zcode/cli/exec/bash-startup/sess_subagent_agent_2fb24ddc-7060-4021-9ba0-9423b93b40fe/embedded-search-startup-f8fe4738bcd3f3d2.sh' if pgrep -f "^/home/chris/artifacts_bin/ninfer-serve" >/dev/null; then echo "WINDOW UP"; else sleep 5; if pgrep -f "^/home/chris/artifacts_bin/ninfer-serve" >/dev/null; then echo "WINDOW CAME BACK"; else echo "WINDOW DOWN - firing"; fi; fi __zcode_status=$? if [ "$__zcode_status" -eq 0 ]; then pwd -P > '/tmp/zcode-ba35f722-ac63-4eec-b76c-910d4fd69ce0-cwd'; fi exit "$__zcode_status"
+=== WO_FP8_RING runner end 2026-09-19T16:18:29-0500 ===
+HEADER mode=staged ndev_visible=2 vrankmap=0:0,1:1,2:0,3:1
+ROW kind=verify arm=stage-R dist=0 bytes=1310720 (uniform) maxabs=0.03906 maxrel=7.812e+06 relL2=0.002604 big=0 crossrank=0
+ROW kind=verify arm=stage-FR dist=0 bytes=1310720 (uniform) maxabs=7.781 maxrel=4e+09 relL2=0.7503 big=525027 crossrank=651728
+ROW kind=verify arm=stage-FS dist=0 bytes=1310720 (uniform) maxabs=0.2812 maxrel=1.426e+08 relL2=0.02556 big=99714 crossrank=0
+ROW kind=falsifier arm=stage-FS dist=0 bytes=1310720 maxabs=2.141 verdict=CAUGHT
+ROW kind=verify arm=stage-R dist=1 bytes=1310720 (kappa0) maxabs=0.4116 maxrel=3.125e+07 relL2=0.002683 big=0 crossrank=0
+ROW kind=verify arm=stage-FR dist=1 bytes=1310720 (kappa0) maxabs=76.58 maxrel=1.062e+10 relL2=0.7516 big=528145 crossrank=655225
+ROW kind=verify arm=stage-FS dist=1 bytes=1310720 (kappa0) maxabs=2.625 maxrel=5.195e+08 relL2=0.02642 big=110531 crossrank=0
+ROW kind=verify arm=stage-R dist=2 bytes=1310720 (kappa1) maxabs=0.625 maxrel=6.25e+07 relL2=0.002505 big=0 crossrank=0
+ROW kind=verify arm=stage-FR dist=2 bytes=1310720 (kappa1) maxabs=146.1 maxrel=6.844e+09 relL2=0.6876 big=555172 crossrank=655323
+ROW kind=verify arm=stage-FS dist=2 bytes=1310720 (kappa1) maxabs=3.75 maxrel=5.469e+08 relL2=0.01678 big=111008 crossrank=0
+ROW kind=verify arm=stage-R dist=3 bytes=1310720 (kappa3) maxabs=1.25 maxrel=7.812e+06 relL2=0.002466 big=0 crossrank=0
+ROW kind=verify arm=stage-FR dist=3 bytes=1310720 (kappa3) maxabs=213.2 maxrel=3.391e+09 relL2=0.6781 big=569011 crossrank=655350
+ROW kind=verify arm=stage-FS dist=3 bytes=1310720 (kappa3) maxabs=6.5 maxrel=2.471e+08 relL2=0.01442 big=106892 crossrank=0
+ROW kind=ar arm=stage-R dist=0 bytes=1310720 run=1 mean_us=2537.01 med_us=2530.99 p5_us=2516.90 p95_us=2568.11 wire_gbs=6.214
+ROW kind=ar arm=stage-R dist=0 bytes=1310720 run=2 mean_us=2532.26 med_us=2522.07 p5_us=2513.58 p95_us=2569.46 wire_gbs=6.236
+ROW kind=ar arm=stage-FR dist=0 bytes=1310720 run=1 mean_us=3869.33 med_us=3865.62 p5_us=3848.59 p95_us=3899.57 wire_gbs=1.017
+ROW kind=ar arm=stage-FR dist=0 bytes=1310720 run=2 mean_us=3863.35 med_us=3861.29 p5_us=3851.45 p95_us=3878.78 wire_gbs=1.018
+ROW kind=ar arm=stage-FS dist=0 bytes=1310720 run=1 mean_us=3163.16 med_us=3164.19 p5_us=3132.02 p95_us=3191.62 wire_gbs=2.071
+ROW kind=ar arm=stage-FS dist=0 bytes=1310720 run=2 mean_us=3159.64 med_us=3159.88 p5_us=3136.10 p95_us=3185.05 wire_gbs=2.074
+ROW kind=ar arm=stage-R dist=0 bytes=1500000 run=1 mean_us=2857.51 med_us=2853.59 p5_us=2845.31 p95_us=2885.28 wire_gbs=6.308
+ROW kind=ar arm=stage-R dist=0 bytes=1500000 run=2 mean_us=2875.14 med_us=2869.82 p5_us=2847.67 p95_us=2930.17 wire_gbs=6.272
+ROW kind=ar arm=stage-FR dist=0 bytes=1500000 run=1 mean_us=4271.69 med_us=4267.84 p5_us=4226.34 p95_us=4327.23 wire_gbs=1.054
+ROW kind=ar arm=stage-FR dist=0 bytes=1500000 run=2 mean_us=4271.44 med_us=4264.67 p5_us=4238.37 p95_us=4319.80 wire_gbs=1.055
+ROW kind=ar arm=stage-FS dist=0 bytes=1500000 run=1 mean_us=3595.39 med_us=3593.28 p5_us=3570.43 p95_us=3630.70 wire_gbs=2.087
+ROW kind=ar arm=stage-FS dist=0 bytes=1500000 run=2 mean_us=3612.76 med_us=3610.66 p5_us=3576.22 p95_us=3656.61 wire_gbs=2.077
+DONE

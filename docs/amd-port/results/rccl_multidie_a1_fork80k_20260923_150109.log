@@ -1,0 +1,5 @@
+rccl_multidie_probe: fork mode, world 4, dies 0 1 2 3, ne 20480 (80 KB fp32), iters 2000, burst 256, pid 336290
+unknown arg --rank
+unknown arg --rank
+unknown arg --rank
+unknown arg --rank

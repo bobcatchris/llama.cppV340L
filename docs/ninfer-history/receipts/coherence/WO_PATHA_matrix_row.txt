@@ -1,0 +1,103 @@
+=== PATH A MATRIX Sat Sep 19 12:10:16 PM CDT 2026 | bin 2c8901d3 | NVMe model | probes: 3x plen-2075 mt64
+=== PATH A MATRIX Sat Sep 19 12:10:38 PM CDT 2026 | bin 2c8901d3 | NVMe model | probes: 3x plen-2075 mt64
+cfg 128/off: walls= 18.43 18.63 18.80
+cfg 128/on: walls= 20.13 24.17 26.94
+cfg 256/off: walls= 1.22 PARITY-FAIL
+cfg 256/on: walls= 1.21 PARITY-FAIL
+cfg 512/off: walls= 2.32 PARITY-FAIL
+cfg 512/on: walls= 2.31 PARITY-FAIL
+=== MATRIX DONE Sat Sep 19 12:16:01 PM CDT 2026 — restoring canonical via serve_fast
+=== RESTORED: FAST PROBE: PASS wall=23.2s finish=stop
+
+=== VERDICTS (coordinator, post-matrix) ===
+G-GRAPH: FAIL — retry CONFIRMS the kill, worse: 128/on degrades 20.13 -> 24.17 -> 26.94 s
+  across identical probes (capture-cache pathology), baseline 128/off stable 18.43-18.80.
+  Graph capture stays dead; the degradation is itself a finding (re-capture per probe?).
+G-LADDER: VRAM-BLOCKED — chunk 256/512 boot but EVERY request dies in ~1.2-2.3 s with
+  std::bad_alloc on 3 ranks (arena exhaustion: 96 MiB workspace is sized for chunk 128).
+  STRUCTURAL FINDING from the preflight composition line (w7_pa_256_off.log):
+  weights 5131 + decoder_fixed 1360 + workspace 96 + staging 200 + padding 160 + hidden 5
+  + kv(36352 cap) 1207 = 8159 of 8176 MiB/die = 17 MiB slack. THE DIE IS VRAM-PACKED.
+  llama.cpp layer-split dies run 3.8 GB/die FREE — that is why M=2048 GEMMs are possible
+  there and bad_alloc here. The M=128 ceiling's root constraint is the VRAM BUDGET, not
+  the kernel.
+CONSEQUENCE CHAIN: chunk ladder + big-M prefill REQUIRE freed VRAM per die. Funding paths
+  (ranked): hosted-KV Phase 2 (frees KV VRAM; Phase 1 bar already cleared), KV cap trade
+  (36352 -> lower, product decision), layer-split (parked, frees nothing vs tensor-split
+  on weights but changes activation residency). Until one lands: M=128 is the ceiling and
+  the AR cure (copy-add/fp8) is the only free prefill lever (its 123->50 ms does not need
+  VRAM). ELEVATED: hosted-KV Phase 2 priority (VRAM-funder for the chunk ladder).
+
+=== GAP BIMODALITY CHARACTERIZED (inline analysis of banked OPTRACE logs) ===
+arfix boot steady-state (rank=0, consecutive chunks of one request): gaps alternate in
+STRICT PAIRS — ~2.5 ms then ~9-13 ms — period 2 chunks, drifting upward (9->17 ms) as the
+box heats. The 9-13 ms chunks carry proportionally larger gemm/ar/body TOO (whole-chunk
+cost mode), NOT a launch-path-only artifact. Earlier boots match: 13.2/15.7 (pair),
+70.4 (outlier), 14.6 then 37.4/36.7 (pair) — the bimodal 15-vs-69 and 15-vs-37 classes
+are this same mode at different thermal states.
+LEADING SUSPECTS (alternating per-chunk resource cycle): kvarn page-pool allocation
+(chunk 128 = exactly 2 pages of 64 — boundary-crossing alternation), per-token scale-table
+update cadence, or allocator arena boundary effects. The V-arm desk's quarantined +70 ms
+excursions and the A7 15-vs-69 signature are this mode.
+NEXT: instrument per-chunk launch counts + pool allocation events during gap-high vs
+gap-low chunks (one instrumented boot names it). VALUE: ~2.5-3.5 ms/chunk recoverable
+(~2-3% prefill) if the high mode flattens to the low mode, plus clean measurements for
+every 5-8% arm.
+
+=== GAP ALTERNATION — n-resolved correction (supersedes the 'pairs' reading) ===
+Clean extraction with the n= field: the arfix boot's per-CHUNK lines (n=1 each) alternate
+strictly — even chunks gap ~2.4-2.5 ms FLAT, odd chunks 10.6->11.4->13.5->17.5 ms RISING
+with depth. The earlier 2.5/9-13 'pairs' and the 57 s lines were n-mixed extraction
+artifacts (warmup requests interleaved). Confirmed structure: a 2-chunk-period alternation
+where odd chunks pay a CONTEXT-GROWING surcharge across gemm/ar/body/gap — i.e. something
+in the odd chunks scales with accumulated context that even chunks don't. Candidate class:
+double-buffered kvarn stage assignment (stage A/B alternate per chunk — stage_scratch
+tile_page/tail_count lifecycle) where one stage's access pattern degrades with KV depth;
+or an odd/even asymmetry in the GDN delta-state handoff. VALUE: flattening odd to even =
+~4-7.5 ms/chunk = ~3-5% prefill, GROWING with context. INSTRUMENT NAMED: per-chunk
+launch/alloc-event log + stage-identity marker (which double-buffer stage served the
+chunk) — one boot with that marker decides stage-vs-depth attribution.
+
+=== GAP ITEM CLOSED — alternation was an EXTRACTION ARTIFACT (2026-09-19 ~16:2x, banked-log analysis, no boot) ===
+Method: request-segmented re-analysis of the SAME arfix log (split [PREFILL-OP]/[PREFILL-BODY]
+streams at chunk-number restart; exclude the final partial chunk; per-request parity stats).
+Both the '2.5/9-13 pairs' and the '10.6->17.5 rising odd surcharge' readings were artifacts of
+extracting consecutive time-sorted lines ACROSS interleaved requests.
+FINDINGS (6 multi-chunk requests x ranks 0+1, self-consistent):
+  1. NO odd/even alternation: even gap 17.5-19.3 vs odd 17-22 ms, walls identical +-0.2%,
+     gemm identical, across every request. There is nothing parity-linked to flatten.
+  2. REAL cost #1 — PER-REQUEST first-chunk gap: chunk 1 pays 305-329 ms hot / 897-908 ms
+     cold, on EVERY request (not boot-once). Priced: ~1.8% of request wall at plen-2075,
+     ~0.4% at 10k. Fix class: pre-touch/warm of the per-request workspace/page path.
+     NEW ITEM (replaces #3 in the queue, priced honestly small).
+  3. REAL cost #2 — thermal drift on walls across back-to-back probes: 987->1034 ms/chunk
+     (gemm 776->818). Known state function; sampler+correlator now exist to sideband it
+     (tools/v340l/w7_gap_clock_sampler.sh + w7_gap_correlate.py — built, parser dry-run OK).
+  4. gqa grows linearly +3.2 ms/chunk with context (4.6->53.3 ms over 16 chunks) — expected
+     attention-vs-depth physics, NOT a defect; it is the honest growing term inside body.
+  5. First-request-only 366 ms upk spike on the final partial chunk (req#2) — lazy
+     first-touch, never repeats on the 4 later identical probes. Amortized by warmup.
+STAGED-SHADOW SUSPECT DEAD: tp2_backend.cpp:1065 pins stage_pages=0 (docs/83 wall);
+has_staged is never true on the serve path — no stage A/B double-buffer exists.
+CONSEQUENCES: VALUE_QUEUE #3 closes (artifact class — no recoverable 3-5%; estimate VOID).
+V-arm re-entry key ('after #3') RESOLVED: measurements were never dirty; the V-arm serving
+loss (+5.7/6.6%) stands as real; closed unless a NEW mechanism arrives (mad-mix census
+learnings remain the named re-attempt class). Clean-measurement blocker for 5-8% arms:
+LIFTED (paired fresh-boot law already handles the real effects: first-chunk + thermal).
+
+=== #3 FIRST-CHUNK INSTRUMENT BUILT + BOOT PROTOCOL (2026-09-19 ~17:0x) ===
+Instrument: [PREFILL-HOST] lines at NINFER_PREFILL_OPTRACE=3 (commit 5d95f60fb, bin
+ninfer-serve_05628598c977e42a.bin banked): host_span (host wall across the chunk launch
+section, mono domain), free_b/free_e (cudaMemGetInfo — a chunk-1 drop names allocation),
+h2d_kb (copy_i32 counter — staged H2D inside the chunk). Depth 1/2 byte-identical.
+BOOT (when window frees; runs BEFORE fp8ar perf legs so every arm gets clean chunk-1s):
+  1. retire EXACT law form; bash serve_fast.sh shape with BIN=<05628598> +
+     NINFER_PREFILL_OPTRACE=3 (canonical env otherwise — bf16 KV, chunk 128).
+  2. start tools/v340l/w7_gap_clock_sampler.sh /tmp/gap_clocks.csv 200 in background.
+  3. fire ONE plen-2075 mt64 probe (single request — the correlator isolates it anyway).
+  4. fire ONE plen-10000 request (depth range + the 78-chunk curve).
+  5. stop sampler; retire; restore canonical serve_fast + health.
+  6. python3 tools/v340l/w7_gap_correlate.py <serve.log> /tmp/gap_clocks.csv --rank 1
+READ: chunk-1 [PREFILL-HOST] vs steady chunks — free_b drop = allocation class;
+h2d_kb spike = prompt-upload class; host_span>>0 with flat free = host-prep class
+(then strace/phase-print follow-up); clocks flat + chunk-1 wall high = launch-path.

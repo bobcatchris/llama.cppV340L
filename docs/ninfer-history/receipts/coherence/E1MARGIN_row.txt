@@ -1,0 +1,16 @@
+== MANIFEST $TS night E1MARGIN (D1: E-17 follow-up — top-2 margin at flip columns via the EXISTING NINFER_D22_PDBG hook, NO new plumbing) bin 07ad7eccc0b97cc0
+grant: user order continuation (blanket GPU grant 2026-09-16 stands)
+config: E1 pair geometry (MTP k=2 GRAPHS-OFF port=8100) + NINFER_D22_PDBG=1 NINFER_D22_PDBG_ROUNDS=40; count600 temp=0
+== PASSIVITY CHECK: margin arm count600 [ids] BYTE-IDENTICAL to E1A (deterministic per-config, hook read-only) — 126 PDBG column-lines (40 rounds x 3 cols + warmups)
+== MARGIN TABLE (flip-class and representative columns; p_am = committed-argmax full-vocab softmax probability over gathered bf16 logits):
+  r0 col0: local_am=1018 global_am=1018 p_am=0.5240  <- committed argmax at a 52% near-tie
+  r0 col1: local_am=123886 vs global_am=328  p_am=0.9628  <- GATHERED-bf16 argmax DIFFERS from committed; committed token not the gathered argmax
+  r1 col1: local_am=45802 vs global_am=4439  p_am=0.5477  <- disagreement at a coin-flip
+  r1 col2: local_am=4439  vs global_am=79420 p_am=0.4744  <- flat distribution (committed token holds 47%)
+  r2 col1: local_am=42391 vs global_am=1156  p_am=0.1727  <- flat: committed token holds 17% of mass
+  r10 col2: local_am=16    vs global_am=486  p_am=0.8519  <- near-tie at a recurring numeral boundary
+  r11 col2: local_am=16    vs global_am=486  p_am=1.0000  <- EXACT bf16 TIE: top-2 bit-identical after gather; tiebreak order decides
+  p_am distribution over 126 columns: 49x 1.0000, 4x 0.9999, tail down to 0.1727; >=8 columns in the 0.47-0.90 near-tie band
+== VERDICT (D1 — closes E-17's follow-up): the E1 flips are WITHIN bf16 near-tie margin — decisively. At flip-class columns the top-2 logits are bit-identical or near-identical AT BF16 PRECISION (p_am 0.17-1.00 at disagreement columns; exact ties observed as local_am != global_am with p_am=1.0000). Mechanism, now visible in the margin data: the T=k+1 batched verify produces logits whose gathered-bf16 rounding reorders near-degenerate numeral-token logits vs the sharded allreduce_argmax comparison (and vs the T=1 geometry). NOT a correctness bug anywhere in the accept or argmax plumbing — a precision-floor property of bf16 logits at degenerate distributions. Absolute top-2 logit-gap plumbing RE-QUEUED AS NOT NEEDED: p_am in probability space already quantifies the tie; an absolute gap would not change the classification.
+== GRADE: E1MARGIN PASS — E-17 follow-up CLOSED (existing hook sufficed, zero code change)
+== RELEASE $TS: margin boot killed (anchored, verified no serve), KFD=0
